@@ -43,6 +43,11 @@ function extractJson(raw) {
       const sendWhenMatch = candidate.match(/"sendWhen"\s*:\s*"((?:\\.|[^"\\])*)"/);
       let sendWhen = "";
       if (sendWhenMatch) { try { sendWhen = JSON.parse('"' + sendWhenMatch[1] + '"'); } catch (_) {} }
+
+      // Se il modello ha troncato il JSON ma ha comunque prodotto le risposte,
+      // non inventiamo un consiglio: lo lasciamo vuoto salvo richiesta esplicita.
+      // Il prompt mette advice/sendWhen all'inizio proprio per farli sopravvivere
+      // anche in caso di output molto lungo.
       return { replies, recommendedIndex, recommendedNormalIndex: normalRecommendedIndex, recommendedSecretIndex: secretRecommendedIndex, recommendationReason: reason, advice, sendWhen };
     }
     throw new Error('Risposta AI non valida.');
@@ -79,7 +84,13 @@ REGOLA SUL MOMENTO IN CUI INVIARE:
 - Devono essere messaggi che riaprono naturalmente il contatto dopo il periodo di silenzio, senza sembrare un inseguimento.
 - Se invece ritieni corretto scrivere oggi, genera normalmente messaggi adatti al momento presente.
 
-Dopo aver generato le 26 alternative, scegli anche una risposta consigliata per ciascuna delle due categorie.
+PRIORITÀ DEL CONSIGLIO:
+Prima di completare le 26 alternative, determina se l'utente ha chiesto un consiglio sul da farsi. Se sì, il consiglio e il momento di invio sono OBBLIGATORI e devono essere inseriti nel JSON prima di "replies".
+- advice: consiglio breve, concreto e specifico alla situazione.
+- sendWhen: indica chiaramente "oggi", "domani", "tra 2 giorni", "tra 3 giorni" o altro intervallo motivato.
+Non lasciare advice vuoto quando l'utente ha chiesto esplicitamente se/ quando scrivere.
+
+Dopo aver determinato advice e sendWhen, scegli anche una risposta consigliata per ciascuna delle due categorie.
 - recommendedNormalIndex: indice di una delle prime 18 risposte normali.
 - recommendedSecretIndex: indice di una delle ultime 8 risposte segrete.
 - recommendedIndex: mantienilo come consiglio generale, scegliendo una delle due.
@@ -92,7 +103,7 @@ GESTIONE DEL CONSIGLIO DELL'UTENTE:
 - Non inventare una richiesta di consiglio quando l'utente non l'ha fatta.
 
 Restituisci SOLO JSON valido, senza markdown, nel formato:
-{"replies":[{"style":"Flirt","text":"..."}, ...],"recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":18,"recommendationReason":"Motivo breve.","advice":"","sendWhen":"oggi"}
+{"advice":"Consiglio concreto.","sendWhen":"domani","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":18,"recommendationReason":"Motivo breve.","replies":[{"style":"Flirt","text":"..."}, ...]}
 
 Il campo "advice" deve essere valorizzato solo quando l'utente ha esplicitamente chiesto un consiglio; altrimenti deve essere una stringa vuota.
 
@@ -143,7 +154,7 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 18000) {
     body: JSON.stringify({
       contents: [{ role: 'user', parts }],
       generationConfig: {
-        maxOutputTokens: 1050,
+        maxOutputTokens: 1350,
         responseMimeType: 'application/json',
         thinkingConfig: {
           thinkingLevel: 'minimal'
