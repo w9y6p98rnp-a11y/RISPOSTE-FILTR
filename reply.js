@@ -37,7 +37,10 @@ function extractJson(raw) {
       const recommendedIndex = Math.min(Math.max(parseInt(idxMatch?.[1] || '0', 10), 0), replies.length - 1);
       const normalRecommendedIndex = (() => { const m = candidate.match(/"recommendedNormalIndex"\s*:\s*(\d+)/); return m ? parseInt(m[1],10) : undefined; })();
       const secretRecommendedIndex = (() => { const m = candidate.match(/"recommendedSecretIndex"\s*:\s*(\d+)/); return m ? parseInt(m[1],10) : undefined; })();
-      return { replies, recommendedIndex, recommendedNormalIndex, recommendedSecretIndex: secretRecommendedIndex, recommendationReason: reason };
+      const adviceMatch = candidate.match(/"advice"\s*:\s*"((?:\\.|[^"\\])*)"/);
+      let advice = "";
+      if (adviceMatch) { try { advice = JSON.parse('"' + adviceMatch[1] + '"'); } catch (_) {} }
+      return { replies, recommendedIndex, recommendedNormalIndex, recommendedSecretIndex: secretRecommendedIndex, recommendationReason: reason, advice };
     }
     throw new Error('Risposta AI non valida.');
   }
@@ -69,14 +72,23 @@ Non inventare dettagli che non sono visibili o presenti nel contesto.
 
 Dopo aver generato le 26 alternative, scegli anche una risposta consigliata per ciascuna delle due categorie.
 - recommendedNormalIndex: indice di una delle prime 18 risposte normali.
-- recommendedSecretIndex: indice di una delle ultime 6 risposte segrete.
+- recommendedSecretIndex: indice di una delle ultime 8 risposte segrete.
 - recommendedIndex: mantienilo come consiglio generale, scegliendo una delle due.
 La scelta deve tenere conto del tono di lei, di ciò che è stato appena detto, della storia della chat e del rischio di risultare fuori luogo o ripetitivi. Non scegliere automaticamente la più audace: scegli quella con la probabilità migliore di far proseguire bene la conversazione. Per le risposte segrete scegli quella più adatta al livello di confidenza mostrato nella conversazione.
 
+GESTIONE DEL CONSIGLIO DELL'UTENTE:
+- Se l'INDICAZIONE DELL'UTENTE chiede esplicitamente un consiglio o una decisione sul da farsi (per esempio "mi consigli se scriverle?", "le mando un altro messaggio?", "devo aspettare?", "non ha risposto, cosa faccio?"), compila anche il campo "advice" con un consiglio breve, concreto e riferito alla situazione visibile nella chat. Questo consiglio deve comparire prima delle risposte nella schermata.
+- Se l'INDICAZIONE DELL'UTENTE chiede solo di cambiare, rifare, rendere più provocatorie, più dolci, più ironiche o comunque modificare le risposte, NON compilare "advice": applica direttamente l'indicazione alle nuove risposte.
+- Se l'INDICAZIONE DELL'UTENTE è vuota, NON dare alcun consiglio extra: genera automaticamente le risposte come al solito.
+- Non inventare una richiesta di consiglio quando l'utente non l'ha fatta.
+
 Restituisci SOLO JSON valido, senza markdown, nel formato:
-{"replies":[{"style":"Flirt","text":"..."}, ...],"recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":18,"recommendationReason":"Spiegazione breve e concreta del perché queste scelte sono adatte al momento."}
+{"replies":[{"style":"Flirt","text":"..."}, ...],"recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":18,"recommendationReason":"Spiegazione breve e concreta del perché queste scelte sono adatte al momento.","advice":""}
+
+Il campo "advice" deve essere valorizzato solo quando l'utente ha esplicitamente chiesto un consiglio; altrimenti deve essere una stringa vuota.
 
 recommendedIndex, recommendedNormalIndex e recommendedSecretIndex sono gli indici numerici delle risposte consigliate nell'array replies, partendo da 0.
+
 
 CONTESTO:
 ${JSON.stringify(context || {})}

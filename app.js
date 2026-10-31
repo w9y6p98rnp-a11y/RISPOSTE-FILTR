@@ -450,6 +450,10 @@ $("generate").onclick=async()=>{
     const normalRecommendedIndex=validIndex(data.recommendedNormalIndex,normalIndexes,normalIndexes[0] ?? recommendedIndex);
     const secretRecommendedIndex=validIndex(data.recommendedSecretIndex,secretIndexes,secretIndexes[0] ?? recommendedIndex);
     const recommendationReason=String(data.recommendationReason||"Questa è quella che si adatta meglio al momento della conversazione.");
+    const aiAdvice=String(data.advice||"").trim();
+    const adviceHtml=aiAdvice
+      ? `<div class="ai-advice-card"><div class="ai-advice-title">💡 Consiglio dell'AI</div><div class="ai-advice-text">${escapeHtml(aiAdvice)}</div></div>`
+      : "";
     const renderCard=(r,i,categoryRecommendedIndex)=>{
       const t=typeof r==="string"?r:(r.text||"");
       const style=typeof r==="string"?"Risposta "+(i+1):(r.style||"Risposta "+(i+1));
@@ -461,7 +465,7 @@ $("generate").onclick=async()=>{
     const orderedSecretIndexes=[secretRecommendedIndex,...secretIndexes.filter(i=>i!==secretRecommendedIndex)];
     const normalCards=orderedNormalIndexes.map(i=>renderCard(replies[i],i,normalRecommendedIndex)).join("");
     const secretCards=orderedSecretIndexes.map(i=>renderCard(replies[i],i,secretRecommendedIndex)).join("");
-    const columns=`<div class="reply-choice-grid">
+    const columns=`${adviceHtml}<div class="reply-choice-grid">
       <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>Flirt, audaci, poetiche, ironiche…</small></span><span class="reply-choice-arrow">›</span></button>
       <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>Erotiche e Hot</small></span><span class="reply-choice-arrow">›</span></button>
     </div>
