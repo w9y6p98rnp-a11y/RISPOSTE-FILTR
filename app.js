@@ -333,7 +333,16 @@ function closeMemoryModal(){
   $("memoryModal").classList.add("hidden");
   memorySelectedGirlId=null;
 }
-$("openMemory").onclick=openMemoryModal;
+
+// Memoria: binding robusto e indipendente dalla ragazza attualmente aperta.
+function bindMemoryButton(){
+  const btn=$("openMemory");
+  if(!btn || btn.dataset.memoryBound==="1") return;
+  btn.dataset.memoryBound="1";
+  btn.addEventListener("click",()=>{ openMemoryModal().catch(err=>{console.error(err);alert("Non riesco ad aprire Cose da ricordare. Ricarica la pagina e riprova."); }); });
+}
+bindMemoryButton();
+
 $("closeMemory").onclick=closeMemoryModal;
 $("cancelMemory").onclick=closeMemoryModal;
 $("memoryModal").addEventListener("click",e=>{if(e.target===$("memoryModal"))closeMemoryModal()});
