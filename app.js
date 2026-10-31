@@ -261,7 +261,7 @@ async function showSelectedImage(e){
 $("screenshotInput")?.addEventListener("change",showSelectedImage);
 $("cameraInput")?.addEventListener("change",showSelectedImage);
 $("chooseScreenshot")?.addEventListener("click",()=> $("screenshotInput").click());
-$("takePhoto")?.addEventListener("click",()=> $("cameraInput").click());
+$("takePhoto")?.addEventListener("click",()=> $("screenshotInput").click());
 
 $("saveMemory").onclick=async()=>{const g=await getGirl(selectedId);g.memory=$("memoryInput").value;g.updatedAt=Date.now();await put("girls",g);await renderGirls();alert("Memoria salvata sul dispositivo.")};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tabpage").forEach(x=>x.classList.add("hidden"));b.classList.add("active");$(b.dataset.tab).classList.remove("hidden")});
