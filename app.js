@@ -60,6 +60,7 @@ function restoreGirlState(id){
   if($("cameraInput")) $("cameraInput").value="";
   $("imageName").textContent=st.imageName||"Nessuno screenshot inserito";
   $("results").innerHTML=st.resultsHtml||"";
+  applySettings();
   document.querySelectorAll(".role").forEach(x=>x.classList.toggle("active",x.dataset.role===currentRole));
   bindResultButtons();
 }
@@ -426,6 +427,7 @@ $("generate").onclick=async()=>{
       return `<div class="reply-card${recommended}"><div class="reply-style">${escapeHtml(style)}${i===recommendedIndex?` <span class="best-badge">Consigliata</span>`:""}</div><div class="reply-text">${escapeHtml(t)}</div><div class="reply-actions"><button class="secondary copy-reply" data-text="${escapeAttr(t)}">Copia</button><button class="secondary save-reply" data-text="${escapeAttr(t)}">Salva come mio messaggio</button></div></div>`;
     }).join("");
     $("results").innerHTML=recommendationHtml+cards;
+    applySettings();
     state.resultsHtml=$("results").innerHTML;
     await persistGirlState(selectedId);
     bindResultButtons();
@@ -442,6 +444,15 @@ $("generate").onclick=async()=>{
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function escapeAttr(s){return escapeHtml(s);}
 
+
+// Impostazioni locali: tema e zoom applicato esclusivamente alle risposte.
+const SETTINGS_KEY="RispostaFlirtSettings";
+function loadSettings(){try{return {...{theme:"dark",replyZoom:100},...(JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"))}}catch(e){return {theme:"dark",replyZoom:100}}}
+function applySettings(){const s=loadSettings();document.body.classList.toggle("light-theme",s.theme==="light");const r=$("results");if(r)r.style.setProperty("--reply-zoom",String((Number(s.replyZoom)||100)/100));document.querySelectorAll(".theme-option").forEach(b=>b.classList.toggle("active",b.dataset.theme===s.theme));if($("replyZoom"))$("replyZoom").value=String(s.replyZoom||100);if($("replyZoomValue"))$("replyZoomValue").textContent=(s.replyZoom||100)+"%";}
+function saveSettings(patch){const next={...loadSettings(),...patch};localStorage.setItem(SETTINGS_KEY,JSON.stringify(next));applySettings()}
+function openSettings(){applySettings();$("settingsModal").classList.remove("hidden")}
+function closeSettings(){$("settingsModal").classList.add("hidden")}
+$("openSettings").onclick=openSettings;$("closeSettings").onclick=closeSettings;$("closeSettingsBottom").onclick=closeSettings;$("settingsModal").addEventListener("click",e=>{if(e.target.id==="settingsModal")closeSettings()});document.querySelectorAll(".theme-option").forEach(b=>b.onclick=()=>saveSettings({theme:b.dataset.theme}));$("replyZoom").addEventListener("input",e=>saveSettings({replyZoom:Number(e.target.value)}));applySettings();
 
 // Avvio dell'app: apre il database prima di usare le funzioni che salvano le ragazze.
 // Senza questa inizializzazione Safari mostrava "Non riesco ad aggiungere la ragazza".
