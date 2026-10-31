@@ -35,7 +35,9 @@ function extractJson(raw) {
       let reason = 'Questa è la risposta che si adatta meglio al tono e al momento della conversazione.';
       if (reasonMatch) { try { reason = JSON.parse('\"' + reasonMatch[1] + '\"'); } catch (_) {} }
       const recommendedIndex = Math.min(Math.max(parseInt(idxMatch?.[1] || '0', 10), 0), replies.length - 1);
-      return { replies, recommendedIndex, recommendationReason: reason };
+      const normalRecommendedIndex = (() => { const m = candidate.match(/"recommendedNormalIndex"\s*:\s*(\d+)/); return m ? parseInt(m[1],10) : undefined; })();
+      const secretRecommendedIndex = (() => { const m = candidate.match(/"recommendedSecretIndex"\s*:\s*(\d+)/); return m ? parseInt(m[1],10) : undefined; })();
+      return { replies, recommendedIndex, recommendedNormalIndex, recommendedSecretIndex: secretRecommendedIndex, recommendationReason: reason };
     }
     throw new Error('Risposta AI non valida.');
   }
@@ -65,12 +67,16 @@ Considera la cronologia e le risposte già inviate per evitare di riproporre le 
 Se lo screenshot contiene più messaggi, interpreta il contesto della conversazione prima di rispondere.
 Non inventare dettagli che non sono visibili o presenti nel contesto.
 
-Dopo aver generato le 21 alternative, scegli UNA sola risposta che ritieni più adatta a quel preciso momento della conversazione. La scelta deve tenere conto del tono di lei, di ciò che è stato appena detto, della storia della chat e del rischio di risultare fuori luogo o ripetitivi. Non scegliere automaticamente la più audace: scegli quella con la probabilità migliore di far proseguire bene la conversazione.
+Dopo aver generato le 24 alternative, scegli anche una risposta consigliata per ciascuna delle due categorie.
+- recommendedNormalIndex: indice di una delle prime 18 risposte normali.
+- recommendedSecretIndex: indice di una delle ultime 6 risposte segrete.
+- recommendedIndex: mantienilo come consiglio generale, scegliendo una delle due.
+La scelta deve tenere conto del tono di lei, di ciò che è stato appena detto, della storia della chat e del rischio di risultare fuori luogo o ripetitivi. Non scegliere automaticamente la più audace: scegli quella con la probabilità migliore di far proseguire bene la conversazione. Per le risposte segrete scegli quella più adatta al livello di confidenza mostrato nella conversazione.
 
 Restituisci SOLO JSON valido, senza markdown, nel formato:
-{"replies":[{"style":"Flirt","text":"..."}, ...],"recommendedIndex":0,"recommendationReason":"Spiegazione breve e concreta del perché questa è la migliore per questo momento."}
+{"replies":[{"style":"Flirt","text":"..."}, ...],"recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":18,"recommendationReason":"Spiegazione breve e concreta del perché queste scelte sono adatte al momento."}
 
-recommendedIndex è l'indice numerico della risposta consigliata nell'array replies, partendo da 0.
+recommendedIndex, recommendedNormalIndex e recommendedSecretIndex sono gli indici numerici delle risposte consigliate nell'array replies, partendo da 0.
 
 CONTESTO:
 ${JSON.stringify(context || {})}

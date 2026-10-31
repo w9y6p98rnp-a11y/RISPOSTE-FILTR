@@ -364,6 +364,18 @@ function bindResultButtons(){
   document.querySelectorAll(".save-reply").forEach(b=>b.onclick=async()=>{
     await saveReplyToChat(b.dataset.text);
   });
+  document.querySelectorAll(".reply-choice").forEach(b=>b.onclick=()=>{
+    const target=$(b.dataset.target);
+    if(!target) return;
+    target.classList.toggle("hidden");
+    b.classList.toggle("selected",!target.classList.contains("hidden"));
+    if(!target.classList.contains("hidden")) setTimeout(()=>target.scrollIntoView({behavior:"smooth",block:"start"}),50);
+  });
+  document.querySelectorAll(".reply-panel-close").forEach(b=>b.onclick=()=>{
+    const target=$(b.dataset.closePanel);
+    if(target) target.classList.add("hidden");
+    document.querySelectorAll(`.reply-choice[data-target="${b.dataset.closePanel}"]`).forEach(c=>c.classList.remove("selected"));
+  });
 }
 
 $("generate").onclick=async()=>{
@@ -419,24 +431,36 @@ $("generate").onclick=async()=>{
     const reason=String(data.recommendationReason||"Questa è quella che si adatta meglio al tono e al momento della conversazione.");
     const recommendedText=typeof replies[recommendedIndex]==="string"?replies[recommendedIndex]:(replies[recommendedIndex]?.text||"");
     const recommendedStyle=typeof replies[recommendedIndex]==="string"?"Risposta consigliata":(replies[recommendedIndex]?.style||"Risposta consigliata");
-    const recommendationHtml=`<div class="recommendation"><div class="recommendation-title">⭐ Quella che ti consiglio</div><div class="recommendation-style">${escapeHtml(recommendedStyle)}</div><div class="recommendation-text">${escapeHtml(recommendedText)}</div><div class="recommendation-reason">${escapeHtml(reason)}</div><div class="recommendation-actions"><button class="secondary copy-recommended" data-text="${escapeAttr(recommendedText)}">Copia questa</button><button class="secondary save-recommended" data-text="${escapeAttr(recommendedText)}">Salva come mio messaggio</button></div></div>`;
     const normalStyles=new Set(["Flirt","Audace","Poeta","Ironico","Stuzzica","Dolce"]);
     const secretStyles=new Set(["Erotica","Hot"]);
-    const renderCard=(r,i)=>{
-      const t=typeof r==="string"?r:(r.text||"");
-      const style=typeof r==="string"?"Risposta "+(i+1):(r.style||"Risposta "+(i+1));
-      const recommended=i===recommendedIndex?" recommended-card":"";
-      return `<div class="reply-card${recommended}"><div class="reply-style">${escapeHtml(style)}${i===recommendedIndex?` <span class="best-badge">Consigliata</span>`:""}</div><div class="reply-text">${escapeHtml(t)}</div><div class="reply-actions"><button class="secondary copy-reply" data-text="${escapeAttr(t)}">Copia</button><button class="secondary save-reply" data-text="${escapeAttr(t)}">Salva come mio messaggio</button></div></div>`;
-    };
-    const normalCards=[];
-    const secretCards=[];
+    const normalIndexes=[];
+    const secretIndexes=[];
     replies.forEach((r,i)=>{
       const style=typeof r==="string"?"":(r.style||"");
-      if(secretStyles.has(style) || i>=18) secretCards.push(renderCard(r,i));
-      else normalCards.push(renderCard(r,i));
+      if(secretStyles.has(style) || i>=18) secretIndexes.push(i); else normalIndexes.push(i);
     });
-    const columns=`<div class="reply-columns"><section class="reply-column normal-column"><div class="reply-column-title">💬 Risposte normali</div><div class="reply-column-subtitle">Flirt, audaci, poetiche e ironiche</div><div class="reply-column-list">${normalCards.join("")}</div></section><section class="reply-column secret-column"><div class="reply-column-title">🔒 Risposte segrete</div><div class="reply-column-subtitle">Erotiche e Hot</div><div class="reply-column-list">${secretCards.join("")}</div></section></div>`;
-    $("results").innerHTML=recommendationHtml+columns;
+    const validIndex=(value,list,fallback)=>{
+      const n=Number(value);
+      return Number.isInteger(n)&&list.includes(n)?n:fallback;
+    };
+    const normalRecommendedIndex=validIndex(data.recommendedNormalIndex,normalIndexes,normalIndexes[0] ?? recommendedIndex);
+    const secretRecommendedIndex=validIndex(data.recommendedSecretIndex,secretIndexes,secretIndexes[0] ?? recommendedIndex);
+    const recommendationReason=String(data.recommendationReason||"Questa è quella che si adatta meglio al momento della conversazione.");
+    const renderCard=(r,i,categoryRecommendedIndex)=>{
+      const t=typeof r==="string"?r:(r.text||"");
+      const style=typeof r==="string"?"Risposta "+(i+1):(r.style||"Risposta "+(i+1));
+      const recommended=i===categoryRecommendedIndex?" recommended-card":"";
+      return `<div class="reply-card${recommended}"><div class="reply-style">${escapeHtml(style)}${i===categoryRecommendedIndex?` <span class="best-badge">Consigliata</span>`:""}</div><div class="reply-text">${escapeHtml(t)}</div><div class="reply-actions"><button class="secondary copy-reply" data-text="${escapeAttr(t)}">Copia</button><button class="secondary save-reply" data-text="${escapeAttr(t)}">Salva come mio messaggio</button></div>${i===categoryRecommendedIndex?`<div class="category-reason">⭐ ${escapeHtml(recommendationReason)}</div>`:""}</div>`;
+    };
+    const normalCards=normalIndexes.map(i=>renderCard(replies[i],i,normalRecommendedIndex)).join("");
+    const secretCards=secretIndexes.map(i=>renderCard(replies[i],i,secretRecommendedIndex)).join("");
+    const columns=`<div class="reply-choice-grid">
+      <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>Flirt, audaci, poetiche, ironiche…</small></span><span class="reply-choice-arrow">›</span></button>
+      <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>Erotiche e Hot</small></span><span class="reply-choice-arrow">›</span></button>
+    </div>
+    <section id="normalRepliesPanel" class="reply-panel hidden"><div class="reply-panel-head"><div><b>💬 Risposte normali</b><small>Quella consigliata è evidenziata.</small></div><button type="button" class="reply-panel-close" data-close-panel="normalRepliesPanel">×</button></div><div class="reply-panel-list">${normalCards}</div></section>
+    <section id="secretRepliesPanel" class="reply-panel secret-panel hidden"><div class="reply-panel-head"><div><b>🔒 Risposte segrete</b><small>Quella consigliata è evidenziata.</small></div><button type="button" class="reply-panel-close" data-close-panel="secretRepliesPanel">×</button></div><div class="reply-panel-list">${secretCards}</div></section>`;
+    $("results").innerHTML=columns;
     applySettings();
     state.resultsHtml=$("results").innerHTML;
     await persistGirlState(selectedId);
