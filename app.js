@@ -341,7 +341,9 @@ function bindResultButtons(){
 $("generate").onclick=async()=>{
   const text=$("msgInput").value.trim();
   const aiHint=$("aiHint")?.value.trim()||"";
-  if(!text && !selectedImageFile){
+  const state=getGirlState(selectedId);
+  const hasImage=Boolean(selectedImageFile || state.imageData);
+  if(!text && !hasImage){
     alert("Incolla un messaggio oppure aggiungi uno screenshot.");
     return;
   }
@@ -350,7 +352,6 @@ $("generate").onclick=async()=>{
   try{
     const context=await buildContext();
     let image=null;
-    const state=getGirlState(selectedId);
     state.message=text;
     state.aiHint=aiHint;
     if(selectedImageFile){
