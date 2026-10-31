@@ -22,14 +22,14 @@ function extractJson(raw) {
     const replies = [];
     const pairRe = /\"style\"\s*:\s*\"((?:\\.|[^\"\\])*)\"\s*,\s*\"text\"\s*:\s*\"((?:\\.|[^\"\\])*)\"/g;
     let m;
-    while ((m = pairRe.exec(candidate)) !== null && replies.length < 18) {
+    while ((m = pairRe.exec(candidate)) !== null && replies.length < 24) {
       try {
         const style = JSON.parse('\"' + m[1] + '\"');
         const text = JSON.parse('\"' + m[2] + '\"');
         if (style && text) replies.push({ style, text });
       } catch (_) {}
     }
-    if (replies.length >= 6) {
+    if (replies.length >= 12) {
       const idxMatch = candidate.match(/\"recommendedIndex\"\s*:\s*(\d+)/);
       const reasonMatch = candidate.match(/\"recommendationReason\"\s*:\s*\"((?:\\.|[^\"\\])*)\"/);
       let reason = 'Questa è la risposta che si adatta meglio al tono e al momento della conversazione.';
@@ -45,7 +45,7 @@ function promptFor(context, message, aiHint = "") {
   return `Sei RispostaFlirt, un assistente italiano specializzato nel suggerire risposte naturali per conversazioni romantiche e di flirt.
 Analizza lo screenshot, se presente, insieme al contesto e al messaggio testuale.
 
-Genera ESATTAMENTE 21 alternative, divise in 7 stili da 3 risposte ciascuno:
+Genera ESATTAMENTE 24 alternative, divise in 8 stili da 3 risposte ciascuno:
 - Flirt: 3
 - Audace: 3
 - Poeta: 3
@@ -53,8 +53,11 @@ Genera ESATTAMENTE 21 alternative, divise in 7 stili da 3 risposte ciascuno:
 - Stuzzica: 3
 - Dolce: 3
 - Erotica: 3
+- Hot: 3
 
-Le ultime 3 risposte DEVONO essere quelle dello stile Erotica. Devono essere sensuali, provocanti e allusive, ma non descrivere atti sessuali in modo grafico o pornografico.
+Le prime 18 risposte sono le RISPOSTE NORMALI (Flirt, Audace, Poeta, Ironico, Stuzzica, Dolce).
+Le ultime 6 risposte sono le RISPOSTE SEGRETE: prima 3 Erotica e poi 3 Hot.
+Erotica e Hot devono essere sensuali, molto provocanti, audaci e allusive, con tensione e desiderio chiaramente percepibili, ma senza descrivere atti sessuali grafici o pornografia.
 
 Le 21 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghezza e livello di iniziativa. Non fare semplici variazioni della stessa frase.
 Usa italiano naturale da chat. Mantieni ogni risposta breve e pronta da inviare, idealmente entro 1-2 frasi. Evita frasi banali e ripetitive.
@@ -113,7 +116,7 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 18000) {
     body: JSON.stringify({
       contents: [{ role: 'user', parts }],
       generationConfig: {
-        maxOutputTokens: 1400,
+        maxOutputTokens: 2200,
         responseMimeType: 'application/json',
         thinkingConfig: {
           thinkingLevel: model === 'gemini-3.5-flash-lite' ? 'minimal' : 'low'
@@ -147,7 +150,7 @@ async function callOpenRouter(apiKey, prompt, image) {
       model: 'openrouter/free',
       messages: [{ role: 'user', content }],
       temperature: 0.85,
-      max_tokens: 1000,
+      max_tokens: 1800,
       response_format: { type: 'json_object' }
     })
   });

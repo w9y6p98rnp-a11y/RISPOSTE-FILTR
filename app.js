@@ -420,13 +420,23 @@ $("generate").onclick=async()=>{
     const recommendedText=typeof replies[recommendedIndex]==="string"?replies[recommendedIndex]:(replies[recommendedIndex]?.text||"");
     const recommendedStyle=typeof replies[recommendedIndex]==="string"?"Risposta consigliata":(replies[recommendedIndex]?.style||"Risposta consigliata");
     const recommendationHtml=`<div class="recommendation"><div class="recommendation-title">⭐ Quella che ti consiglio</div><div class="recommendation-style">${escapeHtml(recommendedStyle)}</div><div class="recommendation-text">${escapeHtml(recommendedText)}</div><div class="recommendation-reason">${escapeHtml(reason)}</div><div class="recommendation-actions"><button class="secondary copy-recommended" data-text="${escapeAttr(recommendedText)}">Copia questa</button><button class="secondary save-recommended" data-text="${escapeAttr(recommendedText)}">Salva come mio messaggio</button></div></div>`;
-    const cards=replies.map((r,i)=>{
+    const normalStyles=new Set(["Flirt","Audace","Poeta","Ironico","Stuzzica","Dolce"]);
+    const secretStyles=new Set(["Erotica","Hot"]);
+    const renderCard=(r,i)=>{
       const t=typeof r==="string"?r:(r.text||"");
       const style=typeof r==="string"?"Risposta "+(i+1):(r.style||"Risposta "+(i+1));
       const recommended=i===recommendedIndex?" recommended-card":"";
       return `<div class="reply-card${recommended}"><div class="reply-style">${escapeHtml(style)}${i===recommendedIndex?` <span class="best-badge">Consigliata</span>`:""}</div><div class="reply-text">${escapeHtml(t)}</div><div class="reply-actions"><button class="secondary copy-reply" data-text="${escapeAttr(t)}">Copia</button><button class="secondary save-reply" data-text="${escapeAttr(t)}">Salva come mio messaggio</button></div></div>`;
-    }).join("");
-    $("results").innerHTML=recommendationHtml+cards;
+    };
+    const normalCards=[];
+    const secretCards=[];
+    replies.forEach((r,i)=>{
+      const style=typeof r==="string"?"":(r.style||"");
+      if(secretStyles.has(style) || i>=18) secretCards.push(renderCard(r,i));
+      else normalCards.push(renderCard(r,i));
+    });
+    const columns=`<div class="reply-columns"><section class="reply-column normal-column"><div class="reply-column-title">💬 Risposte normali</div><div class="reply-column-subtitle">Flirt, audaci, poetiche e ironiche</div><div class="reply-column-list">${normalCards.join("")}</div></section><section class="reply-column secret-column"><div class="reply-column-title">🔒 Risposte segrete</div><div class="reply-column-subtitle">Erotiche e Hot</div><div class="reply-column-list">${secretCards.join("")}</div></section></div>`;
+    $("results").innerHTML=recommendationHtml+columns;
     applySettings();
     state.resultsHtml=$("results").innerHTML;
     await persistGirlState(selectedId);
