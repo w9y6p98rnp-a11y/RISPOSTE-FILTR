@@ -81,11 +81,11 @@ async function renderMessages(){
   const ms=await messagesFor(selectedId);
   const st=selectedId?getGirlState(selectedId):null;
   const saved=ms.map(m=>{
-    const image=m.imageData?`<img class="chat-image" src="${escapeAttr(m.imageData)}" alt="Screenshot della conversazione">`:"";
+    const image=m.imageData?`<img class="chat-image zoomable-screenshot" src="${escapeAttr(m.imageData)}" alt="Screenshot della conversazione" title="Tocca per ingrandire">`:"";
     const text=m.text?`<div class="bubble-text">${esc(m.text)}</div>`:"";
     return `<div class="bubble ${m.role}${m.imageData?" has-image":""}">${image}${text}<small>${m.role==="her"?"Lei":"Io"} · ${fmt(m.createdAt)}</small></div>`;
   }).join("");
-  const pending=st?.imageData?`<div class="bubble her pending-bubble has-image"><img class="chat-image" src="${escapeAttr(st.imageData)}" alt="Screenshot da inviare"><div class="pending-label">Screenshot pronto per l'invio</div></div>`:"";
+  const pending=st?.imageData?`<div class="bubble her pending-bubble has-image"><img class="chat-image zoomable-screenshot" src="${escapeAttr(st.imageData)}" alt="Screenshot da inviare" title="Tocca per ingrandire"><div class="pending-label">Screenshot pronto per l'invio</div></div>`:"";
   $("messages").innerHTML=(saved||pending)?saved+pending:`<div class="hint">Nessun messaggio salvato ancora.</div>`;
   $("messages").scrollTop=$("messages").scrollHeight;
 }
@@ -359,6 +359,19 @@ $("generate").onclick=async()=>{
   }
 };
 
+
+// Tocca lo screenshot piccolo per aprirlo a schermo intero.
+document.addEventListener("click",e=>{
+  const img=e.target.closest(".zoomable-screenshot");
+  if(!img)return;
+  const modal=$("imageZoomModal");
+  const big=$("imageZoomPreview");
+  if(!modal||!big)return;
+  big.src=img.src;
+  modal.classList.remove("hidden");
+});
+$("closeImageZoom")?.addEventListener("click",()=>$("imageZoomModal")?.classList.add("hidden"));
+$("imageZoomModal")?.addEventListener("click",e=>{if(e.target.id==="imageZoomModal")e.currentTarget.classList.add("hidden")});
 
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function escapeAttr(s){return escapeHtml(s);}
