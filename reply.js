@@ -69,6 +69,12 @@ recommendedIndex è l'indice numerico della risposta consigliata nell'array repl
 CONTESTO:
 ${JSON.stringify(context || {})}
 
+MEMORIA DA RICORDARE SULLA RAGAZZA:
+${context?.memory || context?.girl?.memory || "Nessuna memoria salvata."}
+
+REGOLA IMPORTANTE SULLA MEMORIA:
+La memoria sopra è informazione persistente fornita dall'utente. DEVI tenerla in considerazione quando scegli tono, argomenti, riferimenti, battute e suggerimenti. Non ignorarla e non inventare dettagli oltre a quelli presenti nella memoria e nella conversazione. Se la memoria contiene preferenze o fatti utili, usali in modo naturale quando pertinenti, senza citarla esplicitamente come "memoria".
+
 MESSAGGIO TESTUALE:
 ${message || ''}
 
