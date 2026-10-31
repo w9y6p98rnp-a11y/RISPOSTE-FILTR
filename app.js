@@ -44,24 +44,18 @@ async function clearGirlState(id){
 async function saveCurrentGirlState(){
   if(!selectedId) return;
   const st=getGirlState(selectedId);
-  st.message=$("msgInput").value;
   st.aiHint=$("aiHint")?.value||"";
   st.imageFile=selectedImageFile;
-  st.role=currentRole;
   await persistGirlState(selectedId);
 }
 function restoreGirlState(id){
   const st=getGirlState(id);
   selectedImageFile=st.imageFile||null;
-  currentRole=st.role||"her";
-  $("msgInput").value=st.message||"";
   if($("aiHint")) $("aiHint").value=st.aiHint||"";
   if($("screenshotInput")) $("screenshotInput").value="";
-  if($("cameraInput")) $("cameraInput").value="";
   $("imageName").textContent=st.imageName||"Nessuno screenshot inserito";
   $("results").innerHTML=st.resultsHtml||"";
   applySettings();
-  document.querySelectorAll(".role").forEach(x=>x.classList.toggle("active",x.dataset.role===currentRole));
   bindResultButtons();
 }
 async function selectGirl(id){
@@ -120,157 +114,6 @@ $("createGirl").onclick=createGirl;
 $("girlName").addEventListener("keydown",e=>{if(e.key==="Enter")createGirl(e)});
 $("girlNote").addEventListener("keydown",e=>{if(e.key==="Enter")createGirl(e)});
 $("closeSide").onclick=closeSide;$("menuBtn").onclick=()=>{$("sidebar").classList.add("open");$("overlay").classList.add("show")};$("overlay").onclick=closeSide;function closeSide(){$("sidebar").classList.remove("open");$("overlay").classList.remove("show")}
-document.querySelectorAll(".role").forEach(b=>b.onclick=()=>{currentRole=b.dataset.role;if(selectedId){getGirlState(selectedId).role=currentRole; persistGirlState(selectedId).catch(console.error);}document.querySelectorAll(".role").forEach(x=>x.classList.remove("active"));b.classList.add("active")});
-$("saveMsg").onclick=async()=>{
-  if(!selectedId)return;
-  const text=$("msgInput").value.trim();
-  const st=getGirlState(selectedId);
-  if(!text && !st.imageData){alert("Inserisci una risposta oppure aggiungi uno screenshot.");return;}
-  const now=Date.now();
-  // Lo screenshot rappresenta il messaggio ricevuto da lei; la risposta scritta viene subito sotto.
-  if(st.imageData) await add("messages",{girlId:selectedId,role:"her",text:"",imageData:st.imageData,createdAt:now});
-  if(text) await add("messages",{girlId:selectedId,role:"me",text,createdAt:now+1});
-  const g=await getGirl(selectedId);g.updatedAt=Date.now();await put("girls",g);
-  $("msgInput").value="";
-  if($("aiHint")) $("aiHint").value="";
-  st.message="";
-  st.aiHint="";
-  st.imageFile=null;
-  st.imageData=null;
-  st.imageName="Nessuno screenshot inserito";
-  st.resultsHtml="";
-  selectedImageFile=null;
-  if($("screenshotInput")) $("screenshotInput").value="";
-  if($("cameraInput")) $("cameraInput").value="";
-  $("imageName").textContent="Nessuno screenshot inserito";
-  $("results").innerHTML="";
-  await persistGirlState(selectedId);
-  await renderMessages();
-  await renderGirls();
-};
-
-async function deleteGirlCompletely(id){
-  // Cancella profilo + messaggi in modo atomico: la ragazza deve sparire davvero dalla barra laterale.
-  await new Promise((resolve,reject)=>{
-    const t=db.transaction(["girls","messages","girlStates"],"readwrite");
-    const girlsStore=t.objectStore("girls");
-    const messagesStore=t.objectStore("messages");
-    const statesStore=t.objectStore("girlStates");
-    statesStore.delete(id);
-    girlsStore.delete(id);
-    const idx=messagesStore.index("girlId");
-    const req=idx.openCursor(IDBKeyRange.only(id));
-    req.onsuccess=e=>{
-      const cursor=e.target.result;
-      if(cursor){ cursor.delete(); cursor.continue(); }
-    };
-    t.oncomplete=resolve;
-    t.onerror=()=>reject(t.error||new Error("Errore durante la cancellazione"));
-    t.onabort=()=>reject(t.error||new Error("Cancellazione annullata"));
-  });
-}
-async function openDeleteChatModal(){
-  const all=await getAll("girls");
-  all.sort((a,b)=>b.updatedAt-a.updatedAt);
-  const list=$("deleteChatList");
-  if(!all.length){
-    list.innerHTML='<div class="delete-empty">Non ci sono ancora chat da cancellare.</div>';
-  }else{
-    const rows=[];
-    for(const g of all){
-      const count=(await messagesFor(g.id)).length;
-      rows.push(`<label class="delete-chat-option"><input type="checkbox" class="delete-chat-check" value="${escapeAttr(g.id)}"><span class="delete-chat-option-main"><span class="delete-chat-option-name">${escapeHtml(g.name)}</span><span class="delete-chat-option-status">${count ? count+" messaggi salvati" : "Chat vuota"}</span></span></label>`);
-    }
-    list.innerHTML=rows.join("");
-  }
-  $("deleteModal").classList.remove("hidden");
-}
-function closeDeleteChatModal(){$("deleteModal").classList.add("hidden")}
-$("deleteChat").onclick=openDeleteChatModal;
-$("cancelDelete").onclick=closeDeleteChatModal;
-$("selectAllChats").onclick=()=>document.querySelectorAll(".delete-chat-check").forEach(x=>x.checked=true);
-$("clearAllChats").onclick=()=>document.querySelectorAll(".delete-chat-check").forEach(x=>x.checked=false);
-$("confirmDelete").onclick=async()=>{
-  const ids=[...document.querySelectorAll(".delete-chat-check:checked")].map(x=>x.value);
-  if(!ids.length){alert("Seleziona almeno una chat da cancellare.");return;}
-  const selectedGirls=ids.map(id=>girls.find(g=>g.id===id)).filter(Boolean);
-  const names=selectedGirls.map(g=>g.name).join(", ");
-  const ok=confirm(`Vuoi eliminare definitivamente queste chat?\n\n${names}\n\nVerranno eliminati completamente profilo, messaggi, screenshot e memoria. Le altre chat non verranno toccate.`);
-  if(!ok)return;
-  const deletingCurrent=ids.includes(selectedId);
-  $("confirmDelete").disabled=true;
-  try{
-    for(const id of ids){
-      await deleteGirlCompletely(id);
-    }
-    // Ricarica SEMPRE dall'archivio dopo la cancellazione, così i nomi eliminati non possono rimanere nella sidebar.
-    girls=await getAll("girls");
-    girls.sort((a,b)=>b.updatedAt-a.updatedAt);
-    if(deletingCurrent){
-      const next=girls[0];
-      selectedId=next?.id||null;
-      if(selectedId){
-        localStorage.setItem("selectedGirl",selectedId);
-        await renderGirls();
-        await selectGirl(selectedId);
-      }else{
-        localStorage.removeItem("selectedGirl");
-        selectedId=null;
-        selectedImageFile=null;
-        $("results").innerHTML="";
-        $("msgInput").value="";
-        if($("screenshotInput")) $("screenshotInput").value="";
-        if($("cameraInput")) $("cameraInput").value="";
-        $("imageName").textContent="Nessuno screenshot inserito";
-        $("chat").classList.add("hidden");
-        $("empty").classList.remove("hidden");
-        $("girlTitle").textContent="Seleziona una ragazza";
-        $("girlSub").textContent="Le conversazioni restano separate";
-        $("memoryInput").value="";
-        await renderGirls();
-      }
-    }else{
-      await renderGirls();
-    }
-    closeDeleteChatModal();
-    alert(ids.length===1 ? "Chat eliminata definitivamente." : `${ids.length} chat eliminate definitivamente.`);
-  }catch(err){
-    console.error("Errore eliminazione chat:",err);
-    alert("Non sono riuscito a eliminare completamente la chat. Riprova.");
-  }finally{
-    $("confirmDelete").disabled=false;
-  }
-};
-async function showSelectedImage(e){
- const f=e.target.files?.[0] || null;
- selectedImageFile=f;
- if(selectedId){
-   const st=getGirlState(selectedId);
-   st.imageFile=f;
-   st.imageData=f?await compressImageForAI(f):null;
-   st.imageName=f ? "Screenshot: "+f.name : "Nessuno screenshot inserito";
-   st.resultsHtml="";
-   await persistGirlState(selectedId);
- }
- $("imageName").textContent=f ? "Screenshot: "+f.name : "Nessuno screenshot inserito";
- $("results").innerHTML="";
- await renderMessages();
-
- // Dopo aver caricato lo screenshot l'utente può aggiungere un'indicazione
- // prima dell'analisi. L'AI parte solo quando viene premuto il pulsante Analizza.
-}
-$("screenshotInput")?.addEventListener("change",showSelectedImage);
-$("cameraInput")?.addEventListener("change",showSelectedImage);
-$("chooseScreenshot")?.addEventListener("click",()=> $("screenshotInput").click());
-$("takePhoto")?.addEventListener("click",()=> $("screenshotInput").click());
-
-$("aiHint")?.addEventListener("input",()=>{
-  if(selectedId){
-    const st=getGirlState(selectedId);
-    st.aiHint=$("aiHint").value;
-    persistGirlState(selectedId).catch(console.error);
-  }
-});
 
 $("saveMemory").onclick=async()=>{
   if(!selectedId)return;
@@ -334,8 +177,7 @@ async function saveReplyToChat(text){
     st.imageName="Nessuno screenshot inserito";
     selectedImageFile=null;
     if($("screenshotInput")) $("screenshotInput").value="";
-    if($("cameraInput")) $("cameraInput").value="";
-    $("imageName").textContent="Nessuno screenshot inserito";
+      $("imageName").textContent="Nessuno screenshot inserito";
     await persistGirlState(selectedId);
     await renderMessages();
   }
@@ -385,12 +227,12 @@ function bindResultButtons(){
 }
 
 $("generate").onclick=async()=>{
-  const text=$("msgInput").value.trim();
+  const text="";
   const aiHint=$("aiHint")?.value.trim()||"";
   const state=getGirlState(selectedId);
   const hasImage=Boolean(selectedImageFile || state.imageData);
-  if(!text && !hasImage){
-    alert("Incolla un messaggio oppure aggiungi uno screenshot.");
+  if(!hasImage){
+    alert("Aggiungi uno screenshot prima di analizzare.");
     return;
   }
   $("generate").disabled=true;
