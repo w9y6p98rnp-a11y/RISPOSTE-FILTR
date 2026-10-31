@@ -68,7 +68,7 @@ Le ultime 8 risposte sono le RISPOSTE SEGRETE: prima 3 Erotica e poi 5 Hot.
 Erotica e Hot devono essere nettamente più intensi delle risposte normali: sensuali, molto provocanti, audaci, cariche di desiderio, tensione fisica, doppisensi e allusioni. Hot deve essere il livello più spinto consentito: diretto, sfacciato e seducente, ma resta non grafico e non descrivere esplicitamente penetrazione, posizioni sessuali, sculacciate o altri atti sessuali.
 
 Le 26 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghezza e livello di iniziativa. Non fare semplici variazioni della stessa frase.
-Usa italiano naturale da chat. Mantieni ogni risposta breve e pronta da inviare: una sola frase, idealmente entro 15 parole. Evita frasi banali e ripetitive.
+Usa italiano naturale da chat. Mantieni ogni risposta molto breve e pronta da inviare: una sola frase, circa 8-14 parole. Evita frasi banali e ripetitive.
 Considera la cronologia e le risposte già inviate per evitare di riproporre le stesse formule.
 Se lo screenshot contiene più messaggi, interpreta il contesto della conversazione prima di rispondere.
 Non inventare dettagli che non sono visibili o presenti nel contesto.
@@ -143,14 +143,14 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 18000) {
     body: JSON.stringify({
       contents: [{ role: 'user', parts }],
       generationConfig: {
-        maxOutputTokens: 1250,
+        maxOutputTokens: 1050,
         responseMimeType: 'application/json',
         thinkingConfig: {
           thinkingLevel: 'minimal'
         }
       }
     })
-  }, 10000);
+  }, timeoutMs);
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -177,7 +177,7 @@ async function callOpenRouter(apiKey, prompt, image) {
       model: 'openrouter/free',
       messages: [{ role: 'user', content }],
       temperature: 0.85,
-      max_tokens: 1200,
+      max_tokens: 1000,
       response_format: { type: 'json_object' }
     })
   });
@@ -208,10 +208,10 @@ export async function onRequestPost(context) {
 
     if (env.GEMINI_API_KEY) {
       // Ordine: modello economico/free prima, poi fallback più robusti.
-      for (const model of ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash']) {
+      for (const model of ['gemini-3.5-flash-lite']) {
         attempts.push(async () => {
           try {
-            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image);
+            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 7000);
             return { result, provider: 'Gemini', model };
           } catch (err) {
             throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
