@@ -39,3 +39,12 @@ body.light-theme .reply-column-title{background:#eef2f7;color:#172033;border-col
 .reply-panel{margin:0 0 12px;padding:12px;border:1px solid #334155;border-radius:16px;background:#0f1726}.secret-panel{border-color:#6b3d78;background:#15101b}.reply-panel.hidden{display:none}
 .reply-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.reply-panel-head b{font-size:16px}.reply-panel-head small{display:block;margin-top:3px;color:#94a3b8;font-size:11px}.reply-panel-close{border:1px solid #334155;background:#172236;color:#cbd5e1;border-radius:10px;width:34px;height:34px;font-size:22px;line-height:1}.reply-panel-list{display:grid;gap:9px}.category-reason{margin-top:9px;padding-top:8px;border-top:1px solid #334155;color:#aeb8c8;font-size:11px;line-height:1.35}.secret-panel .category-reason{border-color:#5b3b66;color:#c9b0d2}
 body.light-theme .reply-choice{background:#eef2f7;color:#172033;border-color:#cbd5e1}body.light-theme .reply-choice small{color:#64748b}body.light-theme .reply-choice:hover,body.light-theme .reply-choice.selected{background:#e7edf7;border-color:#93b4df}body.light-theme .secret-choice{background:#f5ecf8;border-color:#c9a8d3}body.light-theme .secret-choice:hover,body.light-theme .secret-choice.selected{background:#efe1f3;border-color:#a879b8}body.light-theme .reply-panel{background:#fff;border-color:#d8dee8}body.light-theme .secret-panel{background:#fbf7fc;border-color:#c9a8d3}body.light-theme .reply-panel-close{background:#e2e8f0;color:#334155;border-color:#cbd5e1}body.light-theme .category-reason{border-color:#d8dee8;color:#64748b}body.light-theme .secret-panel .category-reason{border-color:#dfcbe4;color:#7c5a85}
+/* UI pulita: solo screenshot + indicazione AI */
+.chat{max-width:none;width:100%;padding-left:18px;padding-right:18px}
+.screenshot-composer{width:100%;box-sizing:border-box}
+.screenshot-box{width:100%;margin:0}
+.screenshot-actions{width:100%;display:block}
+.screenshot-upload-btn{width:100%;min-height:56px;font-size:18px;display:flex!important;align-items:center;justify-content:center}
+.actions{display:flex;gap:8px;justify-content:stretch;margin-top:12px}
+.actions #generate{width:100%}
+@media(max-width:760px){.chat{padding-left:18px;padding-right:18px}.screenshot-upload-btn{width:100%}.actions #generate{width:100%}}

@@ -44,7 +44,7 @@ async function clearGirlState(id){
 async function saveCurrentGirlState(){
   if(!selectedId) return;
   const st=getGirlState(selectedId);
-  st.message=$("msgInput").value;
+  st.message=$("msgInput")?.value||"";
   st.aiHint=$("aiHint")?.value||"";
   st.imageFile=selectedImageFile;
   st.role=currentRole;
@@ -54,7 +54,7 @@ function restoreGirlState(id){
   const st=getGirlState(id);
   selectedImageFile=st.imageFile||null;
   currentRole=st.role||"her";
-  $("msgInput").value=st.message||"";
+  if($("msgInput")) $("msgInput").value=st.message||"";
   if($("aiHint")) $("aiHint").value=st.aiHint||"";
   if($("screenshotInput")) $("screenshotInput").value="";
   if($("cameraInput")) $("cameraInput").value="";
@@ -121,9 +121,9 @@ $("girlName").addEventListener("keydown",e=>{if(e.key==="Enter")createGirl(e)});
 $("girlNote").addEventListener("keydown",e=>{if(e.key==="Enter")createGirl(e)});
 $("closeSide").onclick=closeSide;$("menuBtn").onclick=()=>{$("sidebar").classList.add("open");$("overlay").classList.add("show")};$("overlay").onclick=closeSide;function closeSide(){$("sidebar").classList.remove("open");$("overlay").classList.remove("show")}
 document.querySelectorAll(".role").forEach(b=>b.onclick=()=>{currentRole=b.dataset.role;if(selectedId){getGirlState(selectedId).role=currentRole; persistGirlState(selectedId).catch(console.error);}document.querySelectorAll(".role").forEach(x=>x.classList.remove("active"));b.classList.add("active")});
-$("saveMsg").onclick=async()=>{
+if($("saveMsg")) $("saveMsg").onclick=async()=>{
   if(!selectedId)return;
-  const text=$("msgInput").value.trim();
+  const text=$("msgInput")?.value.trim()||"";
   const st=getGirlState(selectedId);
   if(!text && !st.imageData){alert("Inserisci una risposta oppure aggiungi uno screenshot.");return;}
   const now=Date.now();
@@ -131,7 +131,7 @@ $("saveMsg").onclick=async()=>{
   if(st.imageData) await add("messages",{girlId:selectedId,role:"her",text:"",imageData:st.imageData,createdAt:now});
   if(text) await add("messages",{girlId:selectedId,role:"me",text,createdAt:now+1});
   const g=await getGirl(selectedId);g.updatedAt=Date.now();await put("girls",g);
-  $("msgInput").value="";
+  if($("msgInput")) if($("msgInput")) $("msgInput").value="";
   if($("aiHint")) $("aiHint").value="";
   st.message="";
   st.aiHint="";
@@ -218,7 +218,7 @@ $("confirmDelete").onclick=async()=>{
         selectedId=null;
         selectedImageFile=null;
         $("results").innerHTML="";
-        $("msgInput").value="";
+        if($("msgInput")) if($("msgInput")) $("msgInput").value="";
         if($("screenshotInput")) $("screenshotInput").value="";
         if($("cameraInput")) $("cameraInput").value="";
         $("imageName").textContent="Nessuno screenshot inserito";
@@ -260,9 +260,7 @@ async function showSelectedImage(e){
  // prima dell'analisi. L'AI parte solo quando viene premuto il pulsante Analizza.
 }
 $("screenshotInput")?.addEventListener("change",showSelectedImage);
-$("cameraInput")?.addEventListener("change",showSelectedImage);
 $("chooseScreenshot")?.addEventListener("click",()=> $("screenshotInput").click());
-$("takePhoto")?.addEventListener("click",()=> $("screenshotInput").click());
 
 $("aiHint")?.addEventListener("input",()=>{
   if(selectedId){
@@ -385,12 +383,12 @@ function bindResultButtons(){
 }
 
 $("generate").onclick=async()=>{
-  const text=$("msgInput").value.trim();
+  const text="";
   const aiHint=$("aiHint")?.value.trim()||"";
   const state=getGirlState(selectedId);
   const hasImage=Boolean(selectedImageFile || state.imageData);
-  if(!text && !hasImage){
-    alert("Incolla un messaggio oppure aggiungi uno screenshot.");
+  if(!hasImage){
+    alert("Aggiungi uno screenshot prima di analizzare.");
     return;
   }
   $("generate").disabled=true;
@@ -398,7 +396,7 @@ $("generate").onclick=async()=>{
   try{
     const context=await buildContext();
     let image=null;
-    state.message=text;
+    state.message="";
     state.aiHint=aiHint;
     if(selectedImageFile){
       image=await compressImageForAI(selectedImageFile);
@@ -474,6 +472,15 @@ $("generate").onclick=async()=>{
     state.resultsHtml=$("results").innerHTML;
     await persistGirlState(selectedId);
     bindResultButtons();
+    // Dopo l'analisi apri automaticamente solo la prima casella: Risposte normali.
+    const normalChoice=document.querySelector('.reply-choice[data-target="normalRepliesPanel"]');
+    const normalPanel=document.getElementById('normalRepliesPanel');
+    const secretPanel=document.getElementById('secretRepliesPanel');
+    document.querySelectorAll('.reply-panel').forEach(panel=>panel.classList.add('hidden'));
+    document.querySelectorAll('.reply-choice').forEach(choice=>choice.classList.remove('selected'));
+    if(normalPanel) normalPanel.classList.remove('hidden');
+    if(normalChoice) normalChoice.classList.add('selected');
+    if(secretPanel) secretPanel.classList.add('hidden');
   }catch(err){
     const msg=err?.name==="AbortError" ? "Il servizio AI ha impiegato troppo tempo. Riprova: la richiesta ora è ottimizzata per rispondere più velocemente." : err.message;
     alert("Analisi non riuscita: "+msg);
