@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+<title>RispostaFlirt</title>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar" class="sidebar">
+    <div class="side-head"><b>RispostaFlirt</b><button id="closeSide">×</button></div>
+    <button id="newGirl" class="primary">＋ Nuova ragazza</button>
+    <div id="girlList" class="girl-list"></div>
+    <button id="deleteChat" class="danger side-delete">🗑️ Elimina chat</button>
+    <div class="privacy">Memoria salvata sul dispositivo.<br>Nessun account richiesto.</div>
+  </aside>
+  <div id="overlay"></div>
+  <main class="main">
+    <header class="topbar">
+      <button id="menuBtn" class="icon">☰</button>
+      <div>
+        <div id="girlTitle" class="title">Seleziona una ragazza</div>
+        <div id="girlSub" class="sub">Le conversazioni restano separate</div>
+      </div>
+      <button id="installBtn" class="icon" title="Installa">＋</button>
+    </header>
+
+    <section id="empty" class="empty">
+      <h2>Inizia una conversazione</h2>
+      <p>Crea la prima scheda ragazza. Ogni chat avrà memoria separata.</p>
+      <button id="emptyNew" class="primary">＋ Nuova ragazza</button>
+    </section>
+
+    <section id="chat" class="chat hidden">
+      <div class="tabs">
+        <button data-tab="chatTab" class="tab active">Conversazione</button>
+        <button data-tab="memoryTab" class="tab">Cose da ricordare</button>
+      </div>
+
+      <div id="chatTab" class="tabpage">
+        <div id="messages" class="messages"></div>
+        <div class="composer">
+          <div class="role-row">
+            <button class="role active" data-role="her">Lei</button>
+            <button class="role" data-role="me">Io</button>
+          </div>
+          <textarea id="msgInput" placeholder="Incolla qui il messaggio oppure aggiungi uno screenshot..." rows="3"></textarea>
+          <div class="screenshot-box">
+            <input id="screenshotInput" type="file" accept="image/*" hidden>
+            <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
+            <div class="screenshot-actions">
+              <button id="chooseScreenshot" type="button" class="secondary">🖼️ Aggiungi screenshot</button>
+              <button id="takePhoto" type="button" class="secondary">📷 Scatta foto</button>
+            </div>
+            <div id="imageName" class="image-name">Nessuno screenshot inserito</div>
+          </div>
+          <div class="actions">
+            <button id="saveMsg" class="primary send-button">➤ Invia nella chat</button>
+            <button id="generate" class="primary">Analizza e dammi risposte</button>
+          </div>
+        </div>
+        <div id="results" class="results"></div>
+      </div>
+
+      <div id="memoryTab" class="tabpage hidden">
+        <h3>🧠 Cose da ricordare</h3>
+        <p class="hint">Scrivi dettagli utili su di lei: gusti, lavoro, battute, appuntamenti, cose già dette.</p>
+        <textarea id="memoryInput" rows="8" placeholder="Esempio: ama il mare, lavora..., ci siamo conosciuti..."></textarea>
+        <button id="saveMemory" class="primary">Salva memoria</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <h2>Nuova ragazza</h2>
+    <input id="girlName" placeholder="Nome" maxlength="80">
+    <input id="girlNote" placeholder="Nota breve (facoltativa)" maxlength="160">
+    <div class="modal-actions">
+      <button type="button" id="cancelGirl" class="secondary">Annulla</button>
+      <button type="button" id="createGirl" class="primary">Crea</button>
+    </div>
+  </div>
+</div>
+
+<div id="deleteModal" class="modal hidden">
+  <div class="modal-card delete-modal-card">
+    <h2>🗑️ Scegli le chat da cancellare</h2>
+    <p class="hint">Seleziona una o più chat. Verranno eliminate completamente solo le chat selezionate, compresi nome, messaggi e cose da ricordare. Le altre resteranno intatte.</p>
+    <div class="delete-select-actions">
+      <button type="button" id="selectAllChats" class="secondary">Seleziona tutte</button>
+      <button type="button" id="clearAllChats" class="secondary">Deseleziona</button>
+    </div>
+    <div id="deleteChatList" class="delete-chat-list"></div>
+    <div class="modal-actions">
+      <button type="button" id="cancelDelete" class="secondary">Annulla</button>
+      <button type="button" id="confirmDelete" class="danger">Cancella selezionate</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
