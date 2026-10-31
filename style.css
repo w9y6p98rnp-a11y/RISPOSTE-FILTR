@@ -55,3 +55,7 @@ body.light-theme .ai-advice-text{color:#172033}
 .actions{display:flex;gap:8px;justify-content:stretch;margin-top:12px}
 .actions #generate{width:100%}
 @media(max-width:760px){.chat{padding-left:18px;padding-right:18px}.screenshot-upload-btn{width:100%}.actions #generate{width:100%}}
+
+/* Nomi ragazze: usa tutta la larghezza disponibile */
+.girl-meta{min-width:0;flex:1;display:block}
+.girl-name{display:block;width:100%;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -134,14 +134,14 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 18000) {
     body: JSON.stringify({
       contents: [{ role: 'user', parts }],
       generationConfig: {
-        maxOutputTokens: 2200,
+        maxOutputTokens: 1500,
         responseMimeType: 'application/json',
         thinkingConfig: {
-          thinkingLevel: model === 'gemini-3.5-flash-lite' ? 'minimal' : 'low'
+          thinkingLevel: 'minimal'
         }
       }
     })
-  }, 18000);
+  }, 10000);
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -168,7 +168,7 @@ async function callOpenRouter(apiKey, prompt, image) {
       model: 'openrouter/free',
       messages: [{ role: 'user', content }],
       temperature: 0.85,
-      max_tokens: 1800,
+      max_tokens: 1400,
       response_format: { type: 'json_object' }
     })
   });
