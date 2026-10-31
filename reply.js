@@ -22,7 +22,7 @@ function extractJson(raw) {
     const replies = [];
     const pairRe = /\"style\"\s*:\s*\"((?:\\.|[^\"\\])*)\"\s*,\s*\"text\"\s*:\s*\"((?:\\.|[^\"\\])*)\"/g;
     let m;
-    while ((m = pairRe.exec(candidate)) !== null && replies.length < 24) {
+    while ((m = pairRe.exec(candidate)) !== null && replies.length < 26) {
       try {
         const style = JSON.parse('\"' + m[1] + '\"');
         const text = JSON.parse('\"' + m[2] + '\"');
@@ -59,7 +59,7 @@ Genera ESATTAMENTE 26 alternative, divise in 8 stili:
 
 Le prime 18 risposte sono le RISPOSTE NORMALI (Flirt, Audace, Poeta, Ironico, Stuzzica, Dolce).
 Le ultime 8 risposte sono le RISPOSTE SEGRETE: prima 3 Erotica e poi 5 Hot.
-Erotica e Hot devono essere nettamente più intensi delle risposte normali: sensuali, molto provocanti, audaci, cariche di desiderio, tensione fisica, doppisensi e allusioni. Hot deve essere il livello più intenso consentito: molto diretto, sfacciato, seducente e carico di desiderio, con allusioni sessuali forti e linguaggio provocatorio, ma resta non grafico e non descrivere esplicitamente atti sessuali o penetrazione.
+Erotica e Hot devono essere nettamente più intensi delle risposte normali: sensuali, molto provocanti, audaci, cariche di desiderio, tensione fisica, doppisensi e allusioni. Hot deve essere il livello più spinto consentito: diretto, sfacciato e seducente, ma resta non grafico e non descrivere esplicitamente penetrazione, posizioni sessuali, sculacciate o altri atti sessuali.
 
 Le 24 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghezza e livello di iniziativa. Non fare semplici variazioni della stessa frase.
 Usa italiano naturale da chat. Mantieni ogni risposta breve e pronta da inviare, idealmente entro 1-2 frasi. Evita frasi banali e ripetitive.
@@ -69,7 +69,7 @@ Non inventare dettagli che non sono visibili o presenti nel contesto.
 
 Dopo aver generato le 24 alternative, scegli anche una risposta consigliata per ciascuna delle due categorie.
 - recommendedNormalIndex: indice di una delle prime 18 risposte normali.
-- recommendedSecretIndex: indice di una delle ultime 8 risposte segrete.
+- recommendedSecretIndex: indice di una delle ultime 6 risposte segrete.
 - recommendedIndex: mantienilo come consiglio generale, scegliendo una delle due.
 La scelta deve tenere conto del tono di lei, di ciò che è stato appena detto, della storia della chat e del rischio di risultare fuori luogo o ripetitivi. Non scegliere automaticamente la più audace: scegli quella con la probabilità migliore di far proseguire bene la conversazione. Per le risposte segrete scegli quella più adatta al livello di confidenza mostrato nella conversazione.
 
@@ -122,7 +122,7 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 18000) {
     body: JSON.stringify({
       contents: [{ role: 'user', parts }],
       generationConfig: {
-        maxOutputTokens: 2800,
+        maxOutputTokens: 2200,
         responseMimeType: 'application/json',
         thinkingConfig: {
           thinkingLevel: model === 'gemini-3.5-flash-lite' ? 'minimal' : 'low'
@@ -156,7 +156,7 @@ async function callOpenRouter(apiKey, prompt, image) {
       model: 'openrouter/free',
       messages: [{ role: 'user', content }],
       temperature: 0.85,
-      max_tokens: 2400,
+      max_tokens: 1800,
       response_format: { type: 'json_object' }
     })
   });
