@@ -59,9 +59,9 @@ Genera ESATTAMENTE 24 alternative, divise in 8 stili da 3 risposte ciascuno:
 
 Le prime 18 risposte sono le RISPOSTE NORMALI (Flirt, Audace, Poeta, Ironico, Stuzzica, Dolce).
 Le ultime 6 risposte sono le RISPOSTE SEGRETE: prima 3 Erotica e poi 3 Hot.
-Erotica e Hot devono essere sensuali, molto provocanti, audaci e allusive, con tensione e desiderio chiaramente percepibili, ma senza descrivere atti sessuali grafici o pornografia.
+Erotica e Hot devono essere nettamente più intensi delle risposte normali: sensuali, molto provocanti, audaci, cariche di desiderio, tensione fisica, doppisensi e allusioni. Hot deve essere il livello più spinto consentito: diretto, sfacciato e seducente, ma resta non grafico e non descrivere esplicitamente penetrazione, posizioni sessuali, sculacciate o altri atti sessuali.
 
-Le 21 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghezza e livello di iniziativa. Non fare semplici variazioni della stessa frase.
+Le 24 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghezza e livello di iniziativa. Non fare semplici variazioni della stessa frase.
 Usa italiano naturale da chat. Mantieni ogni risposta breve e pronta da inviare, idealmente entro 1-2 frasi. Evita frasi banali e ripetitive.
 Considera la cronologia e le risposte già inviate per evitare di riproporre le stesse formule.
 Se lo screenshot contiene più messaggi, interpreta il contesto della conversazione prima di rispondere.

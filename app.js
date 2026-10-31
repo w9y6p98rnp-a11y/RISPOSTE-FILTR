@@ -367,9 +367,15 @@ function bindResultButtons(){
   document.querySelectorAll(".reply-choice").forEach(b=>b.onclick=()=>{
     const target=$(b.dataset.target);
     if(!target) return;
-    target.classList.toggle("hidden");
-    b.classList.toggle("selected",!target.classList.contains("hidden"));
-    if(!target.classList.contains("hidden")) setTimeout(()=>target.scrollIntoView({behavior:"smooth",block:"start"}),50);
+    const isOpening=target.classList.contains("hidden");
+    // Apri una sola categoria alla volta: quando scegli Normali, Segrete si chiude e viceversa.
+    document.querySelectorAll(".reply-panel").forEach(panel=>panel.classList.add("hidden"));
+    document.querySelectorAll(".reply-choice").forEach(choice=>choice.classList.remove("selected"));
+    if(isOpening){
+      target.classList.remove("hidden");
+      b.classList.add("selected");
+      setTimeout(()=>target.scrollIntoView({behavior:"smooth",block:"start"}),50);
+    }
   });
   document.querySelectorAll(".reply-panel-close").forEach(b=>b.onclick=()=>{
     const target=$(b.dataset.closePanel);
@@ -452,8 +458,11 @@ $("generate").onclick=async()=>{
       const recommended=i===categoryRecommendedIndex?" recommended-card":"";
       return `<div class="reply-card${recommended}"><div class="reply-style">${escapeHtml(style)}${i===categoryRecommendedIndex?` <span class="best-badge">Consigliata</span>`:""}</div><div class="reply-text">${escapeHtml(t)}</div><div class="reply-actions"><button class="secondary copy-reply" data-text="${escapeAttr(t)}">Copia</button><button class="secondary save-reply" data-text="${escapeAttr(t)}">Salva come mio messaggio</button></div>${i===categoryRecommendedIndex?`<div class="category-reason">⭐ ${escapeHtml(recommendationReason)}</div>`:""}</div>`;
     };
-    const normalCards=normalIndexes.map(i=>renderCard(replies[i],i,normalRecommendedIndex)).join("");
-    const secretCards=secretIndexes.map(i=>renderCard(replies[i],i,secretRecommendedIndex)).join("");
+    // La risposta consigliata deve essere sempre la prima card della categoria quando la si apre.
+    const orderedNormalIndexes=[normalRecommendedIndex,...normalIndexes.filter(i=>i!==normalRecommendedIndex)];
+    const orderedSecretIndexes=[secretRecommendedIndex,...secretIndexes.filter(i=>i!==secretRecommendedIndex)];
+    const normalCards=orderedNormalIndexes.map(i=>renderCard(replies[i],i,normalRecommendedIndex)).join("");
+    const secretCards=orderedSecretIndexes.map(i=>renderCard(replies[i],i,secretRecommendedIndex)).join("");
     const columns=`<div class="reply-choice-grid">
       <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>Flirt, audaci, poetiche, ironiche…</small></span><span class="reply-choice-arrow">›</span></button>
       <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>Erotiche e Hot</small></span><span class="reply-choice-arrow">›</span></button>
