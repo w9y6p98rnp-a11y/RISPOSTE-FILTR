@@ -302,6 +302,11 @@ async function selectMemoryGirl(id){
   const g=await getGirl(id);
   $("memoryInput").value=g?.memory||"";
   $("memorySelectedGirl").innerHTML=`🧠 Memoria di <strong>${esc(g?.name||"Ragazza")}</strong>`;
+  // Dopo la scelta, nascondi completamente l'elenco: la seconda schermata
+  // deve riguardare solo la ragazza appena selezionata.
+  $("memoryGirlList").classList.add("hidden");
+  $("memoryGirlSelectLabel").classList.add("hidden");
+  $("memoryModalHint").classList.add("hidden");
   $("memoryEditor").classList.remove("hidden");
   $("saveMemory").disabled=false;
   document.querySelectorAll(".memory-girl-option").forEach(x=>x.classList.toggle("active",x.dataset.memoryGirl===id));
@@ -312,6 +317,9 @@ async function openMemoryModal(){
   memorySelectedGirlId=null;
   $("memoryInput").value="";
   $("memoryEditor").classList.add("hidden");
+  $("memoryGirlList").classList.remove("hidden");
+  $("memoryGirlSelectLabel").classList.remove("hidden");
+  $("memoryModalHint").classList.remove("hidden");
   $("saveMemory").disabled=true;
   $("memoryModal").classList.remove("hidden");
   await renderMemoryGirlList();
