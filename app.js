@@ -16,11 +16,11 @@ function fmt(t){return new Date(t).toLocaleString("it-IT",{day:"2-digit",month:"
 
 async function renderGirls(){girls=await getAll("girls");girls.sort((a,b)=>b.updatedAt-a.updatedAt);$("girlList").innerHTML=girls.map(g=>`<button class="girl ${g.id===selectedId?"active":""}" data-id="${g.id}"><span class="avatar">${esc((g.name||"?")[0].toUpperCase())}</span><span class="girl-meta"><span class="girl-name">${esc(g.name)}</span><span class="girl-last">${esc(g.note||"Nessun dettaglio")}</span></span></button>`).join("");document.querySelectorAll(".girl").forEach(b=>b.onclick=()=>selectGirl(b.dataset.id))}
 function getGirlState(id){
-  if(!girlStates.has(id)) girlStates.set(id,{message:"",imageFile:null,imageData:null,imageName:"",resultsHtml:"",role:"her"});
+  if(!girlStates.has(id)) girlStates.set(id,{message:"",imageFile:null,imageData:null,imageName:"",resultsHtml:"",role:"her",aiHint:""});
   return girlStates.get(id);
 }
 async function loadGirlState(id){
-  const base={message:"",imageFile:null,imageData:null,imageName:"",resultsHtml:"",role:"her"};
+  const base={message:"",imageFile:null,imageData:null,imageName:"",resultsHtml:"",role:"her",aiHint:""};
   try{
     const saved=await new Promise((res,rej)=>{const r=tx("girlStates").get(id);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
     const st={...base,...(saved||{})};
@@ -35,7 +35,7 @@ async function loadGirlState(id){
 async function persistGirlState(id){
   if(!id)return;
   const st=getGirlState(id);
-  await put("girlStates",{girlId:id,message:st.message||"",imageData:st.imageData||null,imageName:st.imageName||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",updatedAt:Date.now()});
+  await put("girlStates",{girlId:id,message:st.message||"",imageData:st.imageData||null,imageName:st.imageName||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",aiHint:st.aiHint||"",updatedAt:Date.now()});
 }
 async function clearGirlState(id){
   girlStates.delete(id);
@@ -45,6 +45,7 @@ async function saveCurrentGirlState(){
   if(!selectedId) return;
   const st=getGirlState(selectedId);
   st.message=$("msgInput").value;
+  st.aiHint=$("aiHint")?.value||"";
   st.imageFile=selectedImageFile;
   st.role=currentRole;
   await persistGirlState(selectedId);
@@ -54,6 +55,7 @@ function restoreGirlState(id){
   selectedImageFile=st.imageFile||null;
   currentRole=st.role||"her";
   $("msgInput").value=st.message||"";
+  if($("aiHint")) $("aiHint").value=st.aiHint||"";
   if($("screenshotInput")) $("screenshotInput").value="";
   if($("cameraInput")) $("cameraInput").value="";
   $("imageName").textContent=st.imageName||"Nessuno screenshot inserito";
@@ -127,7 +129,9 @@ $("saveMsg").onclick=async()=>{
   if(text) await add("messages",{girlId:selectedId,role:"me",text,createdAt:now+1});
   const g=await getGirl(selectedId);g.updatedAt=Date.now();await put("girls",g);
   $("msgInput").value="";
+  if($("aiHint")) $("aiHint").value="";
   st.message="";
+  st.aiHint="";
   st.imageFile=null;
   st.imageData=null;
   st.imageName="Nessuno screenshot inserito";
@@ -249,19 +253,21 @@ async function showSelectedImage(e){
  $("results").innerHTML="";
  await renderMessages();
 
- // Analisi automatica: appena viene caricato uno screenshot parte direttamente l'AI,
- // senza obbligare l'utente a premere ogni volta il pulsante Analizza.
- if(f && selectedId){
-   const generateButton=$("generate");
-   if(generateButton && !generateButton.disabled){
-     generateButton.click();
-   }
- }
+ // Dopo aver caricato lo screenshot l'utente può aggiungere un'indicazione
+ // prima dell'analisi. L'AI parte solo quando viene premuto il pulsante Analizza.
 }
 $("screenshotInput")?.addEventListener("change",showSelectedImage);
 $("cameraInput")?.addEventListener("change",showSelectedImage);
 $("chooseScreenshot")?.addEventListener("click",()=> $("screenshotInput").click());
 $("takePhoto")?.addEventListener("click",()=> $("screenshotInput").click());
+
+$("aiHint")?.addEventListener("input",()=>{
+  if(selectedId){
+    const st=getGirlState(selectedId);
+    st.aiHint=$("aiHint").value;
+    persistGirlState(selectedId).catch(console.error);
+  }
+});
 
 $("saveMemory").onclick=async()=>{const g=await getGirl(selectedId);g.memory=$("memoryInput").value;g.updatedAt=Date.now();await put("girls",g);await renderGirls();alert("Memoria salvata sul dispositivo.")};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tabpage").forEach(x=>x.classList.add("hidden"));b.classList.add("active");$(b.dataset.tab).classList.remove("hidden")});
@@ -334,6 +340,7 @@ function bindResultButtons(){
 
 $("generate").onclick=async()=>{
   const text=$("msgInput").value.trim();
+  const aiHint=$("aiHint")?.value.trim()||"";
   if(!text && !selectedImageFile){
     alert("Incolla un messaggio oppure aggiungi uno screenshot.");
     return;
@@ -345,6 +352,7 @@ $("generate").onclick=async()=>{
     let image=null;
     const state=getGirlState(selectedId);
     state.message=text;
+    state.aiHint=aiHint;
     if(selectedImageFile){
       image=await compressImageForAI(selectedImageFile);
       state.imageData=image;
@@ -365,6 +373,7 @@ $("generate").onclick=async()=>{
         body:JSON.stringify({
           girlId:selectedId,
           message:text,
+          aiHint,
           context,
           image
         })

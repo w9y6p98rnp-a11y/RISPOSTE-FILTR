@@ -41,7 +41,7 @@ function extractJson(raw) {
   }
 }
 
-function promptFor(context, message) {
+function promptFor(context, message, aiHint = "") {
   return `Sei RispostaFlirt, un assistente italiano specializzato nel suggerire risposte naturali per conversazioni romantiche e di flirt.
 Analizza lo screenshot, se presente, insieme al contesto e al messaggio testuale.
 
@@ -70,7 +70,10 @@ CONTESTO:
 ${JSON.stringify(context || {})}
 
 MESSAGGIO TESTUALE:
-${message || ''}`;
+${message || ''}
+
+INDICAZIONE DELL'UTENTE (facoltativa):
+${aiHint || 'Nessuna indicazione aggiuntiva.'}`;
 }
 
 function imagePart(image) {
@@ -153,10 +156,10 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { message = '', context = '', image = null } = body;
+    const { message = '', aiHint = '', context = '', image = null } = body;
     if (!message && !image) return json(400, { error: 'Manca messaggio o screenshot.' });
 
-    const prompt = promptFor(context, message);
+    const prompt = promptFor(context, message, aiHint);
     const errors = [];
 
     // Avvia tutti i provider disponibili in parallelo: il primo che risponde
