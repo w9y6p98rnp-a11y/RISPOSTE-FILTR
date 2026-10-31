@@ -61,13 +61,13 @@ Le prime 18 risposte sono le RISPOSTE NORMALI (Flirt, Audace, Poeta, Ironico, St
 Le ultime 8 risposte sono le RISPOSTE SEGRETE: prima 3 Erotica e poi 5 Hot.
 Erotica e Hot devono essere nettamente più intensi delle risposte normali: sensuali, molto provocanti, audaci, cariche di desiderio, tensione fisica, doppisensi e allusioni. Hot deve essere il livello più spinto consentito: diretto, sfacciato e seducente, ma resta non grafico e non descrivere esplicitamente penetrazione, posizioni sessuali, sculacciate o altri atti sessuali.
 
-Le 24 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghezza e livello di iniziativa. Non fare semplici variazioni della stessa frase.
+Le 26 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghezza e livello di iniziativa. Non fare semplici variazioni della stessa frase.
 Usa italiano naturale da chat. Mantieni ogni risposta breve e pronta da inviare, idealmente entro 1-2 frasi. Evita frasi banali e ripetitive.
 Considera la cronologia e le risposte già inviate per evitare di riproporre le stesse formule.
 Se lo screenshot contiene più messaggi, interpreta il contesto della conversazione prima di rispondere.
 Non inventare dettagli che non sono visibili o presenti nel contesto.
 
-Dopo aver generato le 24 alternative, scegli anche una risposta consigliata per ciascuna delle due categorie.
+Dopo aver generato le 26 alternative, scegli anche una risposta consigliata per ciascuna delle due categorie.
 - recommendedNormalIndex: indice di una delle prime 18 risposte normali.
 - recommendedSecretIndex: indice di una delle ultime 6 risposte segrete.
 - recommendedIndex: mantienilo come consiglio generale, scegliendo una delle due.
@@ -180,42 +180,46 @@ export async function onRequestPost(context) {
     const prompt = promptFor(context, message, aiHint);
     const errors = [];
 
-    // Avvia tutti i provider disponibili in parallelo: il primo che risponde
-    // vince. In questo modo un provider lento/non disponibile non blocca gli altri.
+    // NON avviare tutti i provider in parallelo: ogni tentativo può consumare quota.
+    // Proviamo un solo servizio alla volta e passiamo al successivo solo se il precedente
+    // è esaurito/non disponibile. In questo modo una richiesta normale usa una sola quota.
     const attempts = [];
 
     if (env.GEMINI_API_KEY) {
-      for (const model of ['gemini-3.5-flash-lite', 'gemini-3.8-flash']) {
-        attempts.push(
-          callGemini(env.GEMINI_API_KEY, model, prompt, image)
-            .then(result => ({ result, provider: 'Gemini', model }))
-            .catch(err => {
-              throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
-            })
-        );
+      // Ordine: modello economico/free prima, poi fallback più robusti.
+      for (const model of ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash']) {
+        attempts.push(async () => {
+          try {
+            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image);
+            return { result, provider: 'Gemini', model };
+          } catch (err) {
+            throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
+          }
+        });
       }
     } else {
       errors.push('GEMINI_API_KEY non configurata');
     }
 
     if (env.OPENROUTER_API_KEY) {
-      attempts.push(
-        callOpenRouter(env.OPENROUTER_API_KEY, prompt, image)
-          .then(result => ({ result, provider: 'OpenRouter', model: 'openrouter/free' }))
-          .catch(err => {
-            throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
-          })
-      );
+      attempts.push(async () => {
+        try {
+          const result = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image);
+          return { result, provider: 'OpenRouter', model: 'openrouter/free' };
+        } catch (err) {
+          throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
+        }
+      });
     } else {
       errors.push('OPENROUTER_API_KEY non configurata');
     }
 
-    if (attempts.length) {
+    for (const attempt of attempts) {
       try {
-        const winner = await Promise.any(attempts);
+        const winner = await attempt();
         return new Response(JSON.stringify({ ...winner.result, provider: winner.provider, model: winner.model }), { status: 200, headers: { "Content-Type": "application/json" } });
-      } catch (aggregate) {
-        for (const reason of (aggregate?.errors || [])) errors.push(reason?.message || String(reason));
+      } catch (err) {
+        errors.push(err?.message || String(err));
       }
     }
 
