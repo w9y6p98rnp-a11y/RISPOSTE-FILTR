@@ -326,6 +326,8 @@ async function saveReplyToChat(text){
 function bindResultButtons(){
   document.querySelectorAll(".copy-recommended").forEach(b=>b.onclick=async()=>{
     await navigator.clipboard.writeText(b.dataset.text); b.textContent="Copiato";
+    window.scrollTo({top:0,behavior:"smooth"});
+    document.documentElement.scrollTop=0; document.body.scrollTop=0;
     setTimeout(()=>b.textContent="Copia questa",1200);
   });
   document.querySelectorAll(".save-recommended").forEach(b=>b.onclick=async()=>{
@@ -333,6 +335,8 @@ function bindResultButtons(){
   });
   document.querySelectorAll(".copy-reply").forEach(b=>b.onclick=async()=>{
     await navigator.clipboard.writeText(b.dataset.text); b.textContent="Copiato";
+    window.scrollTo({top:0,behavior:"smooth"});
+    document.documentElement.scrollTop=0; document.body.scrollTop=0;
     setTimeout(()=>b.textContent="Copia",1200);
   });
   document.querySelectorAll(".save-reply").forEach(b=>b.onclick=async()=>{
