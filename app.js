@@ -78,6 +78,8 @@ async function selectGirl(id){
   await renderMessages();
   await renderGirls();
   closeSide();
+  // Quando si entra/apre una chat, torna sempre all'inizio della pagina invece di mantenere la posizione precedente.
+  requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:"instant"}));
 }
 async function getGirl(id){const all=await getAll("girls");return all.find(x=>x.id===id)}
 async function renderMessages(){
