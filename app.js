@@ -173,6 +173,50 @@ $("closeMemory").onclick=closeMemoryModal;
 $("cancelMemory").onclick=closeMemoryModal;
 $("memoryModal").addEventListener("click",e=>{if(e.target===$("memoryModal"))closeMemoryModal()});
 
+async function openDeleteModal(){
+  if(!selectedId){ alert("Seleziona prima una ragazza."); return; }
+  const list=$("deleteChatList");
+  if(!list) return;
+  const all=await getAll("girls");
+  all.sort((a,b)=>(a.name||"").localeCompare(b.name||"","it"));
+  list.innerHTML=all.length?all.map(g=>`<label class="delete-chat-option"><input type="checkbox" value="${escapeAttr(g.id)}" ${g.id===selectedId?"checked":""}><span class="delete-chat-option-main"><span class="delete-chat-option-name">${esc(g.name)}</span><span class="delete-chat-option-status">${g.id===selectedId?"Chat attualmente aperta":"Chat salvata sul dispositivo"}</span></span></label>`).join(""):`<div class="delete-empty">Nessuna chat da cancellare.</div>`;
+  $("deleteModal").classList.remove("hidden");
+}
+function closeDeleteModal(){ $("deleteModal")?.classList.add("hidden"); }
+async function deleteGirlCompletely(id){
+  const all=await getAll("messages");
+  for(const m of all.filter(x=>x.girlId===id)) await del("messages",m.id);
+  await del("girls",id);
+  await clearGirlState(id);
+  girlStates.delete(id);
+}
+async function confirmDeleteChats(){
+  const checks=[...document.querySelectorAll('#deleteChatList input[type="checkbox"]:checked')];
+  const ids=checks.map(x=>x.value);
+  if(!ids.length){ closeDeleteModal(); return; }
+  if(!confirm(`Cancellare definitivamente ${ids.length} chat?`)) return;
+  const deletingSelected=selectedId && ids.includes(selectedId);
+  for(const id of ids) await deleteGirlCompletely(id);
+  closeDeleteModal();
+  await renderGirls();
+  if(deletingSelected){
+    selectedId=null;
+    localStorage.removeItem("selectedGirl");
+    $("chat").classList.add("hidden");
+    $("empty").classList.remove("hidden");
+    $("girlTitle").textContent="Seleziona una ragazza";
+    $("girlSub").textContent="Le conversazioni restano separate";
+    $("messages").innerHTML="";
+    $("results").innerHTML="";
+  }
+}
+$("deleteChat")?.addEventListener("click",openDeleteModal);
+$("cancelDelete")?.addEventListener("click",closeDeleteModal);
+$("deleteModal")?.addEventListener("click",e=>{if(e.target===$("deleteModal"))closeDeleteModal()});
+$("selectAllChats")?.addEventListener("click",()=>document.querySelectorAll('#deleteChatList input[type="checkbox"]').forEach(x=>x.checked=true));
+$("clearAllChats")?.addEventListener("click",()=>document.querySelectorAll('#deleteChatList input[type="checkbox"]').forEach(x=>x.checked=false));
+$("confirmDelete")?.addEventListener("click",confirmDeleteChats);
+
 async function buildContext(){const g=await getGirl(selectedId),ms=await messagesFor(selectedId);return {girl:{id:g?.id,name:g?.name,note:g?.note||"",memory:g?.memory||""},memory:g?.memory||"",conversation:ms.slice(-16),previousReplies:ms.filter(x=>x.role==="me").map(x=>x.text).slice(-12)}}
 function demoReplies(style){const base={flirt:["Hai un modo tutto tuo di farti notare… e direi che funziona.","Con te rischio di prendere gusto a queste conversazioni.","Non so se sei più pericolosa quando sorridi o quando fai finta di niente."],stuzzica:["Tu fai sempre così o oggi ti sei impegnata apposta?","Mi sa che ti piace mettermi alla prova.","Attenta, che prima o poi ti rispondo come meriti."],poeta:["Ci sono persone che arrivano in una conversazione e cambiano subito il ritmo.","Alcune parole restano, anche quando la chat finisce.","Hai quel tipo di presenza che si nota senza chiedere attenzione."],ironico:["Va bene, segno tutto: oggi hai deciso di rendermi il lavoro difficile.","Ottimo, anche oggi la normalità è ufficialmente saltata.","Tranquilla, faccio finta di non aver capito quanto sei furba."],dolce:["Mi piace quando mi racconti queste cose.","Con te parlare viene abbastanza naturale.","Mi fai sorridere più spesso di quanto dovresti."],audace:["Potrei dirti quello che penso, ma rischierei di farti sorridere troppo.","Se continuo così, prima o poi dovrai concedermi un caffè.","Non provocarmi se poi non vuoi vedere dove porta la curiosità."],erotica:["Con te la fantasia prende una piega decisamente interessante…","Hai quel modo di provocare che rende difficile restare innocenti.","Se continui a guardarmi così, la conversazione potrebbe diventare molto più intrigante."]};return base[style]||base.flirt}
 
