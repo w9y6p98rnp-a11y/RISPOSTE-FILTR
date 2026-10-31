@@ -86,14 +86,23 @@
     <div class="memory-modal-head">
       <div>
         <h2>🧠 Cose da ricordare</h2>
-        <p class="hint">Queste informazioni verranno considerate dall'AI quando genera le risposte per questa ragazza.</p>
+        <p class="hint">Prima scegli a quale ragazza vuoi associare le informazioni.</p>
       </div>
       <button type="button" id="closeMemory" class="memory-close">×</button>
     </div>
-    <textarea id="memoryInput" rows="9" placeholder="Esempio: ama il mare, lavora..., ci siamo conosciuti..."></textarea>
+
+    <div class="memory-select-label">👩 Ragazza</div>
+    <div id="memoryGirlList" class="memory-girl-list"></div>
+
+    <div id="memoryEditor" class="memory-editor hidden">
+      <div id="memorySelectedGirl" class="memory-selected-girl"></div>
+      <textarea id="memoryInput" rows="8" placeholder="Scrivi qui cosa vuoi ricordare di lei: che tipo di ragazza è, quando vi siete conosciuti, cosa le piace, cosa avete fatto, dettagli importanti..."></textarea>
+      <div class="memory-help">Queste informazioni verranno considerate dall'AI quando genera le risposte per questa ragazza.</div>
+    </div>
+
     <div class="modal-actions">
       <button type="button" id="cancelMemory" class="secondary">Chiudi</button>
-      <button type="button" id="saveMemory" class="primary">Salva memoria</button>
+      <button type="button" id="saveMemory" class="primary" disabled>Salva memoria</button>
     </div>
   </div>
 </div>

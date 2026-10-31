@@ -270,25 +270,69 @@ $("aiHint")?.addEventListener("input",()=>{
   }
 });
 
+let memorySelectedGirlId=null;
+
+async function renderMemoryGirlList(){
+  const all=await getAll("girls");
+  all.sort((a,b)=>b.updatedAt-a.updatedAt);
+  const list=$("memoryGirlList");
+
+  if(!all.length){
+    list.innerHTML='<div class="memory-empty">Non hai ancora aggiunto nessuna ragazza.</div>';
+    $("memoryEditor").classList.add("hidden");
+    $("saveMemory").disabled=true;
+    return;
+  }
+
+  list.innerHTML=all.map(g=>`
+    <button type="button" class="memory-girl-option ${g.id===memorySelectedGirlId?"active":""}" data-memory-girl="${escapeAttr(g.id)}">
+      <span class="memory-girl-avatar">${esc((g.name||"?")[0].toUpperCase())}</span>
+      <span class="memory-girl-name">${esc(g.name)}</span>
+      <span class="memory-girl-check">${g.id===memorySelectedGirlId?"✓":"›"}</span>
+    </button>
+  `).join("");
+
+  list.querySelectorAll(".memory-girl-option").forEach(btn=>{
+    btn.onclick=()=>selectMemoryGirl(btn.dataset.memoryGirl);
+  });
+}
+
+async function selectMemoryGirl(id){
+  memorySelectedGirlId=id;
+  const g=await getGirl(id);
+  $("memoryInput").value=g?.memory||"";
+  $("memorySelectedGirl").innerHTML=`🧠 Memoria di <strong>${esc(g?.name||"Ragazza")}</strong>`;
+  $("memoryEditor").classList.remove("hidden");
+  $("saveMemory").disabled=false;
+  document.querySelectorAll(".memory-girl-option").forEach(x=>x.classList.toggle("active",x.dataset.memoryGirl===id));
+  setTimeout(()=>$("memoryInput").focus(),0);
+}
+
+async function openMemoryModal(){
+  memorySelectedGirlId=null;
+  $("memoryInput").value="";
+  $("memoryEditor").classList.add("hidden");
+  $("saveMemory").disabled=true;
+  $("memoryModal").classList.remove("hidden");
+  await renderMemoryGirlList();
+}
+
 $("saveMemory").onclick=async()=>{
-  if(!selectedId)return;
-  const g=await getGirl(selectedId);
+  if(!memorySelectedGirlId)return;
+  const g=await getGirl(memorySelectedGirlId);
+  if(!g)return;
   g.memory=$("memoryInput").value.trim();
   g.updatedAt=Date.now();
   await put("girls",g);
   await renderGirls();
   closeMemoryModal();
-  alert("Memoria salvata sul dispositivo.\n\nDa ora verrà considerata nelle risposte per "+g.name+".");
+  alert("Memoria salvata per "+g.name+".\n\nDa ora verrà considerata nelle risposte per questa ragazza.");
 };
-function openMemoryModal(){
-  if(!selectedId)return;
-  getGirl(selectedId).then(g=>{
-    $("memoryInput").value=g?.memory||"";
-    $("memoryModal").classList.remove("hidden");
-    setTimeout(()=>$("memoryInput").focus(),0);
-  });
+
+function closeMemoryModal(){
+  $("memoryModal").classList.add("hidden");
+  memorySelectedGirlId=null;
 }
-function closeMemoryModal(){$("memoryModal").classList.add("hidden")}
 $("openMemory").onclick=openMemoryModal;
 $("closeMemory").onclick=closeMemoryModal;
 $("cancelMemory").onclick=closeMemoryModal;
