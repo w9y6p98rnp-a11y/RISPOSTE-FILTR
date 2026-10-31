@@ -40,7 +40,10 @@ function extractJson(raw) {
       const adviceMatch = candidate.match(/"advice"\s*:\s*"((?:\\.|[^"\\])*)"/);
       let advice = "";
       if (adviceMatch) { try { advice = JSON.parse('"' + adviceMatch[1] + '"'); } catch (_) {} }
-      return { replies, recommendedIndex, recommendedNormalIndex, recommendedSecretIndex: secretRecommendedIndex, recommendationReason: reason, advice };
+      const sendWhenMatch = candidate.match(/"sendWhen"\s*:\s*"((?:\\.|[^"\\])*)"/);
+      let sendWhen = "";
+      if (sendWhenMatch) { try { sendWhen = JSON.parse('"' + sendWhenMatch[1] + '"'); } catch (_) {} }
+      return { replies, recommendedIndex, recommendedNormalIndex, recommendedSecretIndex: secretRecommendedIndex, recommendationReason: reason, advice, sendWhen };
     }
     throw new Error('Risposta AI non valida.');
   }
@@ -65,10 +68,16 @@ Le ultime 8 risposte sono le RISPOSTE SEGRETE: prima 3 Erotica e poi 5 Hot.
 Erotica e Hot devono essere nettamente più intensi delle risposte normali: sensuali, molto provocanti, audaci, cariche di desiderio, tensione fisica, doppisensi e allusioni. Hot deve essere il livello più spinto consentito: diretto, sfacciato e seducente, ma resta non grafico e non descrivere esplicitamente penetrazione, posizioni sessuali, sculacciate o altri atti sessuali.
 
 Le 26 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghezza e livello di iniziativa. Non fare semplici variazioni della stessa frase.
-Usa italiano naturale da chat. Mantieni ogni risposta breve e pronta da inviare, idealmente entro 1-2 frasi. Evita frasi banali e ripetitive.
+Usa italiano naturale da chat. Mantieni ogni risposta breve e pronta da inviare: una sola frase, idealmente entro 15 parole. Evita frasi banali e ripetitive.
 Considera la cronologia e le risposte già inviate per evitare di riproporre le stesse formule.
 Se lo screenshot contiene più messaggi, interpreta il contesto della conversazione prima di rispondere.
 Non inventare dettagli che non sono visibili o presenti nel contesto.
+
+REGOLA SUL MOMENTO IN CUI INVIARE:
+- Se dal contesto o dalla tua valutazione consigli di non scrivere oggi e di aspettare domani, 2 giorni, 3 giorni o un altro intervallo, le 26 risposte devono essere pensate ESPLICITAMENTE per essere inviate dopo quell'attesa.
+- In questo caso non scrivere messaggi adatti a stasera, non fare riferimenti a una serata imminente e non formulare risposte come se si dovesse continuare subito la conversazione.
+- Devono essere messaggi che riaprono naturalmente il contatto dopo il periodo di silenzio, senza sembrare un inseguimento.
+- Se invece ritieni corretto scrivere oggi, genera normalmente messaggi adatti al momento presente.
 
 Dopo aver generato le 26 alternative, scegli anche una risposta consigliata per ciascuna delle due categorie.
 - recommendedNormalIndex: indice di una delle prime 18 risposte normali.
@@ -77,13 +86,13 @@ Dopo aver generato le 26 alternative, scegli anche una risposta consigliata per 
 La scelta deve tenere conto del tono di lei, di ciò che è stato appena detto, della storia della chat e del rischio di risultare fuori luogo o ripetitivi. Non scegliere automaticamente la più audace: scegli quella con la probabilità migliore di far proseguire bene la conversazione. Per le risposte segrete scegli quella più adatta al livello di confidenza mostrato nella conversazione.
 
 GESTIONE DEL CONSIGLIO DELL'UTENTE:
-- Se l'INDICAZIONE DELL'UTENTE chiede esplicitamente un consiglio o una decisione sul da farsi (per esempio "mi consigli se scriverle?", "le mando un altro messaggio?", "devo aspettare?", "non ha risposto, cosa faccio?"), compila anche il campo "advice" con un consiglio breve, concreto e riferito alla situazione visibile nella chat. Questo consiglio deve comparire prima delle risposte nella schermata.
+- Se l'INDICAZIONE DELL'UTENTE chiede esplicitamente un consiglio o una decisione sul da farsi (per esempio "mi consigli se scriverle?", "le mando un altro messaggio?", "devo aspettare?", "non ha risposto, cosa faccio?"), compila anche il campo "advice" con un consiglio breve, concreto e riferito alla situazione visibile nella chat. Questo consiglio deve comparire prima delle risposte nella schermata. Deve anche dire chiaramente quando conviene inviare il prossimo messaggio (oggi, domani, tra 2 giorni, tra 3 giorni, ecc.) quando la situazione lo richiede.
 - Se l'INDICAZIONE DELL'UTENTE chiede solo di cambiare, rifare, rendere più provocatorie, più dolci, più ironiche o comunque modificare le risposte, NON compilare "advice": applica direttamente l'indicazione alle nuove risposte.
 - Se l'INDICAZIONE DELL'UTENTE è vuota, NON dare alcun consiglio extra: genera automaticamente le risposte come al solito.
 - Non inventare una richiesta di consiglio quando l'utente non l'ha fatta.
 
 Restituisci SOLO JSON valido, senza markdown, nel formato:
-{"replies":[{"style":"Flirt","text":"..."}, ...],"recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":18,"recommendationReason":"Spiegazione breve e concreta del perché queste scelte sono adatte al momento.","advice":""}
+{"replies":[{"style":"Flirt","text":"..."}, ...],"recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":18,"recommendationReason":"Motivo breve.","advice":"","sendWhen":"oggi"}
 
 Il campo "advice" deve essere valorizzato solo quando l'utente ha esplicitamente chiesto un consiglio; altrimenti deve essere una stringa vuota.
 
@@ -134,7 +143,7 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 18000) {
     body: JSON.stringify({
       contents: [{ role: 'user', parts }],
       generationConfig: {
-        maxOutputTokens: 1500,
+        maxOutputTokens: 1250,
         responseMimeType: 'application/json',
         thinkingConfig: {
           thinkingLevel: 'minimal'
@@ -168,7 +177,7 @@ async function callOpenRouter(apiKey, prompt, image) {
       model: 'openrouter/free',
       messages: [{ role: 'user', content }],
       temperature: 0.85,
-      max_tokens: 1400,
+      max_tokens: 1200,
       response_format: { type: 'json_object' }
     })
   });

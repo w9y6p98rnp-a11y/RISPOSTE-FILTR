@@ -306,14 +306,14 @@ async function compressImageForAI(file){
       el.onerror=reject;
       el.src=src;
     });
-    const maxW=900, maxH=1200;
+    const maxW=700, maxH=1000;
     const scale=Math.min(1,maxW/img.naturalWidth,maxH/img.naturalHeight);
     const w=Math.max(1,Math.round(img.naturalWidth*scale));
     const h=Math.max(1,Math.round(img.naturalHeight*scale));
     const canvas=document.createElement('canvas');
     canvas.width=w; canvas.height=h;
     canvas.getContext('2d').drawImage(img,0,0,w,h);
-    return canvas.toDataURL('image/jpeg',0.55);
+    return canvas.toDataURL('image/jpeg',0.48);
   }finally{
     URL.revokeObjectURL(src);
   }
@@ -451,8 +451,9 @@ $("generate").onclick=async()=>{
     const secretRecommendedIndex=validIndex(data.recommendedSecretIndex,secretIndexes,secretIndexes[0] ?? recommendedIndex);
     const recommendationReason=String(data.recommendationReason||"Questa è quella che si adatta meglio al momento della conversazione.");
     const aiAdvice=String(data.advice||"").trim();
+    const sendWhen=String(data.sendWhen||"").trim();
     const adviceHtml=aiAdvice
-      ? `<div class="ai-advice-card"><div class="ai-advice-title">💡 Consiglio dell'AI</div><div class="ai-advice-text">${escapeHtml(aiAdvice)}</div></div>`
+      ? `<div class="ai-advice-card"><div class="ai-advice-title">💡 Consiglio dell'AI</div><div class="ai-advice-text">${escapeHtml(aiAdvice)}</div>${sendWhen ? `<div class="ai-send-when">🕒 Da inviare: ${escapeHtml(sendWhen)}</div>` : ""}</div>`
       : "";
     const renderCard=(r,i,categoryRecommendedIndex)=>{
       const t=typeof r==="string"?r:(r.text||"");

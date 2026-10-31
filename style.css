@@ -59,3 +59,6 @@ body.light-theme .ai-advice-text{color:#172033}
 /* Nomi ragazze: usa tutta la larghezza disponibile */
 .girl-meta{min-width:0;flex:1;display:block}
 .girl-name{display:block;width:100%;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.ai-send-when{margin-top:10px;padding-top:10px;border-top:1px solid rgba(147,197,253,.28);font-weight:900;color:#93c5fd}
+body.light-theme .ai-send-when{color:#2563eb;border-top-color:rgba(37,99,235,.2)}
