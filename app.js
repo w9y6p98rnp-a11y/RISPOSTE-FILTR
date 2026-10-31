@@ -109,6 +109,40 @@ async function createGirl(e){
   }
 }
 $("newGirl").onclick=$("emptyNew").onclick=()=>{$("modal").classList.remove("hidden");$("girlName").focus()};
+$("chooseScreenshot").onclick=()=>{
+  const input=$("screenshotInput");
+  if(input){ input.value=""; input.click(); }
+};
+$("screenshotInput").addEventListener("change",async e=>{
+  const file=e.target.files?.[0];
+  if(!file)return;
+  if(!file.type.startsWith("image/")){
+    alert("Seleziona un'immagine.");
+    e.target.value="";
+    return;
+  }
+  if(!selectedId)return;
+  try{
+    selectedImageFile=file;
+    const state=getGirlState(selectedId);
+    state.imageFile=file;
+    state.imageName="Screenshot: "+file.name;
+    state.imageData=await compressImageForAI(file);
+    $("imageName").textContent=state.imageName;
+    await persistGirlState(selectedId);
+    await renderMessages();
+  }catch(err){
+    console.error("Errore caricamento screenshot",err);
+    selectedImageFile=null;
+    const state=getGirlState(selectedId);
+    state.imageFile=null;
+    state.imageData=null;
+    state.imageName="Nessuno screenshot inserito";
+    $("imageName").textContent=state.imageName;
+    e.target.value="";
+    alert("Non riesco a caricare questo screenshot. Prova con un'altra immagine.");
+  }
+});
 $("cancelGirl").onclick=()=>{$("modal").classList.add("hidden")};
 $("createGirl").onclick=createGirl;
 $("girlName").addEventListener("keydown",e=>{if(e.key==="Enter")createGirl(e)});
