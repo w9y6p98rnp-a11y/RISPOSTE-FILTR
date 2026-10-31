@@ -15,7 +15,10 @@
     <div class="side-head"><b>RispostaFlirt</b><button id="closeSide">×</button></div>
     <button id="newGirl" class="primary">＋ Nuova ragazza</button>
     <div id="girlList" class="girl-list"></div>
-    <button id="deleteChat" class="danger side-delete">🗑️ Elimina chat</button>
+    <div class="side-bottom">
+      <button id="openMemory" class="side-memory" title="Cose da ricordare">🧠 <span>Cose da ricordare</span></button>
+      <button id="deleteChat" class="danger side-delete">🗑️ Elimina chat</button>
+    </div>
     <div class="privacy">Memoria salvata sul dispositivo.<br>Nessun account richiesto.</div>
   </aside>
   <div id="overlay"></div>
@@ -36,9 +39,8 @@
     </section>
 
     <section id="chat" class="chat hidden">
-      <div class="tabs">
-        <button data-tab="chatTab" class="tab active">Conversazione</button>
-        <button data-tab="memoryTab" class="tab">Cose da ricordare</button>
+      <div class="tabs single-tab">
+        <button class="tab active">Conversazione</button>
       </div>
 
       <div id="chatTab" class="tabpage">
@@ -70,12 +72,6 @@
         <div id="results" class="results"></div>
       </div>
 
-      <div id="memoryTab" class="tabpage hidden">
-        <h3>🧠 Cose da ricordare</h3>
-        <p class="hint">Scrivi dettagli utili su di lei: gusti, lavoro, battute, appuntamenti, cose già dette.</p>
-        <textarea id="memoryInput" rows="8" placeholder="Esempio: ama il mare, lavora..., ci siamo conosciuti..."></textarea>
-        <button id="saveMemory" class="primary">Salva memoria</button>
-      </div>
     </section>
   </main>
 </div>
@@ -88,6 +84,23 @@
     <div class="modal-actions">
       <button type="button" id="cancelGirl" class="secondary">Annulla</button>
       <button type="button" id="createGirl" class="primary">Crea</button>
+    </div>
+  </div>
+</div>
+
+<div id="memoryModal" class="modal hidden">
+  <div class="modal-card memory-modal-card">
+    <div class="memory-modal-head">
+      <div>
+        <h2>🧠 Cose da ricordare</h2>
+        <p class="hint">Queste informazioni verranno considerate dall'AI quando genera le risposte per questa ragazza.</p>
+      </div>
+      <button type="button" id="closeMemory" class="memory-close">×</button>
+    </div>
+    <textarea id="memoryInput" rows="9" placeholder="Esempio: ama il mare, lavora..., ci siamo conosciuti..."></textarea>
+    <div class="modal-actions">
+      <button type="button" id="cancelMemory" class="secondary">Chiudi</button>
+      <button type="button" id="saveMemory" class="primary">Salva memoria</button>
     </div>
   </div>
 </div>

@@ -9,3 +9,15 @@
 .chat-image{display:block;width:100%;max-width:320px;max-height:430px;object-fit:contain;border-radius:12px;background:#020617;border:1px solid #334155}.bubble.has-image{padding:7px;overflow:hidden}.bubble.has-image small{padding:0 5px 2px}.bubble-text{white-space:pre-wrap;word-break:break-word}.pending-bubble{opacity:.95;border-style:dashed!important}.pending-label{font-size:11px;color:#93c5fd;padding:6px 4px 2px}.send-button{min-width:170px}@media(max-width:760px){.chat-image{max-width:100%;max-height:380px}.send-button{width:100%}}
 
 .ai-hint-box{margin-top:10px;padding:10px;border:1px solid #334155;border-radius:12px;background:#0d1523}.ai-hint-box label{display:block;color:#93c5fd;font-size:13px;font-weight:800;margin-bottom:7px}.ai-hint-box textarea{min-height:64px;margin:0}
+
+/* Memoria spostata nella parte bassa della barra laterale */
+.side-bottom{margin-top:auto;display:grid;gap:8px}
+.side-memory{width:100%;display:flex;align-items:center;justify-content:flex-start;gap:8px;padding:9px 11px;border-radius:10px;background:#111b2a;color:#cbd5e1;border:1px solid #334155;font-size:13px;font-weight:700}
+.side-memory:hover{background:#1a2638}
+.memory-modal-card{max-height:min(82vh,720px)}
+.memory-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.memory-modal-head h2{margin:0 0 5px}
+.memory-close{background:#1f2937;color:#cbd5e1;border:1px solid #374151;border-radius:9px;width:34px;height:34px;font-size:24px;line-height:1;flex:none}
+.single-tab{margin-bottom:12px}
+.single-tab .tab{cursor:default}
+@media(max-width:760px){.side-memory{padding:10px 12px}.memory-modal-card{width:min(420px,100%)}}

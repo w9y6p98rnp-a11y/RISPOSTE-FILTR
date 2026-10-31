@@ -271,8 +271,29 @@ $("aiHint")?.addEventListener("input",()=>{
   }
 });
 
-$("saveMemory").onclick=async()=>{const g=await getGirl(selectedId);g.memory=$("memoryInput").value;g.updatedAt=Date.now();await put("girls",g);await renderGirls();alert("Memoria salvata sul dispositivo.")};
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tabpage").forEach(x=>x.classList.add("hidden"));b.classList.add("active");$(b.dataset.tab).classList.remove("hidden")});
+$("saveMemory").onclick=async()=>{
+  if(!selectedId)return;
+  const g=await getGirl(selectedId);
+  g.memory=$("memoryInput").value.trim();
+  g.updatedAt=Date.now();
+  await put("girls",g);
+  await renderGirls();
+  closeMemoryModal();
+  alert("Memoria salvata sul dispositivo.\n\nDa ora verrà considerata nelle risposte per "+g.name+".");
+};
+function openMemoryModal(){
+  if(!selectedId)return;
+  getGirl(selectedId).then(g=>{
+    $("memoryInput").value=g?.memory||"";
+    $("memoryModal").classList.remove("hidden");
+    setTimeout(()=>$("memoryInput").focus(),0);
+  });
+}
+function closeMemoryModal(){$("memoryModal").classList.add("hidden")}
+$("openMemory").onclick=openMemoryModal;
+$("closeMemory").onclick=closeMemoryModal;
+$("cancelMemory").onclick=closeMemoryModal;
+$("memoryModal").addEventListener("click",e=>{if(e.target===$("memoryModal"))closeMemoryModal()});
 
 async function buildContext(){const g=await getGirl(selectedId),ms=await messagesFor(selectedId);return {girl:{id:g?.id,name:g?.name,note:g?.note||"",memory:g?.memory||""},memory:g?.memory||"",conversation:ms.slice(-16),previousReplies:ms.filter(x=>x.role==="me").map(x=>x.text).slice(-12)}}
 function demoReplies(style){const base={flirt:["Hai un modo tutto tuo di farti notare… e direi che funziona.","Con te rischio di prendere gusto a queste conversazioni.","Non so se sei più pericolosa quando sorridi o quando fai finta di niente."],stuzzica:["Tu fai sempre così o oggi ti sei impegnata apposta?","Mi sa che ti piace mettermi alla prova.","Attenta, che prima o poi ti rispondo come meriti."],poeta:["Ci sono persone che arrivano in una conversazione e cambiano subito il ritmo.","Alcune parole restano, anche quando la chat finisce.","Hai quel tipo di presenza che si nota senza chiedere attenzione."],ironico:["Va bene, segno tutto: oggi hai deciso di rendermi il lavoro difficile.","Ottimo, anche oggi la normalità è ufficialmente saltata.","Tranquilla, faccio finta di non aver capito quanto sei furba."],dolce:["Mi piace quando mi racconti queste cose.","Con te parlare viene abbastanza naturale.","Mi fai sorridere più spesso di quanto dovresti."],audace:["Potrei dirti quello che penso, ma rischierei di farti sorridere troppo.","Se continuo così, prima o poi dovrai concedermi un caffè.","Non provocarmi se poi non vuoi vedere dove porta la curiosità."]};return base[style]||base.flirt}
