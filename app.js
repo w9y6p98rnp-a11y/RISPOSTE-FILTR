@@ -61,9 +61,7 @@ function restoreGirlState(id){
   if($("aiHint")) $("aiHint").value=st.aiHint||"";
   if($("screenshotInput")) $("screenshotInput").value="";
   if($("cameraInput")) $("cameraInput").value="";
-  if($("audioInput")) $("audioInput").value="";
   $("imageName").textContent=st.imageName||"Nessuno screenshot inserito";
-  $("audioName").textContent=st.audioName||"Nessuna registrazione vocale inserita";
   $("results").innerHTML=st.resultsHtml||"";
   applySettings();
   document.querySelectorAll(".role").forEach(x=>x.classList.toggle("active",x.dataset.role===currentRole));
@@ -135,7 +133,7 @@ if($("saveMsg")) $("saveMsg").onclick=async()=>{
   if(!selectedId)return;
   const text=$("msgInput")?.value.trim()||"";
   const st=getGirlState(selectedId);
-  if(!text && !st.imageData && !st.audioData){alert("Inserisci una risposta oppure aggiungi uno screenshot o una registrazione vocale.");return;}
+  if(!text && !st.imageData && !st.audioData){alert("Inserisci una risposta oppure aggiungi uno screenshot. Se il vocale è un file audio, selezionalo insieme allo screenshot.");return;}
   const now=Date.now();
   // Screenshot e registrazione rappresentano il messaggio ricevuto da lei; la risposta scritta viene subito sotto.
   if(st.imageData || st.audioData){
@@ -159,9 +157,8 @@ if($("saveMsg")) $("saveMsg").onclick=async()=>{
   selectedAudioFile=null;
   if($("screenshotInput")) $("screenshotInput").value="";
   if($("cameraInput")) $("cameraInput").value="";
-  if($("audioInput")) $("audioInput").value="";
+  if($("screenshotInput")) $("screenshotInput").value="";
   $("imageName").textContent="Nessuno screenshot inserito";
-  $("audioName").textContent="Nessuna registrazione vocale inserita";
   $("results").innerHTML="";
   await persistGirlState(selectedId);
   await renderMessages();
@@ -261,18 +258,41 @@ $("confirmDelete").onclick=async()=>{
     $("confirmDelete").disabled=false;
   }
 };
-async function showSelectedImage(e){
- const f=e.target.files?.[0] || null;
- selectedImageFile=f;
+async function showSelectedMedia(e){
+ const files=[...(e.target.files||[])];
+ const imageFile=files.find(f=>f.type?.startsWith("image/"))||null;
+ const audioFile=files.find(f=>f.type?.startsWith("audio/"))||null;
+ if(!imageFile && !audioFile){
+   e.target.value="";
+   alert("Seleziona uno screenshot oppure il file audio del vocale.");
+   return;
+ }
+ if(audioFile && audioFile.size>12*1024*1024){
+   alert("La registrazione è troppo grande. Per questa versione usa un audio fino a 12 MB.");
+   e.target.value="";
+   return;
+ }
+ selectedImageFile=imageFile;
+ selectedAudioFile=audioFile;
  if(selectedId){
    const st=getGirlState(selectedId);
-   st.imageFile=f;
-   st.imageData=f?await compressImageForAI(f):null;
-   st.imageName=f ? "Screenshot: "+f.name : "Nessuno screenshot inserito";
+   st.imageFile=imageFile;
+   st.imageData=imageFile?await compressImageForAI(imageFile):null;
+   st.imageName=imageFile ? "Screenshot: "+imageFile.name : "Nessuno screenshot inserito";
+   st.audioFile=audioFile;
+   st.audioData=audioFile?await fileToDataUrl(audioFile):null;
+   st.audioName=audioFile ? audioFile.name : "";
+   st.audioTranscript="";
    st.resultsHtml="";
    await persistGirlState(selectedId);
  }
- $("imageName").textContent=f ? "Screenshot: "+f.name : "Nessuno screenshot inserito";
+ if(imageFile && audioFile){
+   $("imageName").textContent=`Screenshot + 🎙️ vocale rilevato: ${imageFile.name}`;
+ }else if(imageFile){
+   $("imageName").textContent=`Screenshot: ${imageFile.name}`;
+ }else{
+   $("imageName").textContent=`🎙️ Vocale rilevato: ${audioFile.name}`;
+ }
  $("results").innerHTML="";
  await renderMessages();
 }
@@ -284,30 +304,8 @@ async function fileToDataUrl(file){
     reader.readAsDataURL(file);
   });
 }
-async function showSelectedAudio(e){
- const f=e.target.files?.[0] || null;
- selectedAudioFile=f;
- if(f && f.size>12*1024*1024){
-   alert("La registrazione è troppo grande. Per questa versione usa un audio fino a 12 MB.");
-   e.target.value=""; selectedAudioFile=null; return;
- }
- if(selectedId){
-   const st=getGirlState(selectedId);
-   st.audioFile=f;
-   st.audioData=f?await fileToDataUrl(f):null;
-   st.audioName=f ? f.name : "";
-   st.audioTranscript="";
-   st.resultsHtml="";
-   await persistGirlState(selectedId);
- }
- $("audioName").textContent=f ? "Registrazione: "+f.name : "Nessuna registrazione vocale inserita";
- $("results").innerHTML="";
- await renderMessages();
-}
-$("screenshotInput")?.addEventListener("change",showSelectedImage);
+$("screenshotInput")?.addEventListener("change",showSelectedMedia);
 $("chooseScreenshot")?.addEventListener("click",()=> $("screenshotInput").click());
-$("audioInput")?.addEventListener("change",showSelectedAudio);
-$("chooseAudio")?.addEventListener("click",()=> $("audioInput").click());
 
 $("aiHint")?.addEventListener("input",()=>{
   if(selectedId){
@@ -491,7 +489,7 @@ $("generate").onclick=async()=>{
   const hasImage=Boolean(selectedImageFile || state.imageData);
   const hasAudio=Boolean(selectedAudioFile || state.audioData);
   if(!hasImage && !hasAudio){
-    alert("Aggiungi uno screenshot oppure una registrazione vocale prima di analizzare.");
+    alert("Aggiungi uno screenshot prima di analizzare. Se nello scambio c’è un vocale, seleziona anche il file audio insieme allo screenshot.");
     return;
   }
   $("generate").disabled=true;
