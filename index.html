@@ -4,8 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="RispostaFlirt">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="stylesheet" href="style.css">
 <title>RispostaFlirt</title>
 </head>
@@ -86,12 +92,12 @@
     <div class="memory-modal-head">
       <div>
         <h2>🧠 Cose da ricordare</h2>
-        <p id="memoryModalHint" class="hint">Prima scegli a quale ragazza vuoi associare le informazioni.</p>
+        <p class="hint">Prima scegli a quale ragazza vuoi associare le informazioni.</p>
       </div>
       <button type="button" id="closeMemory" class="memory-close">×</button>
     </div>
 
-    <div id="memoryGirlSelectLabel" class="memory-select-label">👩 Ragazza</div>
+    <div class="memory-select-label">👩 Ragazza</div>
     <div id="memoryGirlList" class="memory-girl-list"></div>
 
     <div id="memoryEditor" class="memory-editor hidden">
@@ -104,6 +110,23 @@
       <button type="button" id="cancelMemory" class="secondary">Chiudi</button>
       <button type="button" id="saveMemory" class="primary" disabled>Salva memoria</button>
     </div>
+  </div>
+</div>
+
+<div id="installModal" class="modal hidden">
+  <div class="modal-card install-card">
+    <div class="settings-head">
+      <div><h2>📲 Installa RispostaFlirt</h2><p class="hint" id="installIntro">Aggiungila alla schermata Home per usarla come un’app.</p></div>
+      <button type="button" id="closeInstall" class="memory-close" aria-label="Chiudi">×</button>
+    </div>
+    <div id="iosInstallSteps" class="install-steps">
+      <div><b>1.</b><span>Apri RispostaFlirt in <strong>Safari</strong>.</span></div>
+      <div><b>2.</b><span>Tocca <strong>Condividi</strong>.</span></div>
+      <div><b>3.</b><span>Scorri e scegli <strong>Aggiungi a Home</strong>.</span></div>
+      <div><b>4.</b><span>Attiva <strong>Apri come app web</strong>, se compare, poi tocca <strong>Aggiungi</strong>.</span></div>
+    </div>
+    <div class="install-note">Dopo l’installazione troverai l’icona di RispostaFlirt sulla Home e si aprirà senza la barra di Safari.</div>
+    <div class="modal-actions"><button type="button" id="closeInstallBottom" class="primary">Fatto</button></div>
   </div>
 </div>
 
@@ -132,6 +155,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20261101-memory4"></script>
+<script src="app.js?v=20261101-ios1"></script>
 </body>
 </html>
