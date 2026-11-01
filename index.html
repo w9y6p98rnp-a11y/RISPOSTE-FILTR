@@ -194,7 +194,20 @@
     <div class="settings-head"><div><h2>⚙️ Altre impostazioni</h2><p class="hint">Personalizza l’aspetto dell’app e la dimensione delle sole risposte.</p></div><button type="button" id="closeSettings" class="memory-close">×</button></div>
     <div class="setting-row"><div><b>🌗 Tema</b><div class="setting-help">Scegli tra chiaro e scuro.</div></div><div class="theme-switch"><button type="button" class="theme-option" data-theme="dark">Scuro</button><button type="button" class="theme-option" data-theme="light">Chiaro</button></div></div>
     <div class="setting-row"><div><b>🔎 Zoom interfaccia</b><div class="setting-help">Modifica la dimensione delle risposte, della barra laterale e delle finestre come “Cose da ricordare”.</div></div><div class="zoom-control"><input id="replyZoom" type="range" min="80" max="150" step="5" value="100"><span id="replyZoomValue">100%</span></div></div>
+    <button type="button" id="openFontSettings" class="setting-option">
+      <span class="setting-option-icon">🔤</span>
+      <span class="setting-option-copy"><b>Font della scrittura</b><small id="fontSettingValue">Sistema</small></span>
+      <span class="setting-option-arrow">›</span>
+    </button>
     <div class="modal-actions"><button type="button" id="closeSettingsBottom" class="primary">Fatto</button></div>
+  </div>
+</div>
+
+<div id="fontModal" class="modal hidden">
+  <div class="modal-card font-modal-card">
+    <div class="settings-head"><div><h2>🔤 Scegli il font</h2><p class="hint">Seleziona il carattere che vuoi usare nell'app, poi premi Salva.</p></div><button type="button" id="closeFontModal" class="memory-close">×</button></div>
+    <div id="fontList" class="font-list"></div>
+    <div class="modal-actions"><button type="button" id="cancelFont" class="secondary">Annulla</button><button type="button" id="saveFont" class="primary">Salva</button></div>
   </div>
 </div>
 
@@ -214,6 +227,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20261101-password1"></script>
+<script src="app.js?v=20261101-font1"></script>
 </body>
 </html>

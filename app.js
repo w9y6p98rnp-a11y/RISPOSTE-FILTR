@@ -556,13 +556,36 @@ function escapeAttr(s){return escapeHtml(s);}
 
 
 // Impostazioni locali: tema e zoom dell’interfaccia/risposte.
+const FONT_OPTIONS=[
+  {id:"system",name:"Sistema",stack:'-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif'},
+  {id:"avenir",name:"Avenir",stack:'Avenir, "Avenir Next", sans-serif'},
+  {id:"futura",name:"Futura",stack:'Futura, "Avenir Next", sans-serif'},
+  {id:"helvetica",name:"Helvetica",stack:'Helvetica, Arial, sans-serif'},
+  {id:"verdana",name:"Verdana",stack:'Verdana, Geneva, sans-serif'},
+  {id:"trebuchet",name:"Trebuchet",stack:'"Trebuchet MS", sans-serif'},
+  {id:"georgia",name:"Georgia",stack:'Georgia, serif'},
+  {id:"times",name:"Times",stack:'"Times New Roman", Times, serif'},
+  {id:"palatino",name:"Palatino",stack:'Palatino, "Palatino Linotype", serif'},
+  {id:"baskerville",name:"Baskerville",stack:'Baskerville, "Times New Roman", serif'},
+  {id:"courier",name:"Courier",stack:'"Courier New", Courier, monospace'},
+  {id:"menlo",name:"Menlo",stack:'Menlo, Monaco, monospace'},
+  {id:"chalkboard",name:"Chalkboard",stack:'Chalkboard, "Comic Sans MS", cursive'},
+  {id:"marker",name:"Marker Felt",stack:'"Marker Felt", Chalkboard, cursive'},
+  {id:"papyrus",name:"Papyrus",stack:'Papyrus, fantasy'},
+  {id:"copperplate",name:"Copperplate",stack:'Copperplate, "Copperplate Gothic Light", fantasy'}
+];
+let pendingFontId="system";
+function getFontOption(id){return FONT_OPTIONS.find(f=>f.id===id)||FONT_OPTIONS[0];}
 function settingsKey(){return `RispostaFlirtSettings_${currentUser?.id||"local"}`;}
-function loadSettings(){try{return {...{theme:"dark",replyZoom:100},...(JSON.parse(localStorage.getItem(settingsKey())||"{}"))}}catch(e){return {theme:"dark",replyZoom:100}}}
-function applySettings(){const s=loadSettings();document.body.classList.toggle("light-theme",s.theme==="light");const zoom=String((Number(s.replyZoom)||100)/100);document.documentElement.style.setProperty("--ui-zoom",zoom);const r=$("results");if(r)r.style.setProperty("--reply-zoom",zoom);document.querySelectorAll(".theme-option").forEach(b=>b.classList.toggle("active",b.dataset.theme===s.theme));if($("replyZoom"))$("replyZoom").value=String(s.replyZoom||100);if($("replyZoomValue"))$("replyZoomValue").textContent=(s.replyZoom||100)+"%";}
+function loadSettings(){try{return {...{theme:"dark",replyZoom:100,font:"system"},...(JSON.parse(localStorage.getItem(settingsKey())||"{}"))}}catch(e){return {theme:"dark",replyZoom:100,font:"system"}}}
+function applySettings(){const s=loadSettings();document.body.classList.toggle("light-theme",s.theme==="light");const zoom=String((Number(s.replyZoom)||100)/100);document.documentElement.style.setProperty("--ui-zoom",zoom);const r=$("results");if(r)r.style.setProperty("--reply-zoom",zoom);const font=getFontOption(s.font);document.documentElement.style.setProperty("--app-font",font.stack);document.querySelectorAll(".theme-option").forEach(b=>b.classList.toggle("active",b.dataset.theme===s.theme));if($("replyZoom"))$("replyZoom").value=String(s.replyZoom||100);if($("replyZoomValue"))$("replyZoomValue").textContent=(s.replyZoom||100)+"%";if($("fontSettingValue"))$("fontSettingValue").textContent=font.name;}
 function saveSettings(patch){const next={...loadSettings(),...patch};localStorage.setItem(settingsKey(),JSON.stringify(next));if(serverSyncEnabled) scheduleServerSync();applySettings()}
+function renderFontList(){const current=getFontOption(pendingFontId);$("fontList").innerHTML=FONT_OPTIONS.map(f=>`<button type="button" class="font-option ${f.id===current.id?"selected":""}" data-font-id="${f.id}"><span class="font-option-name">${esc(f.name)}</span><span class="font-option-preview" style="font-family:${f.stack}">Aa — RispostaFlirt</span><span class="font-option-check">✓</span></button>`).join("");document.querySelectorAll(".font-option").forEach(b=>b.onclick=()=>{pendingFontId=b.dataset.fontId;renderFontList()});}
+function openFontModal(){pendingFontId=loadSettings().font||"system";renderFontList();$("fontModal").classList.remove("hidden")}
+function closeFontModal(){$("fontModal").classList.add("hidden")}
 function openSettings(){applySettings();$("settingsModal").classList.remove("hidden")}
 function closeSettings(){$("settingsModal").classList.add("hidden")}
-$("openSettings").onclick=openSettings;$("closeSettings").onclick=closeSettings;$("closeSettingsBottom").onclick=closeSettings;$("settingsModal").addEventListener("click",e=>{if(e.target.id==="settingsModal")closeSettings()});document.querySelectorAll(".theme-option").forEach(b=>b.onclick=()=>saveSettings({theme:b.dataset.theme}));$("replyZoom").addEventListener("input",e=>saveSettings({replyZoom:Number(e.target.value)}));applySettings();
+$("openSettings").onclick=openSettings;$("closeSettings").onclick=closeSettings;$("closeSettingsBottom").onclick=closeSettings;$("settingsModal").addEventListener("click",e=>{if(e.target.id==="settingsModal")closeSettings()});document.querySelectorAll(".theme-option").forEach(b=>b.onclick=()=>saveSettings({theme:b.dataset.theme}));$("replyZoom").addEventListener("input",e=>saveSettings({replyZoom:Number(e.target.value)}));$("openFontSettings").onclick=openFontModal;$("closeFontModal").onclick=closeFontModal;$("cancelFont").onclick=closeFontModal;$("fontModal").addEventListener("click",e=>{if(e.target.id==="fontModal")closeFontModal()});$("saveFont").onclick=()=>{saveSettings({font:pendingFontId});closeFontModal()};applySettings();
 
 // -------------------------
 // Autenticazione e sincronizzazione multiutente
