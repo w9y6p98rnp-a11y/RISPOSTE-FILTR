@@ -85,7 +85,7 @@ REGOLA SUL MOMENTO IN CUI INVIARE:
 - Se invece ritieni corretto scrivere oggi, genera normalmente messaggi adatti al momento presente.
 
 PRIORITÀ DEL CONSIGLIO:
-Prima di completare le 26 alternative, determina se l'utente ha chiesto un consiglio sul da farsi. Se sì, il consiglio e il momento di invio sono OBBLIGATORI e devono essere inseriti nel JSON prima di "replies".
+Prima di completare le 26 alternative, determina il consiglio operativo migliore. Il campo advice e il momento di invio sono SEMPRE OBBLIGATORI e devono essere inseriti nel JSON prima di "replies".
 - advice: consiglio breve, concreto e specifico alla situazione.
 - sendWhen: indica chiaramente "oggi", "domani", "tra 2 giorni", "tra 3 giorni" o altro intervallo motivato.
 Non lasciare advice vuoto quando l'utente ha chiesto esplicitamente se/ quando scrivere.
@@ -97,15 +97,14 @@ Dopo aver determinato advice e sendWhen, scegli anche una risposta consigliata p
 La scelta deve tenere conto del tono di lei, di ciò che è stato appena detto, della storia della chat e del rischio di risultare fuori luogo o ripetitivi. Non scegliere automaticamente la più audace: scegli quella con la probabilità migliore di far proseguire bene la conversazione. Per le risposte segrete scegli quella più adatta al livello di confidenza mostrato nella conversazione.
 
 GESTIONE DEL CONSIGLIO DELL'UTENTE:
-- Se l'INDICAZIONE DELL'UTENTE chiede esplicitamente un consiglio o una decisione sul da farsi (per esempio "mi consigli se scriverle?", "le mando un altro messaggio?", "devo aspettare?", "non ha risposto, cosa faccio?"), compila anche il campo "advice" con un consiglio breve, concreto e riferito alla situazione visibile nella chat. Questo consiglio deve comparire prima delle risposte nella schermata. Deve anche dire chiaramente quando conviene inviare il prossimo messaggio (oggi, domani, tra 2 giorni, tra 3 giorni, ecc.) quando la situazione lo richiede.
-- Se l'INDICAZIONE DELL'UTENTE chiede solo di cambiare, rifare, rendere più provocatorie, più dolci, più ironiche o comunque modificare le risposte, NON compilare "advice": applica direttamente l'indicazione alle nuove risposte.
-- Se l'INDICAZIONE DELL'UTENTE è vuota, NON dare alcun consiglio extra: genera automaticamente le risposte come al solito.
-- Non inventare una richiesta di consiglio quando l'utente non l'ha fatta.
+- L'INDICAZIONE DELL'UTENTE può chiedere anche solo di cambiare lo stile delle risposte: in quel caso applicala alle nuove risposte, ma compila comunque advice e sendWhen con il consiglio operativo migliore per la situazione.
+- Se l'INDICAZIONE DELL'UTENTE è vuota, compila comunque advice e sendWhen con la valutazione automatica del momento migliore.
+- Non lasciare mai vuoti advice o sendWhen.
 
 Restituisci SOLO JSON valido, senza markdown, nel formato:
 {"advice":"Consiglio concreto.","sendWhen":"domani","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":18,"recommendationReason":"Motivo breve.","replies":[{"style":"Flirt","text":"..."}, ...]}
 
-Il campo "advice" deve essere valorizzato solo quando l'utente ha esplicitamente chiesto un consiglio; altrimenti deve essere una stringa vuota.
+Il campo "advice" DEVE essere sempre valorizzato con il consiglio operativo migliore. Il campo "sendWhen" DEVE essere sempre valorizzato con il momento consigliato per inviare il messaggio.
 
 recommendedIndex, recommendedNormalIndex e recommendedSecretIndex sono gli indici numerici delle risposte consigliate nell'array replies, partendo da 0.
 
