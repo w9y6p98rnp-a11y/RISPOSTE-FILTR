@@ -210,3 +210,6 @@ body.light-theme .audio-transcript-card{background:#fff;color:#172033;border-col
 .reply-category-title{font-size:1.05rem;font-weight:800;margin:6px 4px 10px;color:var(--accent,#8fc4ff);display:flex;align-items:center;gap:8px}
 .reply-category-count{font-size:.78rem;font-weight:600;opacity:.7}
 .secret-category-group .reply-category-title{color:#d9a8ff}
+
+.reply-category-more.hidden{display:none}.category-more-toggle{display:flex;align-items:center;justify-content:center;width:100%;margin:2px 0 2px;padding:10px 12px;border:1px solid #334155;border-radius:10px;background:#172236;color:#93c5fd;font-weight:800;font-size:13px;cursor:pointer}.category-more-toggle:hover{background:#1d2b42}.secret-category-group .category-more-toggle{border-color:#5b3b66;background:#211827;color:#d8a8ee}.reply-category-group{display:grid;gap:9px}.reply-category-title{display:flex;align-items:center;gap:8px;font-weight:900;color:#f8fafc;font-size:15px;margin-top:5px}.reply-category-count{font-size:10px;font-weight:700;color:#94a3b8}.reply-category-more{display:grid;gap:9px}.reply-category-more.hidden{display:none}
+body.light-theme .category-more-toggle{background:#eef2f7;color:#2563eb;border-color:#cbd5e1}.reply-category-more.hidden{display:none}

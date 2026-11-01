@@ -465,6 +465,14 @@ function bindResultButtons(){
     document.documentElement.scrollTop=0; document.body.scrollTop=0;
     setTimeout(()=>b.textContent="Copia",1200);
   });
+  document.querySelectorAll(".category-more-toggle").forEach(b=>b.onclick=()=>{
+    const target=$(b.dataset.target);
+    if(!target) return;
+    const opening=target.classList.contains("hidden");
+    target.classList.toggle("hidden",!opening);
+    const count=Number(b.dataset.count||0);
+    b.textContent=opening ? `⌃ Nascondi le ${count} risposte` : `⌄ Mostra le altre ${count} risposte`;
+  });
   document.querySelectorAll(".reply-choice").forEach(b=>b.onclick=()=>{
     const target=$(b.dataset.target);
     if(!target) return;
@@ -593,7 +601,12 @@ $("generate").onclick=async()=>{
       const recIndex=cat[Math.max(0,Math.min(rec,cat.length-1))];
       const reason=String(categoryRecommendations[style]?.reason||"").trim();
       const ordered=[recIndex,...cat.filter(i=>i!==recIndex)];
-      return `<div class="reply-category-group${isSecret?" secret-category-group":""}"><div class="reply-category-title">${style}${recIndex!==undefined?` <span class="reply-category-count">${cat.length} risposte</span>`:""}</div>${ordered.map(i=>renderCard(replies[i],i,recIndex,reason)).join("")}</div>`;
+      const recommendedCard=ordered.length ? renderCard(replies[ordered[0]],ordered[0],recIndex,reason) : "";
+      const otherCards=ordered.slice(1).map(i=>renderCard(replies[i],i,recIndex,"")).join("");
+      const groupId=`replyGroup_${(isSecret?"secret_":"normal_")}${style.replace(/[^a-zA-Z0-9]/g,"_")}`;
+      const moreCount=Math.max(0,ordered.length-1);
+      const moreBlock=moreCount?`<div id="${groupId}_more" class="reply-category-more hidden">${otherCards}</div><button type="button" class="category-more-toggle" data-target="${groupId}_more" data-count="${moreCount}">⌄ Mostra le altre ${moreCount} risposte</button>`:"";
+      return `<div id="${groupId}" class="reply-category-group${isSecret?" secret-category-group":""}"><div class="reply-category-title">${style}${recIndex!==undefined?` <span class="reply-category-count">${cat.length} risposte</span>`:""}</div>${recommendedCard}${moreBlock}</div>`;
     };
     const normalCards=styleOrder.slice(0,6).map(style=>renderCategory(style,normalIndexes,false)).join("");
     const secretCards=styleOrder.slice(6).map(style=>renderCategory(style,secretIndexes,true)).join("");
