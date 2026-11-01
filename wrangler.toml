@@ -7,3 +7,9 @@ directory = "."
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 exclude = ["worker.js", "reply.js", "wrangler.toml", "README_CLOUDFLARE_WORKER.txt"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rispostaflirt-auth"
+database_id = "9372e6cb-0118-412f-b7f2-9c37e7911b94"
+migrations_dir = "migrations"

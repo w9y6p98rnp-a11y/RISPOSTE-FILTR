@@ -8,9 +8,68 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="style.css?v=20261101-account1">
 <title>RispostaFlirt</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="app">
+<div id="authScreen" class="auth-screen hidden">
+  <div class="auth-card">
+    <div class="auth-logo">💬</div>
+    <h1>RispostaFlirt</h1>
+    <p class="auth-subtitle">Accedi per mantenere private le tue conversazioni.</p>
+
+    <form id="loginForm" class="auth-form">
+      <input id="loginEmail" type="email" autocomplete="email" placeholder="Email" required>
+      <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password" required>
+      <button class="primary auth-submit" type="submit">ACCEDI</button>
+    </form>
+
+    <button id="forgotPassword" type="button" class="auth-link">Password dimenticata?</button>
+
+    <div class="auth-divider"><span>oppure</span></div>
+    <button id="googleLogin" type="button" class="google-btn"><span class="google-g">G</span> Continua con Google</button>
+
+    <button id="showRegister" type="button" class="auth-create">Crea un account</button>
+    <div id="authMessage" class="auth-message hidden"></div>
+  </div>
+</div>
+
+<div id="registerModal" class="modal hidden">
+  <div class="modal-card auth-modal-card">
+    <div class="auth-modal-head"><div><h2>Crea un account</h2><p class="hint">Usa un nickname che vedrai nel tuo profilo.</p></div><button type="button" id="closeRegister" class="memory-close">×</button></div>
+    <form id="registerForm" class="auth-form">
+      <input id="registerNickname" type="text" maxlength="40" autocomplete="nickname" placeholder="Nickname" required>
+      <input id="registerEmail" type="email" autocomplete="email" placeholder="Email" required>
+      <input id="registerPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Password (minimo 8 caratteri)" required>
+      <input id="registerPassword2" type="password" minlength="8" autocomplete="new-password" placeholder="Ripeti password" required>
+      <button class="primary" type="submit">CREA ACCOUNT</button>
+    </form>
+  </div>
+</div>
+
+<div id="forgotModal" class="modal hidden">
+  <div class="modal-card auth-modal-card">
+    <div class="auth-modal-head"><div><h2>Password dimenticata?</h2><p class="hint">Inserisci la tua email e ti invieremo un link per reimpostarla.</p></div><button type="button" id="closeForgot" class="memory-close">×</button></div>
+    <form id="forgotForm" class="auth-form">
+      <input id="forgotEmail" type="email" autocomplete="email" placeholder="Email" required>
+      <button class="primary" type="submit">INVIA LINK</button>
+    </form>
+    <div id="forgotMessage" class="auth-message hidden"></div>
+  </div>
+</div>
+
+<div id="resetModal" class="modal hidden">
+  <div class="modal-card auth-modal-card">
+    <div class="auth-modal-head"><div><h2>Nuova password</h2><p class="hint">Scegli una nuova password per il tuo account.</p></div></div>
+    <form id="resetForm" class="auth-form">
+      <input id="resetPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Nuova password" required>
+      <input id="resetPassword2" type="password" minlength="8" autocomplete="new-password" placeholder="Ripeti password" required>
+      <button class="primary" type="submit">SALVA PASSWORD</button>
+    </form>
+    <div id="resetMessage" class="auth-message hidden"></div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
   <aside id="sidebar" class="sidebar">
     <div class="side-head"><b>RispostaFlirt</b><button id="closeSide">×</button></div>
     <button id="newGirl" class="primary">＋ Nuova ragazza</button>
@@ -155,6 +214,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20261101-zoom5"></script>
+<script src="app.js?v=20261101-auth1"></script>
 </body>
 </html>

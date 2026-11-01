@@ -1,5 +1,6 @@
-const DB_NAME="RispostaFlirtDB", DB_VERSION=2;
+let DB_NAME="RispostaFlirtDB", DB_VERSION=2;
 let db, girls=[], selectedId=null, currentRole="her", deferredInstall=null, selectedImageFile=null;
+let currentUser=null, serverSyncEnabled=false, serverSyncTimer=null, serverSyncPaused=false;
 // Stato temporaneo separato per ogni ragazza: screenshot, testo e risultati non vengono condivisi tra chat.
 const girlStates = new Map();
 
@@ -7,9 +8,9 @@ const $=id=>document.getElementById(id);
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,DB_VERSION);r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains("girls"))d.createObjectStore("girls",{keyPath:"id"});if(!d.objectStoreNames.contains("messages")){const s=d.createObjectStore("messages",{keyPath:"id",autoIncrement:true});s.createIndex("girlId","girlId")}if(!d.objectStoreNames.contains("girlStates")){d.createObjectStore("girlStates",{keyPath:"girlId"})}};r.onsuccess=e=>{db=e.target.result;res(db)};r.onerror=()=>rej(r.error)})}
 function tx(store,mode="readonly"){return db.transaction(store,mode).objectStore(store)}
 function getAll(store){return new Promise((res,rej)=>{const r=tx(store).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
-function put(store,obj){return new Promise((res,rej)=>{const r=tx(store,"readwrite").put(obj);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
-function add(store,obj){return new Promise((res,rej)=>{const r=tx(store,"readwrite").add(obj);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
-function del(store,key){return new Promise((res,rej)=>{const r=tx(store,"readwrite").delete(key);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
+function put(store,obj){return new Promise((res,rej)=>{const r=tx(store,"readwrite").put(obj);r.onsuccess=()=>{if(!serverSyncPaused && serverSyncEnabled) scheduleServerSync();res(r.result)};r.onerror=()=>rej(r.error)})}
+function add(store,obj){return new Promise((res,rej)=>{const r=tx(store,"readwrite").add(obj);r.onsuccess=()=>{if(!serverSyncPaused && serverSyncEnabled) scheduleServerSync();res(r.result)};r.onerror=()=>rej(r.error)})}
+function del(store,key){return new Promise((res,rej)=>{const r=tx(store,"readwrite").delete(key);r.onsuccess=()=>{if(!serverSyncPaused && serverSyncEnabled) scheduleServerSync();res()};r.onerror=()=>rej(r.error)})}
 async function messagesFor(gid){const all=await getAll("messages");return all.filter(x=>x.girlId===gid).sort((a,b)=>a.createdAt-b.createdAt)}
 function esc(s){return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function fmt(t){return new Date(t).toLocaleString("it-IT",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}
@@ -67,7 +68,7 @@ function restoreGirlState(id){
 async function selectGirl(id){
   if(selectedId && selectedId!==id) await saveCurrentGirlState();
   selectedId=id;
-  localStorage.setItem("selectedGirl",id);
+  localStorage.setItem(`selectedGirl_${currentUser?.id||"local"}`,id);
   const g=girls.find(x=>x.id===id)||await getGirl(id);
   $("empty").classList.add("hidden");
   $("chat").classList.remove("hidden");
@@ -168,6 +169,7 @@ async function deleteGirlCompletely(id){
     t.onerror=()=>reject(t.error||new Error("Errore durante la cancellazione"));
     t.onabort=()=>reject(t.error||new Error("Cancellazione annullata"));
   });
+  if(serverSyncEnabled) scheduleServerSync();
 }
 async function openDeleteChatModal(){
   const all=await getAll("girls");
@@ -210,11 +212,11 @@ $("confirmDelete").onclick=async()=>{
       const next=girls[0];
       selectedId=next?.id||null;
       if(selectedId){
-        localStorage.setItem("selectedGirl",selectedId);
+        localStorage.setItem(`selectedGirl_${currentUser?.id||"local"}`,selectedId);
         await renderGirls();
         await selectGirl(selectedId);
       }else{
-        localStorage.removeItem("selectedGirl");
+        localStorage.removeItem(`selectedGirl_${currentUser?.id||"local"}`);
         selectedId=null;
         selectedImageFile=null;
         $("results").innerHTML="";
@@ -554,60 +556,155 @@ function escapeAttr(s){return escapeHtml(s);}
 
 
 // Impostazioni locali: tema e zoom applicato esclusivamente alle risposte.
-const SETTINGS_KEY="RispostaFlirtSettings";
-function loadSettings(){try{return {...{theme:"dark",replyZoom:100},...(JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"))}}catch(e){return {theme:"dark",replyZoom:100}}}
+function settingsKey(){return `RispostaFlirtSettings_${currentUser?.id||"local"}`;}
+function loadSettings(){try{return {...{theme:"dark",replyZoom:100},...(JSON.parse(localStorage.getItem(settingsKey())||"{}"))}}catch(e){return {theme:"dark",replyZoom:100}}}
 function applySettings(){const s=loadSettings();document.body.classList.toggle("light-theme",s.theme==="light");const r=$("results");if(r)r.style.setProperty("--reply-zoom",String((Number(s.replyZoom)||100)/100));document.querySelectorAll(".theme-option").forEach(b=>b.classList.toggle("active",b.dataset.theme===s.theme));if($("replyZoom"))$("replyZoom").value=String(s.replyZoom||100);if($("replyZoomValue"))$("replyZoomValue").textContent=(s.replyZoom||100)+"%";}
-function saveSettings(patch){const next={...loadSettings(),...patch};localStorage.setItem(SETTINGS_KEY,JSON.stringify(next));applySettings()}
+function saveSettings(patch){const next={...loadSettings(),...patch};localStorage.setItem(settingsKey(),JSON.stringify(next));if(serverSyncEnabled) scheduleServerSync();applySettings()}
 function openSettings(){applySettings();$("settingsModal").classList.remove("hidden")}
 function closeSettings(){$("settingsModal").classList.add("hidden")}
 $("openSettings").onclick=openSettings;$("closeSettings").onclick=closeSettings;$("closeSettingsBottom").onclick=closeSettings;$("settingsModal").addEventListener("click",e=>{if(e.target.id==="settingsModal")closeSettings()});document.querySelectorAll(".theme-option").forEach(b=>b.onclick=()=>saveSettings({theme:b.dataset.theme}));$("replyZoom").addEventListener("input",e=>saveSettings({replyZoom:Number(e.target.value)}));applySettings();
 
-// Avvio dell'app: apre il database prima di usare le funzioni che salvano le ragazze.
-// Senza questa inizializzazione Safari mostrava "Non riesco ad aggiungere la ragazza".
-(async function initApp(){
+// -------------------------
+// Autenticazione e sincronizzazione multiutente
+// -------------------------
+function authMessage(text, type=""){ const el=$("authMessage"); if(!el)return; el.textContent=text||""; el.className="auth-message"+(type?" "+type:"")+(text?"":" hidden"); }
+function forgotMessage(text, type=""){ const el=$("forgotMessage"); if(!el)return; el.textContent=text||""; el.className="auth-message"+(type?" "+type:"")+(text?"":" hidden"); }
+function resetMessage(text, type=""){ const el=$("resetMessage"); if(!el)return; el.textContent=text||""; el.className="auth-message"+(type?" "+type:"")+(text?"":" hidden"); }
+function setAuthBusy(btn,busy,label){ if(btn){btn.disabled=busy;btn.textContent=busy?"Attendi…":label;} }
+async function api(path,options={}){ const res=await fetch(path,{credentials:"same-origin",...options}); const data=await res.json().catch(()=>({})); if(!res.ok) throw new Error(data.error||"Operazione non riuscita."); return data; }
+
+async function clearCurrentLocalDB(){
+  serverSyncEnabled=false;
+  if(db){try{db.close()}catch{}}
+  await new Promise(resolve=>{const r=indexedDB.deleteDatabase(DB_NAME);r.onsuccess=r.onerror=r.onblocked=()=>resolve()});
+  girls=[]; selectedId=null; girlStates.clear();
+}
+
+async function localSnapshot(){
+  return { girls:await getAll("girls"), messages:await getAll("messages"), girlStates:await getAll("girlStates"), settings:loadSettings() };
+}
+function hasLocalData(s){return Boolean(s.girls?.length || s.messages?.length || s.girlStates?.length);}
+function hasRemoteData(d){return Boolean(d.girls?.length || d.messages?.length || d.girlStates?.length);}
+
+async function importRemoteData(data){
+  serverSyncPaused=true;
   try{
+    const local=await localSnapshot();
+    await new Promise(resolve=>{if(db){try{db.close()}catch{}} const r=indexedDB.deleteDatabase(DB_NAME);r.onsuccess=r.onerror=r.onblocked=()=>resolve()});
     await openDB();
-    await renderGirls();
-    const saved=localStorage.getItem("selectedGirl");
-    if(saved && girls.some(g=>g.id===saved)){
-      await selectGirl(saved);
-    }else if(girls.length){
-      await selectGirl(girls[0].id);
-    }
-  }catch(err){
-    console.error("Errore avvio RispostaFlirt:",err);
-    alert("Non riesco ad avviare l'archivio delle conversazioni. Ricarica la pagina e riprova.");
+    for(const g of (data.girls||[])) await put("girls",{id:g.id,name:g.name,note:g.note||"",memory:g.memory||"",createdAt:g.createdAt||Date.now(),updatedAt:g.updatedAt||Date.now()});
+    for(const m of (data.messages||[])) await add("messages",{clientId:m.clientId||`remote:${m.girlId}:${m.createdAt}:${crypto.randomUUID()}`,girlId:m.girlId,role:m.role,text:m.text||"",imageData:m.imageData||null,createdAt:m.createdAt||Date.now()});
+    for(const st of (data.girlStates||[])) await put("girlStates",{girlId:st.girlId,message:st.message||"",imageData:st.imageData||null,imageName:st.imageName||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",aiHint:st.aiHint||"",updatedAt:st.updatedAt||Date.now()});
+    if(data.settings) localStorage.setItem(settingsKey(),JSON.stringify(data.settings));
+  }finally{serverSyncPaused=false;}
+}
+
+async function syncLocalToServer(){
+  if(!serverSyncEnabled || !currentUser || serverSyncPaused) return;
+  try{
+    const s=await localSnapshot();
+    const messages=s.messages.map(m=>({...m,clientId:m.clientId||`${m.girlId}:${m.id}`}));
+    await api("/api/data/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({girls:s.girls,messages,girlStates:s.girlStates,settings:s.settings})});
+  }catch(err){ console.warn("Sincronizzazione non riuscita",err); }
+}
+function scheduleServerSync(){
+  if(!serverSyncEnabled)return;
+  clearTimeout(serverSyncTimer);
+  serverSyncTimer=setTimeout(()=>syncLocalToServer(),700);
+}
+
+async function prepareUserData(){
+  DB_NAME=`RispostaFlirtDB_${currentUser.id}`;
+  await openDB();
+  const local=await localSnapshot();
+  const remote=await api("/api/data");
+  if(!hasRemoteData(remote) && hasLocalData(local)){
+    serverSyncEnabled=true;
+    await syncLocalToServer();
+  }else if(hasRemoteData(remote)){
+    await importRemoteData(remote);
   }
+  serverSyncEnabled=true;
+}
+
+async function showAccount(){
+  if(!currentUser)return;
+  const nickname=currentUser.nickname||"Il tuo nickname"; const email=currentUser.email||"";
+  $("accountNickname").textContent=nickname; $("accountEmail").textContent=email; $("accountAvatar").textContent=(nickname.trim().charAt(0)||"?").toUpperCase();
+  $("accountModal").classList.remove("hidden");
+}
+async function startUserApp(user){
+  currentUser=user;
+  $("authScreen").classList.add("hidden"); $("app").classList.remove("hidden");
+  try{
+    await prepareUserData();
+    await renderGirls();
+    const saved=localStorage.getItem(`selectedGirl_${currentUser.id}`);
+    if(saved && girls.some(g=>g.id===saved)) await selectGirl(saved);
+    else if(girls.length) await selectGirl(girls[0].id);
+    else {$("empty").classList.remove("hidden");$("chat").classList.add("hidden");}
+  }catch(err){console.error("Errore avvio account:",err);authMessage(err.message||"Impossibile caricare i dati.","error");}
+}
+
+async function finishLogin(data){
+  if(!data?.user) throw new Error("Account non valido.");
+  await startUserApp(data.user);
+}
+
+async function initAuth(){
+  try{
+    const me=await api("/api/auth/me");
+    const resetToken=new URLSearchParams(location.search).get("reset");
+    if(resetToken){$("resetModal").classList.remove("hidden");window.__resetToken=resetToken;}
+    if(me.authenticated){await startUserApp(me.user);}
+    else {$("authScreen").classList.remove("hidden");$("app").classList.add("hidden");}
+  }catch(err){$("authScreen").classList.remove("hidden");$("app").classList.add("hidden");authMessage("Server di autenticazione non disponibile. Riprova tra poco.","error");}
+}
+
+$("loginForm")?.addEventListener("submit",async e=>{
+  e.preventDefault(); authMessage(""); const btn=e.currentTarget.querySelector("button[type=submit]"); setAuthBusy(btn,true,"ACCEDI");
+  try{const data=await api("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("loginEmail").value,password:$("loginPassword").value})}); await finishLogin(data);}
+  catch(err){authMessage(err.message,"error");}finally{setAuthBusy(btn,false,"ACCEDI");}
+});
+$("showRegister")?.addEventListener("click",()=>{$("registerModal").classList.remove("hidden");$("registerNickname").focus()});
+$("closeRegister")?.addEventListener("click",()=>$("registerModal").classList.add("hidden"));
+$("registerModal")?.addEventListener("click",e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add("hidden")});
+$("registerForm")?.addEventListener("submit",async e=>{
+  e.preventDefault(); authMessage(""); const p=$("registerPassword").value,p2=$("registerPassword2").value; if(p!==p2){authMessage("Le due password non coincidono.","error");return;}
+  const btn=e.currentTarget.querySelector("button[type=submit]");setAuthBusy(btn,true,"CREA ACCOUNT");
+  try{const data=await api("/api/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nickname:$("registerNickname").value,email:$("registerEmail").value,password:p})});$("registerModal").classList.add("hidden");await finishLogin(data);}
+  catch(err){authMessage(err.message,"error");}finally{setAuthBusy(btn,false,"CREA ACCOUNT");}
+});
+$("forgotPassword")?.addEventListener("click",()=>{$("forgotModal").classList.remove("hidden");$("forgotEmail").focus();forgotMessage("")});
+$("closeForgot")?.addEventListener("click",()=>$("forgotModal").classList.add("hidden"));
+$("forgotModal")?.addEventListener("click",e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add("hidden")});
+$("forgotForm")?.addEventListener("submit",async e=>{e.preventDefault();const btn=e.currentTarget.querySelector("button[type=submit]");setAuthBusy(btn,true,"INVIA LINK");try{const d=await api("/api/auth/forgot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("forgotEmail").value})});forgotMessage(d.message,"success");}catch(err){forgotMessage(err.message,"error");}finally{setAuthBusy(btn,false,"INVIA LINK");}});
+$("resetForm")?.addEventListener("submit",async e=>{e.preventDefault();const p=$("resetPassword").value,p2=$("resetPassword2").value;if(p!==p2){resetMessage("Le due password non coincidono.","error");return;}const btn=e.currentTarget.querySelector("button[type=submit]");setAuthBusy(btn,true,"SALVA PASSWORD");try{const d=await api("/api/auth/reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:window.__resetToken,password:p})});history.replaceState({},"",location.pathname);$("resetModal").classList.add("hidden");await finishLogin(d);}catch(err){resetMessage(err.message,"error");}finally{setAuthBusy(btn,false,"SALVA PASSWORD");}});
+
+let googleClient=null;
+async function initGoogle(){
+  try{
+    const cfg=await api("/api/auth/config");
+    if(!cfg.googleClientId || !window.google?.accounts?.oauth2){if($("googleLogin"))$("googleLogin").disabled=true;return;}
+    googleClient=google.accounts.oauth2.initCodeClient({client_id:cfg.googleClientId,scope:"openid email profile",ux_mode:"popup",callback:async response=>{
+      try{const data=await api("/api/auth/google",{method:"POST",headers:{"Content-Type":"application/json","X-Requested-With":"XmlHttpRequest"},body:JSON.stringify({code:response.code})});await finishLogin(data);}catch(err){authMessage(err.message,"error");}
+    }});
+  }catch{}
+}
+$("googleLogin")?.addEventListener("click",()=>{if(googleClient)googleClient.requestCode();else authMessage("Accesso Google non ancora configurato.","error")});
+
+$("accountBtn")?.addEventListener("click",()=>showAccount());
+$("closeAccount")?.addEventListener("click",()=>$("accountModal").classList.add("hidden"));
+$("accountModal")?.addEventListener("click",e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add("hidden")});
+$("logoutBtn")?.addEventListener("click",async()=>{
+  try{await syncLocalToServer(); await api("/api/auth/logout",{method:"POST"});}catch{}
+  $("accountModal").classList.add("hidden");
+  await clearCurrentLocalDB();
+  currentUser=null; location.reload();
+});
+
+(async function boot(){
+  await initAuth();
+  setTimeout(initGoogle,400);
 })();
 
-
-/* Account UI placeholder: sarà collegata al login email/Google nella fase autenticazione. */
-(function initAccountUI(){
-  const accountBtn = $("accountBtn");
-  const accountModal = $("accountModal");
-  const closeAccount = $("closeAccount");
-  const logoutBtn = $("logoutBtn");
-  if(!accountBtn || !accountModal) return;
-
-  function closeAccountModal(){ accountModal.classList.add("hidden"); }
-
-  accountBtn.onclick = () => {
-    // Per ora mostra la struttura del profilo; i dati reali arriveranno dal sistema di autenticazione.
-    const nickname = localStorage.getItem("rispostaFlirtNickname") || "Il tuo nickname";
-    const email = localStorage.getItem("rispostaFlirtEmail") || "Account non ancora collegato";
-    const first = (nickname.trim().charAt(0) || "?").toUpperCase();
-    $("accountNickname").textContent = nickname;
-    $("accountEmail").textContent = email;
-    $("accountAvatar").textContent = first;
-    accountModal.classList.remove("hidden");
-  };
-
-  closeAccount && (closeAccount.onclick = closeAccountModal);
-  accountModal.addEventListener("click", e => {
-    if(e.target === accountModal) closeAccountModal();
-  });
-
-  logoutBtn && (logoutBtn.onclick = () => {
-    alert("Il logout sarà attivo quando collegheremo il sistema di accesso email/Google.");
-  });
-})();

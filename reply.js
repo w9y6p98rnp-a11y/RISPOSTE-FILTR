@@ -206,10 +206,34 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { message = '', aiHint = '', context = '', image = null } = body;
-    if (!message && !image) return json(400, { error: 'Manca messaggio o screenshot.' });
+    const { message = '', aiHint = '', image = null, girlId = '' } = body;
+    if (!image) return json(400, { error: 'Manca lo screenshot.' });
+    if (!env.DB || !context.user?.id || !girlId) return json(401, { error: 'Sessione o ragazza non valide.' });
 
-    const prompt = promptFor(context, message, aiHint);
+    // Il contesto usato dall'AI viene letto dal database del proprietario della sessione.
+    // Non ci fidiamo del contesto inviato dal browser, così un utente non può
+    // chiedere all'AI i dati di un'altra persona modificando la richiesta.
+    const girl = await env.DB.prepare(
+      'SELECT id,name,note,memory FROM girls WHERE id=? AND user_id=? LIMIT 1'
+    ).bind(String(girlId), context.user.id).first();
+    if (!girl) return json(404, { error: 'Conversazione non trovata.' });
+
+    const history = await env.DB.prepare(
+      'SELECT role,text,created_at AS createdAt FROM messages WHERE user_id=? AND girl_id=? ORDER BY created_at DESC LIMIT 16'
+    ).bind(context.user.id, String(girlId)).all();
+    const conversation = (history.results || []).reverse();
+    const previous = await env.DB.prepare(
+      "SELECT text FROM messages WHERE user_id=? AND girl_id=? AND role='me' ORDER BY created_at DESC LIMIT 12"
+    ).bind(context.user.id, String(girlId)).all();
+
+    const serverContext = {
+      girl: { id: girl.id, name: girl.name, note: girl.note || '', memory: girl.memory || '' },
+      memory: girl.memory || '',
+      conversation,
+      previousReplies: (previous.results || []).reverse().map(x => x.text).filter(Boolean)
+    };
+
+    const prompt = promptFor(serverContext, message, aiHint);
     const errors = [];
 
     // NON avviare tutti i provider in parallelo: ogni tentativo può consumare quota.
