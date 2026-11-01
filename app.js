@@ -651,6 +651,21 @@ async function finishLogin(data){
   await startUserApp(data.user);
 }
 
+function initPasswordToggles(){
+  document.querySelectorAll(".password-toggle[data-password-target]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const input=document.getElementById(btn.dataset.passwordTarget);
+      if(!input)return;
+      const showing=input.type==="text";
+      input.type=showing?"password":"text";
+      btn.classList.toggle("showing",!showing);
+      btn.textContent=showing?"👁":"🙈";
+      btn.setAttribute("aria-label",showing?"Mostra password":"Nascondi password");
+      btn.title=showing?"Mostra password":"Nascondi password";
+    });
+  });
+}
+
 async function initAuth(){
   try{
     const me=await api("/api/auth/me");
@@ -680,6 +695,8 @@ $("closeForgot")?.addEventListener("click",()=>$("forgotModal").classList.add("h
 $("forgotModal")?.addEventListener("click",e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add("hidden")});
 $("forgotForm")?.addEventListener("submit",async e=>{e.preventDefault();const btn=e.currentTarget.querySelector("button[type=submit]");setAuthBusy(btn,true,"INVIA LINK");try{const d=await api("/api/auth/forgot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("forgotEmail").value})});forgotMessage(d.message,"success");}catch(err){forgotMessage(err.message,"error");}finally{setAuthBusy(btn,false,"INVIA LINK");}});
 $("resetForm")?.addEventListener("submit",async e=>{e.preventDefault();const p=$("resetPassword").value,p2=$("resetPassword2").value;if(p!==p2){resetMessage("Le due password non coincidono.","error");return;}const btn=e.currentTarget.querySelector("button[type=submit]");setAuthBusy(btn,true,"SALVA PASSWORD");try{const d=await api("/api/auth/reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:window.__resetToken,password:p})});history.replaceState({},"",location.pathname);$("resetModal").classList.add("hidden");await finishLogin(d);}catch(err){resetMessage(err.message,"error");}finally{setAuthBusy(btn,false,"SALVA PASSWORD");}});
+
+initPasswordToggles();
 
 let googleClient=null;
 async function initGoogle(){
