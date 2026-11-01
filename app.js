@@ -604,6 +604,11 @@ $("generate").onclick=async()=>{
     if(normalPanel) normalPanel.classList.remove('hidden');
     if(normalChoice) normalChoice.classList.add('selected');
     if(secretPanel) secretPanel.classList.add('hidden');
+    // Porta automaticamente l'utente alla schermata dei risultati dopo l'analisi.
+    const resultsBox=document.getElementById("results");
+    if(resultsBox){
+      setTimeout(()=>resultsBox.scrollIntoView({behavior:"smooth",block:"start"}),80);
+    }
   }catch(err){
     const msg=err?.name==="AbortError" ? "Il servizio AI ha impiegato troppo tempo. Riprova: la richiesta ora è ottimizzata per rispondere più velocemente." : err.message;
     alert("Analisi non riuscita: "+msg);
