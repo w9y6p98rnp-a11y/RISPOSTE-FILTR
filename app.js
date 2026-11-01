@@ -555,10 +555,10 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":
 function escapeAttr(s){return escapeHtml(s);}
 
 
-// Impostazioni locali: tema e zoom applicato esclusivamente alle risposte.
+// Impostazioni locali: tema e zoom dell’interfaccia/risposte.
 function settingsKey(){return `RispostaFlirtSettings_${currentUser?.id||"local"}`;}
 function loadSettings(){try{return {...{theme:"dark",replyZoom:100},...(JSON.parse(localStorage.getItem(settingsKey())||"{}"))}}catch(e){return {theme:"dark",replyZoom:100}}}
-function applySettings(){const s=loadSettings();document.body.classList.toggle("light-theme",s.theme==="light");const r=$("results");if(r)r.style.setProperty("--reply-zoom",String((Number(s.replyZoom)||100)/100));document.querySelectorAll(".theme-option").forEach(b=>b.classList.toggle("active",b.dataset.theme===s.theme));if($("replyZoom"))$("replyZoom").value=String(s.replyZoom||100);if($("replyZoomValue"))$("replyZoomValue").textContent=(s.replyZoom||100)+"%";}
+function applySettings(){const s=loadSettings();document.body.classList.toggle("light-theme",s.theme==="light");const zoom=String((Number(s.replyZoom)||100)/100);document.documentElement.style.setProperty("--ui-zoom",zoom);const r=$("results");if(r)r.style.setProperty("--reply-zoom",zoom);document.querySelectorAll(".theme-option").forEach(b=>b.classList.toggle("active",b.dataset.theme===s.theme));if($("replyZoom"))$("replyZoom").value=String(s.replyZoom||100);if($("replyZoomValue"))$("replyZoomValue").textContent=(s.replyZoom||100)+"%";}
 function saveSettings(patch){const next={...loadSettings(),...patch};localStorage.setItem(settingsKey(),JSON.stringify(next));if(serverSyncEnabled) scheduleServerSync();applySettings()}
 function openSettings(){applySettings();$("settingsModal").classList.remove("hidden")}
 function closeSettings(){$("settingsModal").classList.add("hidden")}
@@ -669,7 +669,12 @@ $("loginForm")?.addEventListener("submit",async e=>{
 $("showRegister")?.addEventListener("click",()=>{$("registerModal").classList.remove("hidden");$("registerNickname").focus()});
 $("closeRegister")?.addEventListener("click",()=>$("registerModal").classList.add("hidden"));
 $("registerModal")?.addEventListener("click",e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add("hidden")});
-// La registrazione è gestita dal form inline in index.html, così funziona anche se uno script opzionale dell'app ha un errore.
+$("registerForm")?.addEventListener("submit",async e=>{
+  e.preventDefault(); authMessage(""); const p=$("registerPassword").value,p2=$("registerPassword2").value; if(p!==p2){authMessage("Le due password non coincidono.","error");return;}
+  const btn=e.currentTarget.querySelector("button[type=submit]");setAuthBusy(btn,true,"CREA ACCOUNT");
+  try{const data=await api("/api/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nickname:$("registerNickname").value,email:$("registerEmail").value,password:p})});$("registerModal").classList.add("hidden");await finishLogin(data);}
+  catch(err){authMessage(err.message,"error");}finally{setAuthBusy(btn,false,"CREA ACCOUNT");}
+});
 $("forgotPassword")?.addEventListener("click",()=>{$("forgotModal").classList.remove("hidden");$("forgotEmail").focus();forgotMessage("")});
 $("closeForgot")?.addEventListener("click",()=>$("forgotModal").classList.add("hidden"));
 $("forgotModal")?.addEventListener("click",e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add("hidden")});
