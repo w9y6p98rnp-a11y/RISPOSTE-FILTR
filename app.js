@@ -558,21 +558,35 @@ function escapeAttr(s){return escapeHtml(s);}
 // Impostazioni locali: tema e zoom dell’interfaccia/risposte.
 const FONT_OPTIONS=[
   {id:"system",name:"Sistema",stack:'-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif'},
+  {id:"sfround",name:"SF Rounded",stack:'"SF Pro Rounded",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'},
+  {id:"newyork",name:"New York",stack:'"New York",Georgia,serif'},
   {id:"avenir",name:"Avenir",stack:'Avenir, "Avenir Next", sans-serif'},
+  {id:"avenirnext",name:"Avenir Next",stack:'"Avenir Next",Avenir,sans-serif'},
   {id:"futura",name:"Futura",stack:'Futura, "Avenir Next", sans-serif'},
+  {id:"gillsans",name:"Gill Sans",stack:'"Gill Sans",GillSans,sans-serif'},
+  {id:"optima",name:"Optima",stack:'Optima, "Segoe UI", sans-serif'},
   {id:"helvetica",name:"Helvetica",stack:'Helvetica, Arial, sans-serif'},
+  {id:"helveticaneue",name:"Helvetica Neue",stack:'"Helvetica Neue",Helvetica,Arial,sans-serif'},
   {id:"verdana",name:"Verdana",stack:'Verdana, Geneva, sans-serif'},
   {id:"trebuchet",name:"Trebuchet",stack:'"Trebuchet MS", sans-serif'},
   {id:"georgia",name:"Georgia",stack:'Georgia, serif'},
+  {id:"cochin",name:"Cochin",stack:'Cochin,Georgia,serif'},
+  {id:"didot",name:"Didot",stack:'Didot,"Bodoni 72",serif'},
+  {id:"bodoni",name:"Bodoni 72",stack:'"Bodoni 72",Didot,serif'},
+  {id:"baskerville",name:"Baskerville",stack:'Baskerville, "Times New Roman", serif'},
   {id:"times",name:"Times",stack:'"Times New Roman", Times, serif'},
   {id:"palatino",name:"Palatino",stack:'Palatino, "Palatino Linotype", serif'},
-  {id:"baskerville",name:"Baskerville",stack:'Baskerville, "Times New Roman", serif'},
+  {id:"american_typewriter",name:"American Typewriter",stack:'"American Typewriter","Courier New",serif'},
   {id:"courier",name:"Courier",stack:'"Courier New", Courier, monospace'},
   {id:"menlo",name:"Menlo",stack:'Menlo, Monaco, monospace'},
+  {id:"sfmono",name:"SF Mono",stack:'"SF Mono",Menlo,Monaco,monospace'},
   {id:"chalkboard",name:"Chalkboard",stack:'Chalkboard, "Comic Sans MS", cursive'},
   {id:"marker",name:"Marker Felt",stack:'"Marker Felt", Chalkboard, cursive'},
-  {id:"papyrus",name:"Papyrus",stack:'Papyrus, fantasy'},
-  {id:"copperplate",name:"Copperplate",stack:'Copperplate, "Copperplate Gothic Light", fantasy'}
+  {id:"snell",name:"Snell Roundhand",stack:'"Snell Roundhand",cursive'},
+  {id:"zapfino",name:"Zapfino",stack:'Zapfino,cursive'},
+  {id:"noteworthy",name:"Noteworthy",stack:'Noteworthy,"Comic Sans MS",cursive'},
+  {id:"papyrus",name:"Papyrus",stack:'Papyrus,fantasy'},
+  {id:"copperplate",name:"Copperplate",stack:'Copperplate,"Copperplate Gothic Light",fantasy'}
 ];
 let pendingFontId="system";
 function getFontOption(id){return FONT_OPTIONS.find(f=>f.id===id)||FONT_OPTIONS[0];}
