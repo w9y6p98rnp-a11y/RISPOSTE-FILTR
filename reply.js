@@ -21,7 +21,7 @@ function extractJson(raw) {
     const replies = [];
     const pairRe = /\"style\"\s*:\s*\"((?:\\.|[^\"\\])*)\"\s*,\s*\"text\"\s*:\s*\"((?:\\.|[^\"\\])*)\"/g;
     let m;
-    while ((m = pairRe.exec(candidate)) !== null && replies.length < 40) {
+    while ((m = pairRe.exec(candidate)) !== null && replies.length < 45) {
       try {
         const style = JSON.parse('\"' + m[1] + '\"');
         const text = JSON.parse('\"' + m[2] + '\"');
@@ -35,7 +35,7 @@ function extractJson(raw) {
       if (reasonMatch) { try { reason = JSON.parse('\"' + reasonMatch[1] + '\"'); } catch (_) {} }
       const recommendedIndex = Math.min(Math.max(parseInt(idxMatch?.[1] || '0', 10), 0), replies.length - 1);
       const normalRecommendedIndex = (() => { const m = candidate.match(/"recommendedNormalIndex"\s*:\s*(\d+)/); return m ? parseInt(m[1],10) : 0; })();
-      const secretRecommendedIndex = (() => { const m = candidate.match(/"recommendedSecretIndex"\s*:\s*(\d+)/); return m ? parseInt(m[1],10) : 30; })();
+      const secretRecommendedIndex = (() => { const m = candidate.match(/"recommendedSecretIndex"\s*:\s*(\d+)/); return m ? parseInt(m[1],10) : 35; })();
       const adviceMatch = candidate.match(/"advice"\s*:\s*"((?:\\.|[^"\\])*)"/);
       let advice = "";
       if (adviceMatch) { try { advice = JSON.parse('"' + adviceMatch[1] + '"'); } catch (_) {} }
@@ -60,31 +60,34 @@ function promptFor(context, message, aiHint = "", audioTranscript = "") {
   return `Sei RispostaFlirt, un assistente italiano specializzato nel suggerire risposte naturali per conversazioni romantiche e di flirt.
 Analizza lo screenshot, se presente, insieme al contesto e al messaggio testuale.
 
-Genera ESATTAMENTE 40 alternative, divise in 8 stili:
+Genera ESATTAMENTE 45 alternative, divise in 9 stili:
 - Dolce: 5
 - Stuzzica: 5
 - Ironico: 5
 - Flirt: 5
 - Audace: 5
 - Poeta: 5
+- Seria: 5
 - Erotica: 5
 - Hot: 5
 
-Le prime 30 risposte sono le RISPOSTE NORMALI (5 per ciascuno dei 6 stili: Dolce, Stuzzica, Ironico, Flirt, Audace, Poeta).
+Le prime 35 risposte sono le RISPOSTE NORMALI (5 per ciascuno dei 7 stili: Dolce, Stuzzica, Ironico, Flirt, Audace, Poeta, Seria).
 Le ultime 10 risposte sono le RISPOSTE SEGRETE: 5 Erotica e 5 Hot.
 Erotica e Hot devono essere nettamente più intensi delle risposte normali: sensuali, molto provocanti, audaci, cariche di desiderio, tensione fisica, doppisensi e allusioni. Hot deve essere il livello più spinto consentito: diretto, sfacciato e seducente, ma resta non grafico e non descrivere esplicitamente penetrazione, posizioni sessuali, sculacciate o altri atti sessuali.
 
-Le 26 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghezza, struttura e livello di iniziativa. Non fare semplici variazioni della stessa frase.
+Le 45 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghezza, struttura e livello di iniziativa. Non fare semplici variazioni della stessa frase.
 Usa italiano naturale da chat. Mantieni ogni risposta breve e pronta da inviare: una sola frase, circa 8-16 parole quando serve. Evita frasi banali, intercambiabili o costruite come complimenti generici.
 
 REGOLA FONDAMENTALE SULLA VARIETÀ: non trasformare ogni risposta in un messaggio che riporta continuamente l'attenzione su di lei. Le risposte devono sembrare scritte da una persona vera che sa flirtare ma sa anche scherzare, cambiare ritmo e parlare normalmente. Insieme alle risposte che riprendono direttamente ciò che lei ha detto, inserisci anche alternative che: fanno una battuta sulla situazione, giocano con il contesto, prendono in giro in modo leggero, fanno autoironia, cambiano argomento con naturalezza oppure aprono un piccolo tema nuovo.
-- Almeno 10 delle 30 RISPOSTE NORMALI devono evitare di iniziare o chiudere con complimenti su di lei o con frasi del tipo "tu sei...", "mi piace quando...", "vorrei te...".
-- Almeno 5 RISPOSTE NORMALI devono essere chiaramente divertenti o ironiche e avere come obiettivo principale farla sorridere, quando il contesto lo permette.
-- Almeno 4 RISPOSTE NORMALI devono poter cambiare argomento o alleggerire la conversazione senza sembrare una fuga dal tema.
+- Almeno 12 delle 35 RISPOSTE NORMALI devono evitare di iniziare o chiudere con complimenti su di lei o con frasi del tipo "tu sei...", "mi piace quando...", "vorrei te...".
+- Almeno 6 RISPOSTE NORMALI devono essere chiaramente divertenti o ironiche e avere come obiettivo principale farla sorridere, quando il contesto lo permette.
+- Almeno 5 RISPOSTE NORMALI devono poter cambiare argomento o alleggerire la conversazione senza sembrare una fuga dal tema.
 - Non usare queste proporzioni in modo meccanico: se il contenuto dello screenshot richiede un approccio diverso, privilegia sempre la coerenza con la conversazione.
 - Non usare sempre il "tu" come centro della frase: alterna risposte centrate sulla situazione, sulla battuta, su quello che è successo, su un dettaglio della chat e, solo quando funziona, su di lei.
 
-REGOLA EMOJI: nella maggior parte delle risposte inserisci almeno 1 emoji, purché sia naturale e coerente con il contenuto. Come obiettivo, circa 28-34 delle 40 risposte dovrebbero avere 1 emoji e alcune possono averne 2 quando il tono lo giustifica; lascia senza emoji solo le risposte in cui il testo risulta chiaramente più forte, elegante o naturale senza. Non mettere sempre la stessa emoji: alterna in base al significato e al tono (per esempio 😂😏😉🙃🤭😌😄😜😎👀🔥 quando appropriate). Evita combinazioni eccessive, infantili o fuori contesto. L'emoji deve sembrare parte naturale del messaggio, non aggiunta a forza alla fine.
+REGOLA TONO SERIO: prima di generare le risposte valuta il tono dell'ultimo messaggio della ragazza. Se lei sta parlando seriamente, esprime preoccupazione, delusione, chiarisce un sentimento, mette un limite, parla del rapporto in modo diretto o sta affrontando un problema reale, devi cambiare registro: tutte le risposte devono essere adeguate a quel momento, mature, sincere e rispettose. In questo caso NON forzare flirt, battute, provocazioni, riferimenti sessuali o inviti a vedersi. Anche Dolce, Stuzzica, Ironico, Flirt, Audace e Poeta devono restare coerenti con il tono serio; "Ironico" può avere solo una leggerezza molto discreta se il contesto la permette. La categoria "Seria" deve essere la più precisa e adulta: 5 risposte sincere, naturali, diverse tra loro, senza frasi da catalogo. Se lei dice esplicitamente che le cose tra voi non vanno bene ma che ci tiene, rispondi al contenuto emotivo senza ignorarlo o trasformarlo automaticamente in seduzione.
+
+REGOLA EMOJI: nella maggior parte delle risposte inserisci almeno 1 emoji, purché sia naturale e coerente con il contenuto. Come obiettivo, circa 30-38 delle 45 risposte dovrebbero avere 1 emoji e alcune possono averne 2 quando il tono lo giustifica; lascia senza emoji solo le risposte in cui il testo risulta chiaramente più forte, elegante o naturale senza. Non mettere sempre la stessa emoji: alterna in base al significato e al tono (per esempio 😂😏😉🙃🤭😌😄😜😎👀🔥 quando appropriate). Evita combinazioni eccessive, infantili o fuori contesto. Se il tono è serio, non mettere emoji salvo quando una singola emoji è davvero naturale. L'emoji deve sembrare parte naturale del messaggio, non aggiunta a forza alla fine.
 
 Considera la cronologia e le risposte già inviate per evitare di riproporre le stesse formule, lo stesso tipo di battuta o lo stesso schema di flirt. Se nelle risposte precedenti hai già usato "vediamo", "curiosità", "misteriosa", "mi piace", "vorrei averti qui" o formule simili, cerca un'impostazione diversa.
 Se lo screenshot contiene più messaggi, ricostruisci prima il filo della conversazione: individua cosa ha detto lei, cosa hai detto tu, quale risposta sta aspettando davvero e quale tono sta usando. La risposta deve essere una continuazione naturale di QUELLA conversazione, non una frase da catalogo.
@@ -110,8 +113,8 @@ Prima di completare le 40 alternative, determina se l'utente ha chiesto un consi
 Non lasciare advice vuoto quando l'utente ha chiesto esplicitamente se/ quando scrivere.
 
 Dopo aver determinato advice e sendWhen, scegli una risposta consigliata PER OGNI STILE.
-- categoryRecommendations deve contenere esattamente queste 8 chiavi, in questo ordine: Dolce, Stuzzica, Ironico, Flirt, Audace, Poeta, Erotica, Hot.
-- Per ogni stile indica index da 0 a 4, cioè quale delle 5 risposte di quello stile è la migliore, e reason con un consiglio specifico di una frase.
+- categoryRecommendations deve contenere esattamente queste 9 chiavi, in questo ordine: Dolce, Stuzzica, Ironico, Flirt, Audace, Poeta, Seria, Erotica, Hot.
+- Per ogni stile indica SEMPRE index: 0. La prima risposta di ogni stile deve essere la risposta consigliata e va generata come la migliore delle 5., e reason con un consiglio specifico di una frase.
 - recommendedNormalIndex: indice globale di una delle prime 30 risposte normali.
 - recommendedSecretIndex: indice globale di una delle ultime 10 risposte segrete.
 - recommendedIndex: indice globale della migliore risposta assoluta.
@@ -124,7 +127,7 @@ GESTIONE DEL CONSIGLIO DELL'UTENTE:
 - Non inventare una richiesta di consiglio quando l'utente non l'ha fatta.
 
 Restituisci SOLO JSON valido, senza markdown, nel formato:
-{"advice":"Consiglio concreto.","sendWhen":"domani","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":30,"recommendationReason":"Motivo breve.","categoryRecommendations":{"Dolce":{"index":0,"reason":"..."},"Stuzzica":{"index":0,"reason":"..."},"Ironico":{"index":0,"reason":"..."},"Flirt":{"index":0,"reason":"..."},"Audace":{"index":0,"reason":"..."},"Poeta":{"index":0,"reason":"..."},"Erotica":{"index":0,"reason":"..."},"Hot":{"index":0,"reason":"..."}},"replies":[{"style":"Flirt","text":"..."}, ...]}
+{"advice":"Consiglio concreto.","sendWhen":"domani","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":30,"recommendationReason":"Motivo breve.","categoryRecommendations":{"Dolce":{"index":0,"reason":"..."},"Stuzzica":{"index":0,"reason":"..."},"Ironico":{"index":0,"reason":"..."},"Flirt":{"index":0,"reason":"..."},"Audace":{"index":0,"reason":"..."},"Poeta":{"index":0,"reason":"..."},"Seria":{"index":0,"reason":"..."},"Erotica":{"index":0,"reason":"..."},"Hot":{"index":0,"reason":"..."}},"replies":[{"style":"Flirt","text":"..."}, ...]}
 
 Il campo "advice" DEVE essere sempre valorizzato con il consiglio operativo migliore. Il campo "sendWhen" DEVE essere sempre valorizzato con il momento consigliato per inviare il messaggio.
 
