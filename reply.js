@@ -56,6 +56,38 @@ function extractJson(raw) {
   }
 }
 
+function decodeBasicHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&nbsp;/g, ' ');
+}
+
+function extractPreviousGeneratedReplies(html) {
+  // Le analisi precedenti vengono salvate come HTML in girl_states.results_html.
+  // Recuperiamo solo il testo delle card delle risposte, così l'AI può evitarne
+  // la ripetizione alla generazione successiva. Se il campo è vuoto o il markup
+  // è diverso, restituiamo semplicemente un array vuoto senza bloccare l'analisi.
+  if (!html || typeof html !== 'string') return [];
+  const out = [];
+  const re = /<div[^>]*class=["'][^"']*reply-text[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi;
+  let match;
+  while ((match = re.exec(html)) !== null && out.length < 45) {
+    const text = decodeBasicHtmlEntities(
+      match[1]
+        .replace(/<br\s*\/?>(?:\n)?/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .trim()
+    );
+    if (text) out.push(text);
+  }
+  return [...new Set(out)];
+}
+
 function promptFor(context, message, aiHint = "", audioTranscript = "", previousGeneratedReplies = []) {
   return `Sei RispostaFlirt, un assistente italiano specializzato nel suggerire risposte naturali per conversazioni romantiche e di flirt.
 Analizza lo screenshot, se presente, insieme al contesto e al messaggio testuale.
