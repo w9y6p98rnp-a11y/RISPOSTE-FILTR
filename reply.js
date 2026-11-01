@@ -75,6 +75,7 @@ Le 26 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghez
 Usa italiano naturale da chat. Mantieni ogni risposta molto breve e pronta da inviare: una sola frase, circa 8-14 parole. Evita frasi banali e ripetitive.
 Considera la cronologia e le risposte già inviate per evitare di riproporre le stesse formule.
 Se lo screenshot contiene più messaggi, interpreta il contesto della conversazione prima di rispondere.
+Prima di generare le risposte, individua eventuali limiti o cose che l'utente ha chiesto esplicitamente di NON dire o NON proporre per questa ragazza: quei limiti sono vincolanti e devono essere rispettati in tutte le risposte.
 Non inventare dettagli che non sono visibili o presenti nel contesto.
 
 REGOLA SUL MOMENTO IN CUI INVIARE:
@@ -121,8 +122,17 @@ Le informazioni sopra descrivono come è fatto l'utente, il suo carattere e il m
 MEMORIA DA RICORDARE SULLA RAGAZZA:
 ${context?.memory || context?.girl?.memory || "Nessuna memoria salvata."}
 
-REGOLA IMPORTANTE SULLA MEMORIA:
-La memoria sopra è informazione persistente fornita dall'utente. DEVI tenerla in considerazione quando scegli tono, argomenti, riferimenti, battute e suggerimenti. Non ignorarla e non inventare dettagli oltre a quelli presenti nella memoria e nella conversazione. Se la memoria contiene preferenze o fatti utili, usali in modo naturale quando pertinenti, senza citarla esplicitamente come "memoria".
+REGOLA IMPORTANTE SULLA MEMORIA — VINCOLI OBBLIGATORI:
+La memoria sopra è informazione persistente fornita dall'utente e ha priorità alta. DEVI applicarla realmente alle risposte, non limitarti a tenerla come semplice contesto.
+- Se la memoria contiene un divieto, un limite o una richiesta negativa (per esempio "non dirmi più di vederci", "non proporre di uscire", "non parlare di X"), trattalo come un VINCOLO OBBLIGATORIO per questa ragazza.
+- In presenza di un divieto, nessuna delle 26 risposte, il consiglio, la motivazione o il messaggio consigliato deve riproporre direttamente o indirettamente ciò che l'utente ha escluso.
+- Esempio: se la memoria dice di NON parlare di vedersi/incontrarsi, evita frasi come "preferirei averti qui", "quando ci vediamo", "vediamoci", "uscire insieme", "incontrarti" o equivalenti. Non sostituire il divieto con una formulazione più elegante che esprime comunque la stessa idea.
+- Se un divieto rende inadatta una risposta, cambia completamente approccio: continua il flirt, la battuta o il tema della conversazione senza violare il limite.
+- Le regole negative della memoria prevalgono sulle tendenze generiche del modello e sulle proposte automatiche di flirt.
+- Non ignorare la memoria e non inventare dettagli oltre a quelli presenti nella memoria e nella conversazione. Usa le informazioni positive in modo naturale quando pertinenti, senza citarle esplicitamente come "memoria".
+
+CONTROLLO FINALE OBBLIGATORIO PRIMA DI RESTITUIRE LE RISPOSTE:
+Rileggi tutte le 26 risposte, il consiglio e la motivazione. Verifica che ogni eventuale divieto presente nella memoria sia rispettato. Se anche una sola risposta viola un divieto, riscrivila prima di restituire il JSON.
 
 MESSAGGIO TESTUALE:
 ${message || ''}
