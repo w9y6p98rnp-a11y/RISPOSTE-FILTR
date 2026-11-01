@@ -56,7 +56,7 @@ function extractJson(raw) {
   }
 }
 
-function promptFor(context, message, aiHint = "", audioTranscript = "") {
+function promptFor(context, message, aiHint = "", audioTranscript = "", previousGeneratedReplies = []) {
   return `Sei RispostaFlirt, un assistente italiano specializzato nel suggerire risposte naturali per conversazioni romantiche e di flirt.
 Analizza lo screenshot, se presente, insieme al contesto e al messaggio testuale.
 
@@ -76,7 +76,12 @@ Le ultime 10 risposte sono le RISPOSTE SEGRETE: 5 Erotica e 5 Hot.
 Erotica e Hot devono essere nettamente più intensi delle risposte normali: sensuali, molto provocanti, audaci, cariche di desiderio, tensione fisica, doppisensi e allusioni. Hot deve essere il livello più spinto consentito: diretto, sfacciato e seducente, ma resta non grafico e non descrivere esplicitamente penetrazione, posizioni sessuali, sculacciate o altri atti sessuali.
 
 Le 45 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghezza, struttura e livello di iniziativa. Non fare semplici variazioni della stessa frase.
-Usa italiano naturale da chat. Mantieni ogni risposta breve e pronta da inviare: una sola frase, circa 8-16 parole quando serve. Evita frasi banali, intercambiabili o costruite come complimenti generici.
+Usa italiano naturale da chat. NON rendere tutte le risposte brevi: la lunghezza deve dipendere da ciò che lei ha scritto e dal tono della conversazione.
+- Per ogni stile crea 5 risposte con lunghezze variate: alcune brevi e immediate, alcune medie e almeno una più articolata quando il contesto la rende naturale.
+- In generale puoi stare indicativamente tra 8 e 30 parole; nelle conversazioni serie o emotive puoi arrivare a circa 35 parole se servono per rispondere bene.
+- Se lei ha scritto un messaggio lungo o importante, una risposta troppo corta può sembrare superficiale: in quel caso rispondi con una lunghezza proporzionata e affronta davvero il contenuto.
+- Se invece una battuta funziona meglio in poche parole, mantienila breve. Non allungare artificialmente.
+Evita frasi banali, intercambiabili o costruite come complimenti generici.
 
 REGOLA FONDAMENTALE SULLA VARIETÀ: non trasformare ogni risposta in un messaggio che riporta continuamente l'attenzione su di lei. Le risposte devono sembrare scritte da una persona vera che sa flirtare ma sa anche scherzare, cambiare ritmo e parlare normalmente. Insieme alle risposte che riprendono direttamente ciò che lei ha detto, inserisci anche alternative che: fanno una battuta sulla situazione, giocano con il contesto, prendono in giro in modo leggero, fanno autoironia, cambiano argomento con naturalezza oppure aprono un piccolo tema nuovo.
 - Almeno 12 delle 35 RISPOSTE NORMALI devono evitare di iniziare o chiudere con complimenti su di lei o con frasi del tipo "tu sei...", "mi piace quando...", "vorrei te...".
@@ -89,7 +94,14 @@ REGOLA TONO SERIO: prima di generare le risposte valuta il tono dell'ultimo mess
 
 REGOLA EMOJI: nella maggior parte delle risposte inserisci almeno 1 emoji, purché sia naturale e coerente con il contenuto. Come obiettivo, circa 30-38 delle 45 risposte dovrebbero avere 1 emoji e alcune possono averne 2 quando il tono lo giustifica; lascia senza emoji solo le risposte in cui il testo risulta chiaramente più forte, elegante o naturale senza. Non mettere sempre la stessa emoji: alterna in base al significato e al tono (per esempio 😂😏😉🙃🤭😌😄😜😎👀🔥 quando appropriate). Evita combinazioni eccessive, infantili o fuori contesto. Se il tono è serio, non mettere emoji salvo quando una singola emoji è davvero naturale. L'emoji deve sembrare parte naturale del messaggio, non aggiunta a forza alla fine.
 
-Considera la cronologia e le risposte già inviate per evitare di riproporre le stesse formule, lo stesso tipo di battuta o lo stesso schema di flirt. Se nelle risposte precedenti hai già usato "vediamo", "curiosità", "misteriosa", "mi piace", "vorrei averti qui" o formule simili, cerca un'impostazione diversa.
+Considera la cronologia, le risposte già inviate E le risposte suggerite nelle analisi precedenti per evitare ripetizioni.
+Non riproporre la stessa frase, né una frase quasi identica, né lo stesso schema con parole appena cambiate. Anche se una risposta precedente non è stata salvata come messaggio "Io", trattala comunque come già proposta e da evitare.
+Se una formula, una battuta o un'immagine concettuale è già comparsa nelle proposte precedenti, cerca un'idea nuova: cambia angolazione, ritmo, argomento o tipo di umorismo.
+Se nelle risposte precedenti hai già usato "vediamo", "curiosità", "misteriosa", "mi piace", "vorrei averti qui" o formule simili, cerca un'impostazione diversa.
+Nella generazione corrente non duplicare mai due risposte tra loro.
+
+RISPOSTE SUGGERITE NELLE ANALISI PRECEDENTI DA EVITARE:
+${previousGeneratedReplies.length ? previousGeneratedReplies.map((x,i)=>`${i+1}. ${x}`).join('\n') : 'Nessuna risposta precedente disponibile.'}
 Se lo screenshot contiene più messaggi, ricostruisci prima il filo della conversazione: individua cosa ha detto lei, cosa hai detto tu, quale risposta sta aspettando davvero e quale tono sta usando. La risposta deve essere una continuazione naturale di QUELLA conversazione, non una frase da catalogo.
 PRIMA DI GENERARE: distingui sempre con precisione i due interlocutori.
 - L'utente è IO/ME. La ragazza è LEI.
@@ -101,13 +113,13 @@ Prima di generare le risposte, individua eventuali limiti o cose che l'utente ha
 Non inventare dettagli che non sono visibili o presenti nel contesto.
 
 REGOLA SUL MOMENTO IN CUI INVIARE:
-- Se dal contesto o dalla tua valutazione consigli di non scrivere oggi e di aspettare domani, 2 giorni, 3 giorni o un altro intervallo, le 40 risposte devono essere pensate ESPLICITAMENTE per essere inviate dopo quell'attesa.
+- Se dal contesto o dalla tua valutazione consigli di non scrivere oggi e di aspettare domani, 2 giorni, 3 giorni o un altro intervallo, le 45 risposte devono essere pensate ESPLICITAMENTE per essere inviate dopo quell'attesa.
 - In questo caso non scrivere messaggi adatti a stasera, non fare riferimenti a una serata imminente e non formulare risposte come se si dovesse continuare subito la conversazione.
 - Devono essere messaggi che riaprono naturalmente il contatto dopo il periodo di silenzio, senza sembrare un inseguimento.
 - Se invece ritieni corretto scrivere oggi, genera normalmente messaggi adatti al momento presente.
 
 PRIORITÀ DEL CONSIGLIO:
-Prima di completare le 40 alternative, determina se l'utente ha chiesto un consiglio sul da farsi. Se sì, il consiglio e il momento di invio sono OBBLIGATORI e devono essere inseriti nel JSON prima di "replies".
+Prima di completare le 45 alternative, determina se l'utente ha chiesto un consiglio sul da farsi. Se sì, il consiglio e il momento di invio sono OBBLIGATORI e devono essere inseriti nel JSON prima di "replies".
 - advice: consiglio breve, concreto e specifico alla situazione.
 - sendWhen: indica chiaramente "oggi", "domani", "tra 2 giorni", "tra 3 giorni" o altro intervallo motivato.
 Non lasciare advice vuoto quando l'utente ha chiesto esplicitamente se/ quando scrivere.
@@ -115,7 +127,7 @@ Non lasciare advice vuoto quando l'utente ha chiesto esplicitamente se/ quando s
 Dopo aver determinato advice e sendWhen, scegli una risposta consigliata PER OGNI STILE.
 - categoryRecommendations deve contenere esattamente queste 9 chiavi, in questo ordine: Dolce, Stuzzica, Ironico, Flirt, Audace, Poeta, Seria, Erotica, Hot.
 - Per ogni stile indica SEMPRE index: 0. La prima risposta di ogni stile deve essere la risposta consigliata e va generata come la migliore delle 5., e reason con un consiglio specifico di una frase.
-- recommendedNormalIndex: indice globale di una delle prime 30 risposte normali.
+- recommendedNormalIndex: indice globale di una delle prime 35 risposte normali.
 - recommendedSecretIndex: indice globale di una delle ultime 10 risposte segrete.
 - recommendedIndex: indice globale della migliore risposta assoluta.
 La scelta deve tenere conto del tono di lei, di ciò che è stato appena detto, della storia della chat e dei vincoli della memoria. Non scegliere automaticamente la più audace: scegli quella con la probabilità migliore di far proseguire bene la conversazione. Per ogni stile, il reason deve spiegare come usare quella risposta, non ripetere semplicemente il testo della risposta.
@@ -127,7 +139,7 @@ GESTIONE DEL CONSIGLIO DELL'UTENTE:
 - Non inventare una richiesta di consiglio quando l'utente non l'ha fatta.
 
 Restituisci SOLO JSON valido, senza markdown, nel formato:
-{"advice":"Consiglio concreto.","sendWhen":"domani","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":30,"recommendationReason":"Motivo breve.","categoryRecommendations":{"Dolce":{"index":0,"reason":"..."},"Stuzzica":{"index":0,"reason":"..."},"Ironico":{"index":0,"reason":"..."},"Flirt":{"index":0,"reason":"..."},"Audace":{"index":0,"reason":"..."},"Poeta":{"index":0,"reason":"..."},"Seria":{"index":0,"reason":"..."},"Erotica":{"index":0,"reason":"..."},"Hot":{"index":0,"reason":"..."}},"replies":[{"style":"Flirt","text":"..."}, ...]}
+{"advice":"Consiglio concreto.","sendWhen":"domani","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":35,"recommendationReason":"Motivo breve.","categoryRecommendations":{"Dolce":{"index":0,"reason":"..."},"Stuzzica":{"index":0,"reason":"..."},"Ironico":{"index":0,"reason":"..."},"Flirt":{"index":0,"reason":"..."},"Audace":{"index":0,"reason":"..."},"Poeta":{"index":0,"reason":"..."},"Seria":{"index":0,"reason":"..."},"Erotica":{"index":0,"reason":"..."},"Hot":{"index":0,"reason":"..."}},"replies":[{"style":"Flirt","text":"..."}, ...]}
 
 Il campo "advice" DEVE essere sempre valorizzato con il consiglio operativo migliore. Il campo "sendWhen" DEVE essere sempre valorizzato con il momento consigliato per inviare il messaggio.
 
@@ -156,7 +168,10 @@ La memoria sopra è informazione persistente fornita dall'utente e ha priorità 
 - Non ignorare la memoria e non inventare dettagli oltre a quelli presenti nella memoria e nella conversazione. Usa le informazioni positive in modo naturale quando pertinenti, senza citarle esplicitamente come "memoria".
 
 CONTROLLO FINALE OBBLIGATORIO PRIMA DI RESTITUIRE LE RISPOSTE:
-Rileggi tutte le 40 risposte, il consiglio e la motivazione. Verifica che ogni eventuale divieto presente nella memoria sia rispettato. Verifica anche che le risposte non riportino tutte il discorso su di lei, che ci siano davvero alcune alternative divertenti o di cambio argomento quando il contesto lo consente e che la maggior parte delle risposte abbia un'emoji naturale e pertinente, evitando però di inserirla nelle poche risposte che funzionano meglio senza. Se una risposta è troppo simile alle altre, troppo generica o viola un divieto, riscrivila prima di restituire il JSON.
+Rileggi tutte le 45 risposte, il consiglio e la motivazione. Verifica che ogni eventuale divieto presente nella memoria sia rispettato. Verifica anche che le risposte non riportino tutte il discorso su di lei, che ci siano davvero alcune alternative divertenti o di cambio argomento quando il contesto lo consente e che la maggior parte delle risposte abbia un'emoji naturale e pertinente, evitando però di inserirla nelle poche risposte che funzionano meglio senza.
+Controlla soprattutto la varietà della lunghezza: non devono essere tutte corte. Se il messaggio di lei è lungo, serio o importante, assicurati che almeno alcune risposte affrontino il contenuto con sufficiente profondità.
+Confronta ogni risposta con le risposte suggerite nelle analisi precedenti: se è uguale, quasi uguale o costruita sullo stesso identico schema, riscrivila con un'idea realmente diversa.
+Se una risposta è troppo simile alle altre, troppo generica, troppo corta per il contesto o viola un divieto, riscrivila prima di restituire il JSON.
 
 MESSAGGIO TESTUALE:
 ${message || ''}
@@ -300,12 +315,17 @@ export async function onRequestPost(context) {
     const previous = await env.DB.prepare(
       "SELECT text FROM messages WHERE user_id=? AND girl_id=? AND role='me' ORDER BY created_at DESC LIMIT 12"
     ).bind(context.user.id, String(girlId)).all();
+    const previousState = await env.DB.prepare(
+      'SELECT results_html AS resultsHtml FROM girl_states WHERE user_id=? AND girl_id=? LIMIT 1'
+    ).bind(context.user.id, String(girlId)).first();
+    const previousGeneratedReplies = extractPreviousGeneratedReplies(previousState?.resultsHtml || '');
 
     const serverContext = {
       girl: { id: girl.id, name: girl.name, note: girl.note || '', memory: girl.memory || '' },
       memory: girl.memory || '',
       conversation,
-      previousReplies: (previous.results || []).reverse().map(x => x.text).filter(Boolean)
+      previousReplies: (previous.results || []).reverse().map(x => x.text).filter(Boolean),
+      previousGeneratedReplies
     };
 
     let audioTranscript = '';
@@ -318,7 +338,7 @@ export async function onRequestPost(context) {
       }
     }
 
-    const prompt = promptFor(serverContext, message, aiHint, audioTranscript);
+    const prompt = promptFor(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies);
     const errors = [];
 
     // NON avviare tutti i provider in parallelo: ogni tentativo può consumare quota.
