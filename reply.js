@@ -97,13 +97,13 @@ Genera ESATTAMENTE 45 alternative, divise in 9 stili:
 - Stuzzica: 5
 - Ironico: 5
 - Flirt: 5
+- Seria: 5
 - Audace: 5
 - Poeta: 5
-- Seria: 5
 - Erotica: 5
 - Hot: 5
 
-Le prime 35 risposte sono le RISPOSTE NORMALI (5 per ciascuno dei 7 stili: Dolce, Stuzzica, Ironico, Flirt, Audace, Poeta, Seria).
+Le prime 35 risposte sono le RISPOSTE NORMALI, rigorosamente in questo ordine e in blocchi da 5: Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Poeta.
 Le ultime 10 risposte sono le RISPOSTE SEGRETE: 5 Erotica e 5 Hot.
 Erotica e Hot devono essere nettamente più intensi delle risposte normali: sensuali, molto provocanti, audaci, cariche di desiderio, tensione fisica, doppisensi e allusioni. Hot deve essere il livello più spinto consentito: diretto, sfacciato e seducente, ma resta non grafico e non descrivere esplicitamente penetrazione, posizioni sessuali, sculacciate o altri atti sessuali.
 
@@ -157,7 +157,7 @@ Prima di completare le 45 alternative, determina se l'utente ha chiesto un consi
 Non lasciare advice vuoto quando l'utente ha chiesto esplicitamente se/ quando scrivere.
 
 Dopo aver determinato advice e sendWhen, scegli una risposta consigliata PER OGNI STILE.
-- categoryRecommendations deve contenere esattamente queste 9 chiavi, in questo ordine: Dolce, Stuzzica, Ironico, Flirt, Audace, Poeta, Seria, Erotica, Hot.
+- categoryRecommendations deve contenere esattamente queste 9 chiavi, in questo ordine: Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Poeta, Erotica, Hot.
 - Per ogni stile indica SEMPRE index: 0. La prima risposta di ogni stile deve essere la risposta consigliata e va generata come la migliore delle 5., e reason con un consiglio specifico di una frase.
 - recommendedNormalIndex: indice globale di una delle prime 35 risposte normali.
 - recommendedSecretIndex: indice globale di una delle ultime 10 risposte segrete.
@@ -171,7 +171,7 @@ GESTIONE DEL CONSIGLIO DELL'UTENTE:
 - Non inventare una richiesta di consiglio quando l'utente non l'ha fatta.
 
 Restituisci SOLO JSON valido, senza markdown, nel formato:
-{"advice":"Consiglio concreto.","sendWhen":"domani","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":35,"recommendationReason":"Motivo breve.","categoryRecommendations":{"Dolce":{"index":0,"reason":"..."},"Stuzzica":{"index":0,"reason":"..."},"Ironico":{"index":0,"reason":"..."},"Flirt":{"index":0,"reason":"..."},"Audace":{"index":0,"reason":"..."},"Poeta":{"index":0,"reason":"..."},"Seria":{"index":0,"reason":"..."},"Erotica":{"index":0,"reason":"..."},"Hot":{"index":0,"reason":"..."}},"replies":[{"style":"Flirt","text":"..."}, ...]}
+{"advice":"Consiglio concreto.","sendWhen":"domani","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":35,"recommendationReason":"Motivo breve.","categoryRecommendations":{"Dolce":{"index":0,"reason":"..."},"Stuzzica":{"index":0,"reason":"..."},"Ironico":{"index":0,"reason":"..."},"Flirt":{"index":0,"reason":"..."},"Seria":{"index":0,"reason":"..."},"Audace":{"index":0,"reason":"..."},"Poeta":{"index":0,"reason":"..."},"Erotica":{"index":0,"reason":"..."},"Hot":{"index":0,"reason":"..."}},"replies":[{"style":"Flirt","text":"..."}, ...]}
 
 Il campo "advice" DEVE essere sempre valorizzato con il consiglio operativo migliore. Il campo "sendWhen" DEVE essere sempre valorizzato con il momento consigliato per inviare il messaggio.
 

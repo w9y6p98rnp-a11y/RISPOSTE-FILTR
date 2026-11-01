@@ -584,7 +584,7 @@ $("generate").onclick=async()=>{
     const aiAdvice=String(data.advice||"").trim();
     const sendWhen=String(data.sendWhen||"").trim();
     const categoryRecommendations=data.categoryRecommendations && typeof data.categoryRecommendations==="object" ? data.categoryRecommendations : {};
-    const styleOrder=["Dolce","Stuzzica","Ironico","Flirt","Audace","Poeta","Seria","Erotica","Hot"];
+    const styleOrder=["Dolce","Stuzzica","Ironico","Flirt","Seria","Audace","Poeta","Erotica","Hot"];
     const adviceHtml=`<div class="ai-advice-card"><div class="ai-advice-title">💡 Consiglio dell'AI</div><div class="ai-advice-text">${escapeHtml(aiAdvice || "Valuto il momento migliore per scriverle in base alla conversazione.")}</div>${sendWhen ? `<div class="ai-send-when">🕒 Da inviare: ${escapeHtml(sendWhen)}</div>` : ""}</div>`;
     const renderCard=(r,i,categoryRecommendedIndex,categoryReason="")=>{
       const t=typeof r==="string"?r:(r.text||"");
@@ -612,7 +612,7 @@ $("generate").onclick=async()=>{
     const secretCards=styleOrder.slice(7).map(style=>renderCategory(style,secretIndexes,true)).join("");
     const transcriptHtml=audioTranscript?`<div class="audio-transcript-card"><div class="audio-transcript-title">🎙️ Trascrizione della registrazione</div><div class="audio-transcript-text">${escapeHtml(audioTranscript)}</div></div>`:"";
     const columns=`${transcriptHtml}${adviceHtml}<div class="reply-choice-grid">
-      <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>5 per stile: Dolce, Stuzzica, Ironico, Flirt, Audace, Poeta, Seria</small></span><span class="reply-choice-arrow">›</span></button>
+      <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>5 per stile: Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Poeta</small></span><span class="reply-choice-arrow">›</span></button>
       <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>5 Erotiche + 5 Hot</small></span><span class="reply-choice-arrow">›</span></button>
     </div>
     <section id="normalRepliesPanel" class="reply-panel hidden"><div class="reply-panel-head"><div><b>💬 Risposte normali</b><small>Quella consigliata è evidenziata.</small></div><button type="button" class="reply-panel-close" data-close-panel="normalRepliesPanel">×</button></div><div class="reply-panel-list">${normalCards}</div></section>
