@@ -201,7 +201,7 @@ async function fetchWithTimeout(url, options, ms = 18000) {
   }
 }
 
-async function callGemini(apiKey, model, prompt, image, timeoutMs = 18000) {
+async function callGemini(apiKey, model, prompt, image, timeoutMs = 55000) {
   const parts = [{ text: prompt }];
   const img = imagePart(image);
   if (img) parts.push({ inlineData: img });
@@ -212,7 +212,7 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 18000) {
     body: JSON.stringify({
       contents: [{ role: 'user', parts }],
       generationConfig: {
-        maxOutputTokens: 3000,
+        maxOutputTokens: 4200,
         responseMimeType: 'application/json',
         thinkingConfig: {
           thinkingLevel: 'minimal'
@@ -230,7 +230,7 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 18000) {
   return extractJson(raw);
 }
 
-async function callOpenRouter(apiKey, prompt, image) {
+async function callOpenRouter(apiKey, prompt, image, timeoutMs = 55000) {
   const content = [{ type: 'text', text: prompt }];
   if (image) content.push({ type: 'image_url', image_url: { url: image } });
 
@@ -249,7 +249,7 @@ async function callOpenRouter(apiKey, prompt, image) {
       max_tokens: 2600,
       response_format: { type: 'json_object' }
     })
-  });
+  }, timeoutMs);
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -319,7 +319,7 @@ export async function onRequestPost(context) {
       for (const model of ['gemini-3.5-flash-lite']) {
         attempts.push(async () => {
           try {
-            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 24000);
+            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 55000);
             return { result, provider: 'Gemini', model };
           } catch (err) {
             throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
@@ -333,7 +333,7 @@ export async function onRequestPost(context) {
     if (env.OPENROUTER_API_KEY) {
       attempts.push(async () => {
         try {
-          const result = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image);
+          const result = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 55000);
           return { result, provider: 'OpenRouter', model: 'openrouter/free' };
         } catch (err) {
           throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
