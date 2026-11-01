@@ -608,10 +608,17 @@ $("generate").onclick=async()=>{
     if(normalPanel) normalPanel.classList.remove('hidden');
     if(normalChoice) normalChoice.classList.add('selected');
     if(secretPanel) secretPanel.classList.add('hidden');
-    // Porta automaticamente l'utente alla schermata dei risultati dopo l'analisi.
-    const resultsBox=document.getElementById("results");
-    if(resultsBox){
-      setTimeout(()=>resultsBox.scrollIntoView({behavior:"smooth",block:"start"}),80);
+    // Porta automaticamente l'utente direttamente al Consiglio dell'AI.
+    // Non fermarti sull'area "Indicazione per l'AI": dopo l'analisi
+    // il primo elemento utile da leggere deve essere il Consiglio dell'AI.
+    const adviceBox=document.querySelector("#results .ai-advice-card");
+    if(adviceBox){
+      setTimeout(()=>{
+        const topbar=document.querySelector(".topbar");
+        const offset=(topbar?.getBoundingClientRect().height || 70) + 12;
+        const y=adviceBox.getBoundingClientRect().top + window.scrollY - offset;
+        window.scrollTo({top:Math.max(0,y),left:0,behavior:"smooth"});
+      },120);
     }
   }catch(err){
     const networkError = navigator.onLine === false || err?.name === "TypeError" || /Load failed|Failed to fetch|NetworkError|network request failed/i.test(String(err?.message || ""));
