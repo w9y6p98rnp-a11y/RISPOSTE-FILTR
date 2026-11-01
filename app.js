@@ -564,7 +564,7 @@ $("generate").onclick=async()=>{
     const secretIndexes=[];
     replies.forEach((r,i)=>{
       const style=typeof r==="string"?"":(r.style||"");
-      if(secretStyles.has(style) || i>=18) secretIndexes.push(i); else normalIndexes.push(i);
+      if(secretStyles.has(style) || i>=30) secretIndexes.push(i); else normalIndexes.push(i);
     });
     const validIndex=(value,list,fallback)=>{
       const n=Number(value);
@@ -575,22 +575,32 @@ $("generate").onclick=async()=>{
     const recommendationReason=String(data.recommendationReason||"Questa è quella che si adatta meglio al momento della conversazione.");
     const aiAdvice=String(data.advice||"").trim();
     const sendWhen=String(data.sendWhen||"").trim();
+    const categoryRecommendations=data.categoryRecommendations && typeof data.categoryRecommendations==="object" ? data.categoryRecommendations : {};
+    const styleOrder=["Flirt","Audace","Poeta","Ironico","Stuzzica","Dolce","Erotica","Hot"];
     const adviceHtml=`<div class="ai-advice-card"><div class="ai-advice-title">💡 Consiglio dell'AI</div><div class="ai-advice-text">${escapeHtml(aiAdvice || "Valuto il momento migliore per scriverle in base alla conversazione.")}</div>${sendWhen ? `<div class="ai-send-when">🕒 Da inviare: ${escapeHtml(sendWhen)}</div>` : ""}</div>`;
-    const renderCard=(r,i,categoryRecommendedIndex)=>{
+    const renderCard=(r,i,categoryRecommendedIndex,categoryReason="")=>{
       const t=typeof r==="string"?r:(r.text||"");
       const style=typeof r==="string"?"Risposta "+(i+1):(r.style||"Risposta "+(i+1));
       const recommended=i===categoryRecommendedIndex?" recommended-card":"";
-      return `<div class="reply-card${recommended}"><div class="reply-style">${escapeHtml(style)}${i===categoryRecommendedIndex?` <span class="best-badge">Consigliata</span>`:""}</div><div class="reply-text">${escapeHtml(t)}</div><div class="reply-actions"><button class="secondary copy-reply" data-text="${escapeAttr(t)}">Copia</button></div>${i===categoryRecommendedIndex?`<div class="category-reason">⭐ ${escapeHtml(recommendationReason)}</div>`:""}</div>`;
+      return `<div class="reply-card${recommended}"><div class="reply-style">${escapeHtml(style)}${i===categoryRecommendedIndex?` <span class="best-badge">Consigliata</span>`:""}</div><div class="reply-text">${escapeHtml(t)}</div><div class="reply-actions"><button class="secondary copy-reply" data-text="${escapeAttr(t)}">Copia</button></div>${i===categoryRecommendedIndex&&categoryReason?`<div class="category-reason">💡 ${escapeHtml(categoryReason)}</div>`:""}</div>`;
     };
-    // La risposta consigliata deve essere sempre la prima card della categoria quando la si apre.
-    const orderedNormalIndexes=[normalRecommendedIndex,...normalIndexes.filter(i=>i!==normalRecommendedIndex)];
-    const orderedSecretIndexes=[secretRecommendedIndex,...secretIndexes.filter(i=>i!==secretRecommendedIndex)];
-    const normalCards=orderedNormalIndexes.map(i=>renderCard(replies[i],i,normalRecommendedIndex)).join("");
-    const secretCards=orderedSecretIndexes.map(i=>renderCard(replies[i],i,secretRecommendedIndex)).join("");
+    const renderCategory=(style, indexes, isSecret=false)=>{
+      const cat=indexes.filter(i=>{
+        const r=replies[i]; return typeof r!=="string" && r.style===style;
+      });
+      if(!cat.length) return "";
+      const rec=categoryRecommendations[style] && Number.isInteger(Number(categoryRecommendations[style].index)) ? Number(categoryRecommendations[style].index) : 0;
+      const recIndex=cat[Math.max(0,Math.min(rec,cat.length-1))];
+      const reason=String(categoryRecommendations[style]?.reason||"").trim();
+      const ordered=[recIndex,...cat.filter(i=>i!==recIndex)];
+      return `<div class="reply-category-group${isSecret?" secret-category-group":""}"><div class="reply-category-title">${style}${recIndex!==undefined?` <span class="reply-category-count">${cat.length} risposte</span>`:""}</div>${ordered.map(i=>renderCard(replies[i],i,recIndex,reason)).join("")}</div>`;
+    };
+    const normalCards=styleOrder.slice(0,6).map(style=>renderCategory(style,normalIndexes,false)).join("");
+    const secretCards=styleOrder.slice(6).map(style=>renderCategory(style,secretIndexes,true)).join("");
     const transcriptHtml=audioTranscript?`<div class="audio-transcript-card"><div class="audio-transcript-title">🎙️ Trascrizione della registrazione</div><div class="audio-transcript-text">${escapeHtml(audioTranscript)}</div></div>`:"";
     const columns=`${transcriptHtml}${adviceHtml}<div class="reply-choice-grid">
-      <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>Flirt, audaci, poetiche, ironiche…</small></span><span class="reply-choice-arrow">›</span></button>
-      <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>Erotiche e Hot</small></span><span class="reply-choice-arrow">›</span></button>
+      <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>5 per stile: Flirt, Audace, Poeta, Ironico, Stuzzica, Dolce</small></span><span class="reply-choice-arrow">›</span></button>
+      <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>5 Erotiche + 5 Hot</small></span><span class="reply-choice-arrow">›</span></button>
     </div>
     <section id="normalRepliesPanel" class="reply-panel hidden"><div class="reply-panel-head"><div><b>💬 Risposte normali</b><small>Quella consigliata è evidenziata.</small></div><button type="button" class="reply-panel-close" data-close-panel="normalRepliesPanel">×</button></div><div class="reply-panel-list">${normalCards}</div></section>
     <section id="secretRepliesPanel" class="reply-panel secret-panel hidden"><div class="reply-panel-head"><div><b>🔒 Risposte segrete</b><small>Quella consigliata è evidenziata.</small></div><button type="button" class="reply-panel-close" data-close-panel="secretRepliesPanel">×</button></div><div class="reply-panel-list">${secretCards}</div></section>`;

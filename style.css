@@ -206,3 +206,7 @@ body.light-theme .audio-transcript-card{background:#fff;color:#172033;border-col
 @media(max-width:760px){.chat-audio{width:100%}}
 
 .about-me-card textarea{min-height:220px;font-family:var(--app-font,inherit);font-size:calc(15px * var(--ui-zoom));line-height:1.45;padding:calc(12px * var(--ui-zoom));border-radius:calc(12px * var(--ui-zoom))}.account-about-btn{margin-top:2px}.account-about-btn .setting-option-copy small{white-space:normal;line-height:1.3}
+.reply-category-group{margin:0 0 18px}
+.reply-category-title{font-size:1.05rem;font-weight:800;margin:6px 4px 10px;color:var(--accent,#8fc4ff);display:flex;align-items:center;gap:8px}
+.reply-category-count{font-size:.78rem;font-weight:600;opacity:.7}
+.secret-category-group .reply-category-title{color:#d9a8ff}
