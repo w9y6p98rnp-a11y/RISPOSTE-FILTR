@@ -71,10 +71,20 @@ Le prime 18 risposte sono le RISPOSTE NORMALI (Flirt, Audace, Poeta, Ironico, St
 Le ultime 8 risposte sono le RISPOSTE SEGRETE: prima 3 Erotica e poi 5 Hot.
 Erotica e Hot devono essere nettamente più intensi delle risposte normali: sensuali, molto provocanti, audaci, cariche di desiderio, tensione fisica, doppisensi e allusioni. Hot deve essere il livello più spinto consentito: diretto, sfacciato e seducente, ma resta non grafico e non descrivere esplicitamente penetrazione, posizioni sessuali, sculacciate o altri atti sessuali.
 
-Le 26 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghezza e livello di iniziativa. Non fare semplici variazioni della stessa frase.
-Usa italiano naturale da chat. Mantieni ogni risposta molto breve e pronta da inviare: una sola frase, circa 8-14 parole. Evita frasi banali e ripetitive.
-Considera la cronologia e le risposte già inviate per evitare di riproporre le stesse formule.
-Se lo screenshot contiene più messaggi, interpreta il contesto della conversazione prima di rispondere.
+Le 26 risposte devono essere realmente diverse: cambia approccio, ritmo, lunghezza, struttura e livello di iniziativa. Non fare semplici variazioni della stessa frase.
+Usa italiano naturale da chat. Mantieni ogni risposta breve e pronta da inviare: una sola frase, circa 8-16 parole quando serve. Evita frasi banali, intercambiabili o costruite come complimenti generici.
+
+REGOLA FONDAMENTALE SULLA VARIETÀ: non trasformare ogni risposta in un messaggio che riporta continuamente l'attenzione su di lei. Le risposte devono sembrare scritte da una persona vera che sa flirtare ma sa anche scherzare, cambiare ritmo e parlare normalmente. Insieme alle risposte che riprendono direttamente ciò che lei ha detto, inserisci anche alternative che: fanno una battuta sulla situazione, giocano con il contesto, prendono in giro in modo leggero, fanno autoironia, cambiano argomento con naturalezza oppure aprono un piccolo tema nuovo.
+- Almeno 6 delle 18 RISPOSTE NORMALI devono evitare di iniziare o chiudere con complimenti su di lei o con frasi del tipo "tu sei...", "mi piace quando...", "vorrei te...".
+- Almeno 3 RISPOSTE NORMALI devono essere chiaramente divertenti o ironiche e avere come obiettivo principale farla sorridere, quando il contesto lo permette.
+- Almeno 2 RISPOSTE NORMALI devono poter cambiare argomento o alleggerire la conversazione senza sembrare una fuga dal tema.
+- Non usare queste proporzioni in modo meccanico: se il contenuto dello screenshot richiede un approccio diverso, privilegia sempre la coerenza con la conversazione.
+- Non usare sempre il "tu" come centro della frase: alterna risposte centrate sulla situazione, sulla battuta, su quello che è successo, su un dettaglio della chat e, solo quando funziona, su di lei.
+
+REGOLA EMOJI: aggiungi emoji solo quando migliorano davvero il tono della singola risposta. Puoi usare 0, 1 o al massimo 2 emoji per risposta. Non mettere emoji automaticamente in tutte le frasi e non ripetere sempre le stesse. Scegli emoji coerenti con il significato e con il livello di flirt (per esempio 😂😏😉🙃🤭😌🔥 quando appropriate), evitando combinazioni eccessive o infantili. Se una risposta è più elegante, ironica o seria, può tranquillamente non avere emoji.
+
+Considera la cronologia e le risposte già inviate per evitare di riproporre le stesse formule, lo stesso tipo di battuta o lo stesso schema di flirt. Se nelle risposte precedenti hai già usato "vediamo", "curiosità", "misteriosa", "mi piace", "vorrei averti qui" o formule simili, cerca un'impostazione diversa.
+Se lo screenshot contiene più messaggi, ricostruisci prima il filo della conversazione: individua cosa ha detto lei, cosa hai detto tu, quale risposta sta aspettando davvero e quale tono sta usando. La risposta deve essere una continuazione naturale di QUELLA conversazione, non una frase da catalogo.
 Prima di generare le risposte, individua eventuali limiti o cose che l'utente ha chiesto esplicitamente di NON dire o NON proporre per questa ragazza: quei limiti sono vincolanti e devono essere rispettati in tutte le risposte.
 Non inventare dettagli che non sono visibili o presenti nel contesto.
 
@@ -132,7 +142,7 @@ La memoria sopra è informazione persistente fornita dall'utente e ha priorità 
 - Non ignorare la memoria e non inventare dettagli oltre a quelli presenti nella memoria e nella conversazione. Usa le informazioni positive in modo naturale quando pertinenti, senza citarle esplicitamente come "memoria".
 
 CONTROLLO FINALE OBBLIGATORIO PRIMA DI RESTITUIRE LE RISPOSTE:
-Rileggi tutte le 26 risposte, il consiglio e la motivazione. Verifica che ogni eventuale divieto presente nella memoria sia rispettato. Se anche una sola risposta viola un divieto, riscrivila prima di restituire il JSON.
+Rileggi tutte le 26 risposte, il consiglio e la motivazione. Verifica che ogni eventuale divieto presente nella memoria sia rispettato. Verifica anche che le risposte non riportino tutte il discorso su di lei, che ci siano davvero alcune alternative divertenti o di cambio argomento quando il contesto lo consente e che le emoji siano usate solo dove appropriate. Se una risposta è troppo simile alle altre, troppo generica o viola un divieto, riscrivila prima di restituire il JSON.
 
 MESSAGGIO TESTUALE:
 ${message || ''}
