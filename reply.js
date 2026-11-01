@@ -1,9 +1,8 @@
 function json(statusCode, payload) {
-  return {
-    statusCode,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  };
+  return new Response(JSON.stringify(payload), {
+    status: statusCode,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
+  });
 }
 
 function extractJson(raw) {
