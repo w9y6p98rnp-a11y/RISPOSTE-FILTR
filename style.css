@@ -134,6 +134,7 @@ body.light-theme .account-email{color:#64748b}
 
 /* Autenticazione multiutente */
 .auth-screen{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:24px;background:linear-gradient(180deg,#0b1220,#070b14);overflow:auto}
+.auth-screen ~ .modal{z-index:10000}
 .auth-screen.hidden{display:none}
 .auth-card{width:min(430px,100%);padding:30px 22px 24px;border:1px solid #26344b;border-radius:24px;background:#0f1726;box-shadow:0 20px 70px #0008;text-align:center}
 .auth-logo{width:64px;height:64px;border-radius:18px;display:grid;place-items:center;margin:0 auto 14px;background:#18263b;font-size:30px}
