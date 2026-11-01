@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b1220">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=20261101-account1">
+<link rel="stylesheet" href="style.css?v=20261101-auth2">
 <title>RispostaFlirt</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -28,7 +28,7 @@
     <div class="auth-divider"><span>oppure</span></div>
     <button id="googleLogin" type="button" class="google-btn"><span class="google-g">G</span> Continua con Google</button>
 
-    <button id="showRegister" type="button" class="auth-create">Crea un account</button>
+    <button id="showRegister" type="button" class="auth-create" onclick="document.getElementById('registerModal')?.classList.remove('hidden');document.getElementById('registerNickname')?.focus();">Crea un account</button>
     <div id="authMessage" class="auth-message hidden"></div>
   </div>
 </div>
