@@ -176,14 +176,18 @@ body.light-theme .auth-screen{background:#eef3f9}.light-theme .auth-card{backgro
 
 
 /* Selettore font dell'interfaccia */
-.setting-option{width:100%;display:flex;align-items:center;gap:12px;text-align:left;padding:13px 14px;border-radius:13px;background:#111b2a;color:#f8fafc;border:1px solid #334155;cursor:pointer}
+.setting-option{width:100%;display:flex;align-items:center;gap:calc(12px * var(--ui-zoom));text-align:left;padding:calc(13px * var(--ui-zoom)) calc(14px * var(--ui-zoom));border-radius:calc(13px * var(--ui-zoom));background:#111b2a;color:#f8fafc;border:1px solid #334155;cursor:pointer}
 .setting-option:hover{background:#18263a;border-color:#4b6280}
-.setting-option-icon{font-size:23px;flex:none}.setting-option-copy{min-width:0;flex:1}.setting-option-copy b{display:block;font-size:15px}.setting-option-copy small{display:block;margin-top:3px;color:#94a3b8;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.setting-option-arrow{font-size:28px;color:#93c5fd;line-height:1}
-.font-modal-card{width:min(560px,94vw);max-height:88vh}.font-list{display:grid;grid-template-columns:1fr 1fr;gap:9px;max-height:58vh;overflow:auto;padding:2px}
-.font-option{position:relative;width:100%;min-height:76px;padding:12px 38px 11px 13px;border-radius:13px;background:#111b2a;color:#f8fafc;border:1px solid #334155;text-align:left;cursor:pointer}
+.setting-option-icon{font-size:calc(23px * var(--ui-zoom));flex:none}.setting-option-copy{min-width:0;flex:1}.setting-option-copy b{display:block;font-size:calc(15px * var(--ui-zoom))}.setting-option-copy small{display:block;margin-top:calc(3px * var(--ui-zoom));color:#94a3b8;font-size:calc(11px * var(--ui-zoom));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.setting-option-arrow{font-size:calc(28px * var(--ui-zoom));color:#93c5fd;line-height:1}
+.font-modal-card{width:min(560px,94vw);max-height:88vh}
+.font-modal-card .settings-head{gap:calc(10px * var(--ui-zoom));padding-bottom:calc(4px * var(--ui-zoom))}
+.font-modal-card .settings-head h2{font-size:calc(22px * var(--ui-zoom));margin:0}
+.font-modal-card .settings-head .hint{font-size:calc(13px * var(--ui-zoom))}
+.font-list{display:grid;grid-template-columns:1fr 1fr;gap:calc(9px * var(--ui-zoom));max-height:58vh;overflow:auto;padding:calc(2px * var(--ui-zoom))}
+.font-option{position:relative;width:100%;min-height:calc(76px * var(--ui-zoom));padding:calc(12px * var(--ui-zoom)) calc(38px * var(--ui-zoom)) calc(11px * var(--ui-zoom)) calc(13px * var(--ui-zoom));border-radius:calc(13px * var(--ui-zoom));background:#111b2a;color:#f8fafc;border:1px solid #334155;text-align:left;cursor:pointer}
 .font-option:hover{background:#18263a;border-color:#4b6280}.font-option.selected{border-color:#60a5fa;background:#182a46;box-shadow:0 0 0 1px rgba(96,165,250,.2)}
-.font-option-name{display:block;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif!important;font-size:12px;font-weight:800;color:#93c5fd;margin-bottom:5px}
-.font-option-preview{display:block;font-size:20px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.font-option-check{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-size:20px;color:#60a5fa;display:none}.font-option.selected .font-option-check{display:block}
+.font-option-name{display:block;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif!important;font-size:calc(12px * var(--ui-zoom));font-weight:800;color:#93c5fd;margin-bottom:calc(5px * var(--ui-zoom))}
+.font-option-preview{display:block;font-size:calc(20px * var(--ui-zoom));line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.font-option-check{position:absolute;right:calc(11px * var(--ui-zoom));top:50%;transform:translateY(-50%);font-size:calc(20px * var(--ui-zoom));color:#60a5fa;display:none}.font-option.selected .font-option-check{display:block}
 body.light-theme .setting-option{background:#f8fafc;color:#172033;border-color:#cbd5e1}body.light-theme .setting-option:hover{background:#eef2f7;border-color:#93b4df}body.light-theme .setting-option-copy small{color:#64748b}body.light-theme .font-option{background:#f8fafc;color:#172033;border-color:#cbd5e1}body.light-theme .font-option:hover{background:#eef2f7;border-color:#93b4df}body.light-theme .font-option.selected{background:#eef5ff;border-color:#60a5fa}
 @media(max-width:760px){.font-list{grid-template-columns:1fr}.font-modal-card{max-height:90vh}.font-list{max-height:62vh}}

@@ -735,18 +735,6 @@ $("resetForm")?.addEventListener("submit",async e=>{e.preventDefault();const p=$
 
 initPasswordToggles();
 
-let googleClient=null;
-async function initGoogle(){
-  try{
-    const cfg=await api("/api/auth/config");
-    if(!cfg.googleClientId || !window.google?.accounts?.oauth2){if($("googleLogin"))$("googleLogin").disabled=true;return;}
-    googleClient=google.accounts.oauth2.initCodeClient({client_id:cfg.googleClientId,scope:"openid email profile",ux_mode:"popup",callback:async response=>{
-      try{const data=await api("/api/auth/google",{method:"POST",headers:{"Content-Type":"application/json","X-Requested-With":"XmlHttpRequest"},body:JSON.stringify({code:response.code})});await finishLogin(data);}catch(err){authMessage(err.message,"error");}
-    }});
-  }catch{}
-}
-$("googleLogin")?.addEventListener("click",()=>{if(googleClient)googleClient.requestCode();else authMessage("Accesso Google non ancora configurato.","error")});
-
 $("accountBtn")?.addEventListener("click",()=>showAccount());
 $("closeAccount")?.addEventListener("click",()=>$("accountModal").classList.add("hidden"));
 $("accountModal")?.addEventListener("click",e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add("hidden")});
@@ -759,6 +747,5 @@ $("logoutBtn")?.addEventListener("click",async()=>{
 
 (async function boot(){
   await initAuth();
-  setTimeout(initGoogle,400);
 })();
 
