@@ -669,12 +669,7 @@ $("loginForm")?.addEventListener("submit",async e=>{
 $("showRegister")?.addEventListener("click",()=>{$("registerModal").classList.remove("hidden");$("registerNickname").focus()});
 $("closeRegister")?.addEventListener("click",()=>$("registerModal").classList.add("hidden"));
 $("registerModal")?.addEventListener("click",e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add("hidden")});
-$("registerForm")?.addEventListener("submit",async e=>{
-  e.preventDefault(); authMessage(""); const p=$("registerPassword").value,p2=$("registerPassword2").value; if(p!==p2){authMessage("Le due password non coincidono.","error");return;}
-  const btn=e.currentTarget.querySelector("button[type=submit]");setAuthBusy(btn,true,"CREA ACCOUNT");
-  try{const data=await api("/api/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nickname:$("registerNickname").value,email:$("registerEmail").value,password:p})});$("registerModal").classList.add("hidden");await finishLogin(data);}
-  catch(err){authMessage(err.message,"error");}finally{setAuthBusy(btn,false,"CREA ACCOUNT");}
-});
+// La registrazione è gestita dal form inline in index.html, così funziona anche se uno script opzionale dell'app ha un errore.
 $("forgotPassword")?.addEventListener("click",()=>{$("forgotModal").classList.remove("hidden");$("forgotEmail").focus();forgotMessage("")});
 $("closeForgot")?.addEventListener("click",()=>$("forgotModal").classList.add("hidden"));
 $("forgotModal")?.addEventListener("click",e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add("hidden")});

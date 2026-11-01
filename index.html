@@ -36,7 +36,7 @@
 <div id="registerModal" class="modal hidden">
   <div class="modal-card auth-modal-card">
     <div class="auth-modal-head"><div><h2>Crea un account</h2><p class="hint">Usa un nickname che vedrai nel tuo profilo.</p></div><button type="button" id="closeRegister" class="memory-close">×</button></div>
-    <form id="registerForm" class="auth-form">
+    <form id="registerForm" class="auth-form" onsubmit="return window.rfRegisterSubmit(event);">
       <input id="registerNickname" type="text" maxlength="40" autocomplete="nickname" placeholder="Nickname" required>
       <input id="registerEmail" type="email" autocomplete="email" placeholder="Email" required>
       <input id="registerPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Password (minimo 8 caratteri)" required>
@@ -214,6 +214,41 @@
   </div>
 </div>
 
-<script src="app.js?v=20261101-auth1"></script>
+<script>
+window.rfRegisterSubmit = async function(event){
+  event.preventDefault();
+  const form = event.currentTarget;
+  const btn = form.querySelector('button[type="submit"]');
+  const msg = document.getElementById('authMessage');
+  const showError = (text) => {
+    if(msg){ msg.textContent = text || 'Operazione non riuscita.'; msg.className = 'auth-message error'; }
+  };
+  const nickname = document.getElementById('registerNickname')?.value.trim() || '';
+  const email = document.getElementById('registerEmail')?.value.trim() || '';
+  const password = document.getElementById('registerPassword')?.value || '';
+  const password2 = document.getElementById('registerPassword2')?.value || '';
+  if(password !== password2){ showError('Le due password non coincidono.'); return false; }
+  if(password.length < 8){ showError('La password deve contenere almeno 8 caratteri.'); return false; }
+  if(!nickname || !email){ showError('Compila tutti i campi.'); return false; }
+  if(btn){ btn.disabled = true; btn.textContent = 'CREAZIONE...'; }
+  try{
+    const res = await fetch('/api/auth/register', {
+      method:'POST',
+      credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({nickname,email,password})
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error || 'Registrazione non riuscita.');
+    // Il Worker ha creato la sessione HttpOnly. Ricaricando, initAuth entra automaticamente nell'app.
+    location.reload();
+  }catch(err){
+    showError(err?.message || 'Registrazione non riuscita.');
+    if(btn){ btn.disabled = false; btn.textContent = 'CREA ACCOUNT'; }
+  }
+  return false;
+};
+</script>
+<script src="app.js?v=20261101-auth6"></script>
 </body>
 </html>
