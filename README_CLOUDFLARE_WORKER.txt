@@ -1,11 +1,17 @@
-RispostaFlirt — Cloudflare Worker + PWA (iPhone ottimizzata)
+RISPOSTAFLIRT — CLOUDFLARE WORKER + STATIC ASSETS
 
-Questa versione mantiene l'interfaccia attuale e aggiunge ottimizzazioni per iPhone/PWA:
-- manifest con start_url/scope/id corretti;
-- icona Apple 180x180;
-- meta tag iOS per apertura come app web;
-- safe-area per notch e indicatore Home;
-- pulsante + in alto: su Android usa il prompt nativo quando disponibile, su iPhone mostra le istruzioni Safari;
-- archivio conversazioni e memoria restano nel dispositivo tramite IndexedDB/localStorage.
+Questa versione usa un vero Cloudflare Worker, non solo risorse statiche.
+In questo modo la sezione Variables and Secrets è disponibile e le chiavi API
+possono essere usate server-side.
 
-Per iPhone: apri l'URL in Safari > Condividi > Aggiungi a Home > attiva "Apri come app web" se compare > Aggiungi.
+STRUTTURA
+- public/ contiene l'app web originale
+- worker.js gestisce /api/reply e serve gli asset
+- reply.js contiene la logica AI
+- wrangler.toml configura il Worker
+
+SECRET DA AGGIUNGERE IN CLOUDFLARE
+GEMINI_API_KEY
+OPENROUTER_API_KEY
+
+NON inserire le chiavi nel repository GitHub.

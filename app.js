@@ -302,6 +302,11 @@ async function selectMemoryGirl(id){
   const g=await getGirl(id);
   $("memoryInput").value=g?.memory||"";
   $("memorySelectedGirl").innerHTML=`🧠 Memoria di <strong>${esc(g?.name||"Ragazza")}</strong>`;
+  // Dopo la scelta, nascondi completamente l'elenco: la seconda schermata
+  // deve riguardare solo la ragazza appena selezionata.
+  $("memoryGirlList").classList.add("hidden");
+  $("memoryGirlSelectLabel").classList.add("hidden");
+  $("memoryModalHint").classList.add("hidden");
   $("memoryEditor").classList.remove("hidden");
   $("saveMemory").disabled=false;
   document.querySelectorAll(".memory-girl-option").forEach(x=>x.classList.toggle("active",x.dataset.memoryGirl===id));
@@ -312,6 +317,9 @@ async function openMemoryModal(){
   memorySelectedGirlId=null;
   $("memoryInput").value="";
   $("memoryEditor").classList.add("hidden");
+  $("memoryGirlList").classList.remove("hidden");
+  $("memoryGirlSelectLabel").classList.remove("hidden");
+  $("memoryModalHint").classList.remove("hidden");
   $("saveMemory").disabled=true;
   $("memoryModal").classList.remove("hidden");
   await renderMemoryGirlList();
@@ -403,17 +411,11 @@ function bindResultButtons(){
     document.documentElement.scrollTop=0; document.body.scrollTop=0;
     setTimeout(()=>b.textContent="Copia questa",1200);
   });
-  document.querySelectorAll(".save-recommended").forEach(b=>b.onclick=async()=>{
-    await saveReplyToChat(b.dataset.text);
-  });
   document.querySelectorAll(".copy-reply").forEach(b=>b.onclick=async()=>{
     await navigator.clipboard.writeText(b.dataset.text); b.textContent="Copiato";
     window.scrollTo({top:0,behavior:"smooth"});
     document.documentElement.scrollTop=0; document.body.scrollTop=0;
     setTimeout(()=>b.textContent="Copia",1200);
-  });
-  document.querySelectorAll(".save-reply").forEach(b=>b.onclick=async()=>{
-    await saveReplyToChat(b.dataset.text);
   });
   document.querySelectorAll(".reply-choice").forEach(b=>b.onclick=()=>{
     const target=$(b.dataset.target);
@@ -512,7 +514,7 @@ $("generate").onclick=async()=>{
       const t=typeof r==="string"?r:(r.text||"");
       const style=typeof r==="string"?"Risposta "+(i+1):(r.style||"Risposta "+(i+1));
       const recommended=i===categoryRecommendedIndex?" recommended-card":"";
-      return `<div class="reply-card${recommended}"><div class="reply-style">${escapeHtml(style)}${i===categoryRecommendedIndex?` <span class="best-badge">Consigliata</span>`:""}</div><div class="reply-text">${escapeHtml(t)}</div><div class="reply-actions"><button class="secondary copy-reply" data-text="${escapeAttr(t)}">Copia</button><button class="secondary save-reply" data-text="${escapeAttr(t)}">Salva come mio messaggio</button></div>${i===categoryRecommendedIndex?`<div class="category-reason">⭐ ${escapeHtml(recommendationReason)}</div>`:""}</div>`;
+      return `<div class="reply-card${recommended}"><div class="reply-style">${escapeHtml(style)}${i===categoryRecommendedIndex?` <span class="best-badge">Consigliata</span>`:""}</div><div class="reply-text">${escapeHtml(t)}</div><div class="reply-actions"><button class="secondary copy-reply" data-text="${escapeAttr(t)}">Copia</button></div>${i===categoryRecommendedIndex?`<div class="category-reason">⭐ ${escapeHtml(recommendationReason)}</div>`:""}</div>`;
     };
     // La risposta consigliata deve essere sempre la prima card della categoria quando la si apre.
     const orderedNormalIndexes=[normalRecommendedIndex,...normalIndexes.filter(i=>i!==normalRecommendedIndex)];
@@ -552,54 +554,6 @@ $("generate").onclick=async()=>{
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function escapeAttr(s){return escapeHtml(s);}
 
-
-
-// Installazione PWA: Android può mostrare il prompt nativo; su iPhone Safari usa “Aggiungi a Home”.
-function isIOSDevice(){
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-}
-function isStandaloneMode(){
-  return window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
-}
-function openInstallModal(){
-  if(isStandaloneMode()) return;
-  const modal=$("installModal");
-  if(!modal) return;
-  const intro=$("installIntro");
-  const steps=$("iosInstallSteps");
-  if(isIOSDevice()){
-    if(intro) intro.textContent="Su iPhone l’installazione si fa direttamente da Safari, senza profili da scaricare.";
-    if(steps) steps.innerHTML=`
-      <div><b>1.</b><span>Apri RispostaFlirt in <strong>Safari</strong>.</span></div>
-      <div><b>2.</b><span>Tocca il pulsante <strong>Condividi</strong>.</span></div>
-      <div><b>3.</b><span>Scorri e tocca <strong>Aggiungi a Home</strong>.</span></div>
-      <div><b>4.</b><span>Attiva <strong>Apri come app web</strong>, se compare, e tocca <strong>Aggiungi</strong>.</span></div>`;
-  } else {
-    if(intro) intro.textContent="Puoi installarla come app dal browser, se il browser offre l’installazione.";
-    if(steps) steps.innerHTML=`
-      <div><b>1.</b><span>Se compare il prompt del browser, scegli <strong>Installa</strong>.</span></div>
-      <div><b>2.</b><span>Se non compare, apri il menu del browser e cerca <strong>Installa app</strong> o <strong>Aggiungi alla schermata Home</strong>.</span></div>`;
-  }
-  modal.classList.remove("hidden");
-}
-function closeInstallModal(){$("installModal")?.classList.add("hidden");}
-if($("installBtn")) $("installBtn").onclick=async()=>{
-  if(isStandaloneMode()) return;
-  if(deferredInstall){
-    try{
-      deferredInstall.prompt();
-      await deferredInstall.userChoice;
-    }catch(e){}
-    deferredInstall=null;
-    return;
-  }
-  openInstallModal();
-};
-window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstall=e;});
-window.addEventListener("appinstalled",()=>{deferredInstall=null;closeInstallModal();});
-$("closeInstall")?.addEventListener("click",closeInstallModal);
-$("closeInstallBottom")?.addEventListener("click",closeInstallModal);
-$("installModal")?.addEventListener("click",e=>{if(e.target.id==="installModal")closeInstallModal();});
 
 // Impostazioni locali: tema e zoom applicato esclusivamente alle risposte.
 const SETTINGS_KEY="RispostaFlirtSettings";
