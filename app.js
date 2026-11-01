@@ -284,6 +284,9 @@ async function showSelectedMedia(e){
    st.audioName=audioFile ? audioFile.name : "";
    st.audioTranscript="";
    st.resultsHtml="";
+   // Ogni nuovo screenshot apre una nuova analisi: l'indicazione precedente non va riutilizzata.
+   st.aiHint="";
+   if($("aiHint")) $("aiHint").value="";
    await persistGirlState(selectedId);
  }
  if(imageFile && audioFile){
