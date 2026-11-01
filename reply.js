@@ -291,7 +291,7 @@ export async function onRequestPost(context) {
       for (const model of ['gemini-3.5-flash-lite']) {
         attempts.push(async () => {
           try {
-            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 7000);
+            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 25000);
             return { result, provider: 'Gemini', model };
           } catch (err) {
             throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
