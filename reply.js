@@ -54,7 +54,7 @@ function extractJson(raw) {
   }
 }
 
-function promptFor(context, message, aiHint = "") {
+function promptFor(context, message, aiHint = "", audioTranscript = "") {
   return `Sei RispostaFlirt, un assistente italiano specializzato nel suggerire risposte naturali per conversazioni romantiche e di flirt.
 Analizza lo screenshot, se presente, insieme al contesto e al messaggio testuale.
 
@@ -122,6 +122,12 @@ La memoria sopra è informazione persistente fornita dall'utente. DEVI tenerla i
 MESSAGGIO TESTUALE:
 ${message || ''}
 
+TRASCRIZIONE DELLA REGISTRAZIONE VOCALE:
+${audioTranscript || 'Nessuna registrazione vocale.'}
+
+REGOLA AUDIO:
+Se è presente una trascrizione, considerala parte reale della conversazione. Non correggere arbitrariamente il contenuto e usala insieme allo screenshot per capire cosa ha detto lei.
+
 INDICAZIONE DELL'UTENTE (facoltativa):
 ${aiHint || 'Nessuna indicazione aggiuntiva.'}`;
 }
@@ -131,6 +137,36 @@ function imagePart(image) {
   const match = image.match(/^data:([^;]+);base64,(.+)$/s);
   if (!match) return null;
   return { mimeType: match[1], data: match[2] };
+}
+
+function audioPart(audio) {
+  if (!audio || typeof audio !== 'string') return null;
+  const match = audio.match(/^data:([^;]+);base64,(.+)$/s);
+  if (!match) return null;
+  return { mimeType: match[1], data: match[2] };
+}
+
+async function transcribeAudio(apiKey, audio, timeoutMs = 16000) {
+  const part = audioPart(audio);
+  if (!part) throw new Error('Registrazione vocale non valida.');
+  const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-transcribe:generateContent?key=${encodeURIComponent(apiKey)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [
+        { text: 'Trascrivi fedelmente questa registrazione vocale in italiano. Non riassumere, non inventare parole e mantieni il significato originale. Restituisci solo la trascrizione.' },
+        { inlineData: part }
+      ] }],
+      generationConfig: {
+        audioTranscriptionConfig: { languageCodes: [] }
+      }
+    })
+  }, timeoutMs);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error('Trascrizione audio non disponibile.');
+  const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim() || '';
+  if (!text) throw new Error('Non è stato possibile trascrivere la registrazione.');
+  return text;
 }
 
 async function fetchWithTimeout(url, options, ms = 18000) {
@@ -206,8 +242,8 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { message = '', aiHint = '', image = null, girlId = '' } = body;
-    if (!image) return json(400, { error: 'Manca lo screenshot.' });
+    const { message = '', aiHint = '', image = null, audio = null, girlId = '' } = body;
+    if (!image && !audio) return json(400, { error: 'Aggiungi uno screenshot oppure una registrazione vocale.' });
     if (!env.DB || !context.user?.id || !girlId) return json(401, { error: 'Sessione o ragazza non valide.' });
 
     // Il contesto usato dall'AI viene letto dal database del proprietario della sessione.
@@ -233,7 +269,17 @@ export async function onRequestPost(context) {
       previousReplies: (previous.results || []).reverse().map(x => x.text).filter(Boolean)
     };
 
-    const prompt = promptFor(serverContext, message, aiHint);
+    let audioTranscript = '';
+    if (audio) {
+      if (!env.GEMINI_API_KEY) return json(503, { error: 'La trascrizione vocale richiede il servizio Gemini configurato.' });
+      try {
+        audioTranscript = await transcribeAudio(env.GEMINI_API_KEY, audio, 16000);
+      } catch (err) {
+        return json(502, { error: err?.message || 'Non riesco a trascrivere la registrazione vocale.' });
+      }
+    }
+
+    const prompt = promptFor(serverContext, message, aiHint, audioTranscript);
     const errors = [];
 
     // NON avviare tutti i provider in parallelo: ogni tentativo può consumare quota.
@@ -273,7 +319,7 @@ export async function onRequestPost(context) {
     for (const attempt of attempts) {
       try {
         const winner = await attempt();
-        return new Response(JSON.stringify({ ...winner.result, provider: winner.provider, model: winner.model }), { status: 200, headers: { "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ ...winner.result, audioTranscript, provider: winner.provider, model: winner.model }), { status: 200, headers: { "Content-Type": "application/json" } });
       } catch (err) {
         errors.push(err?.message || String(err));
       }

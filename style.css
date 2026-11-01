@@ -191,3 +191,16 @@ body.light-theme .auth-screen{background:#eef3f9}.light-theme .auth-card{backgro
 .font-option-check{position:absolute;right:calc(11px * var(--ui-zoom));top:50%;transform:translateY(-50%);font-size:calc(20px * var(--ui-zoom));color:#60a5fa;display:none}.font-option.selected .font-option-check{display:block}
 body.light-theme .setting-option{background:#f8fafc;color:#172033;border-color:#cbd5e1}body.light-theme .setting-option:hover{background:#eef2f7;border-color:#93b4df}body.light-theme .setting-option-copy small{color:#64748b}body.light-theme .font-option{background:#f8fafc;color:#172033;border-color:#cbd5e1}body.light-theme .font-option:hover{background:#eef2f7;border-color:#93b4df}body.light-theme .font-option.selected{background:#eef5ff;border-color:#60a5fa}
 @media(max-width:760px){.font-list{grid-template-columns:1fr}.font-modal-card{max-height:90vh}.font-list{max-height:62vh}}
+
+/* Registrazioni vocali e trascrizioni */
+.audio-upload-btn{margin-top:8px}
+.chat-audio{display:block;width:min(320px,100%);margin:2px 0 7px}
+.audio-transcript{margin-top:8px;padding:9px 10px;border-radius:11px;background:#0b1321;border:1px solid #334155;color:#dbeafe;font-size:13px;line-height:1.45}
+.audio-transcript b{display:block;margin-bottom:4px;color:#93c5fd}
+.audio-transcript-card{background:#111b2a;border:1px solid #2d3a4f;color:#f3f4f6;border-radius:14px;padding:12px;margin-bottom:9px}
+.audio-transcript-title{font-weight:800;color:#93c5fd;margin-bottom:6px}
+.audio-transcript-text{white-space:pre-wrap;line-height:1.5}
+body.light-theme .audio-transcript{background:#f8fafc;color:#334155;border-color:#cbd5e1}
+body.light-theme .audio-transcript b,body.light-theme .audio-transcript-title{color:#2563eb}
+body.light-theme .audio-transcript-card{background:#fff;color:#172033;border-color:#d8dee8}
+@media(max-width:760px){.chat-audio{width:100%}}

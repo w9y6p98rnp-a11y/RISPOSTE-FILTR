@@ -104,10 +104,13 @@
         <div class="composer screenshot-composer">
           <div class="screenshot-box">
             <input id="screenshotInput" type="file" accept="image/*" hidden>
+            <input id="audioInput" type="file" accept="audio/*" hidden>
             <div class="screenshot-actions">
               <button id="chooseScreenshot" type="button" class="secondary screenshot-upload-btn">✨ Aggiungi screenshot</button>
+              <button id="chooseAudio" type="button" class="secondary screenshot-upload-btn audio-upload-btn">🎙️ Aggiungi registrazione vocale</button>
             </div>
             <div id="imageName" class="image-name">Nessuno screenshot inserito</div>
+            <div id="audioName" class="image-name">Nessuna registrazione vocale inserita</div>
           <div class="ai-hint-box">
             <label for="aiHint">💡 Indicazione per l'AI (facoltativa)</label>
             <textarea id="aiHint" rows="2" placeholder="Es. Voglio essere più provocatorio… oppure: cambia argomento e falla incuriosire. Dopo le risposte puoi scrivere una nuova indicazione e premere di nuovo Analizza."></textarea>
@@ -223,6 +226,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20261101-font2"></script>
+<script src="app.js?v=20261101-voice1"></script>
 </body>
 </html>

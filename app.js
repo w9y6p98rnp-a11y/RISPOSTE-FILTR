@@ -1,5 +1,5 @@
 let DB_NAME="RispostaFlirtDB", DB_VERSION=2;
-let db, girls=[], selectedId=null, currentRole="her", deferredInstall=null, selectedImageFile=null;
+let db, girls=[], selectedId=null, currentRole="her", deferredInstall=null, selectedImageFile=null, selectedAudioFile=null;
 let currentUser=null, serverSyncEnabled=false, serverSyncTimer=null, serverSyncPaused=false;
 // Stato temporaneo separato per ogni ragazza: screenshot, testo e risultati non vengono condivisi tra chat.
 const girlStates = new Map();
@@ -17,15 +17,16 @@ function fmt(t){return new Date(t).toLocaleString("it-IT",{day:"2-digit",month:"
 
 async function renderGirls(){girls=await getAll("girls");girls.sort((a,b)=>b.updatedAt-a.updatedAt);$("girlList").innerHTML=girls.map(g=>`<button class="girl ${g.id===selectedId?"active":""}" data-id="${g.id}"><span class="avatar">${esc((g.name||"?")[0].toUpperCase())}</span><span class="girl-meta"><span class="girl-name">${esc(g.name)}</span></span></button>`).join("");document.querySelectorAll(".girl").forEach(b=>b.onclick=()=>selectGirl(b.dataset.id))}
 function getGirlState(id){
-  if(!girlStates.has(id)) girlStates.set(id,{message:"",imageFile:null,imageData:null,imageName:"",resultsHtml:"",role:"her",aiHint:""});
+  if(!girlStates.has(id)) girlStates.set(id,{message:"",imageFile:null,imageData:null,imageName:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""});
   return girlStates.get(id);
 }
 async function loadGirlState(id){
-  const base={message:"",imageFile:null,imageData:null,imageName:"",resultsHtml:"",role:"her",aiHint:""};
+  const base={message:"",imageFile:null,imageData:null,imageName:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""};
   try{
     const saved=await new Promise((res,rej)=>{const r=tx("girlStates").get(id);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
     const st={...base,...(saved||{})};
     st.imageFile=null;
+    st.audioFile=null;
     girlStates.set(id,st);
     return st;
   }catch(err){
@@ -36,7 +37,7 @@ async function loadGirlState(id){
 async function persistGirlState(id){
   if(!id)return;
   const st=getGirlState(id);
-  await put("girlStates",{girlId:id,message:st.message||"",imageData:st.imageData||null,imageName:st.imageName||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",aiHint:st.aiHint||"",updatedAt:Date.now()});
+  await put("girlStates",{girlId:id,message:st.message||"",imageData:st.imageData||null,imageName:st.imageName||"",audioData:st.audioData||null,audioName:st.audioName||"",audioTranscript:st.audioTranscript||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",aiHint:st.aiHint||"",updatedAt:Date.now()});
 }
 async function clearGirlState(id){
   girlStates.delete(id);
@@ -54,12 +55,15 @@ async function saveCurrentGirlState(){
 function restoreGirlState(id){
   const st=getGirlState(id);
   selectedImageFile=st.imageFile||null;
+  selectedAudioFile=st.audioFile||null;
   currentRole=st.role||"her";
   if($("msgInput")) $("msgInput").value=st.message||"";
   if($("aiHint")) $("aiHint").value=st.aiHint||"";
   if($("screenshotInput")) $("screenshotInput").value="";
   if($("cameraInput")) $("cameraInput").value="";
+  if($("audioInput")) $("audioInput").value="";
   $("imageName").textContent=st.imageName||"Nessuno screenshot inserito";
+  $("audioName").textContent=st.audioName||"Nessuna registrazione vocale inserita";
   $("results").innerHTML=st.resultsHtml||"";
   applySettings();
   document.querySelectorAll(".role").forEach(x=>x.classList.toggle("active",x.dataset.role===currentRole));
@@ -89,10 +93,15 @@ async function renderMessages(){
   const st=selectedId?getGirlState(selectedId):null;
   const saved=ms.map(m=>{
     const image=m.imageData?`<img class="chat-image" src="${escapeAttr(m.imageData)}" alt="Screenshot della conversazione">`:"";
+    const audio=m.audioData?`<audio class="chat-audio" controls preload="metadata" src="${escapeAttr(m.audioData)}"></audio>`:"";
+    const transcript=m.audioTranscript?`<div class="audio-transcript"><b>📝 Trascrizione</b><div>${esc(m.audioTranscript)}</div></div>`:"";
     const text=m.text?`<div class="bubble-text">${esc(m.text)}</div>`:"";
-    return `<div class="bubble ${m.role}${m.imageData?" has-image":""}">${image}${text}<small>${m.role==="her"?"Lei":"Io"} · ${fmt(m.createdAt)}</small></div>`;
+    const hasMedia=m.imageData||m.audioData;
+    return `<div class="bubble ${m.role}${hasMedia?" has-image":""}">${image}${audio}${text}${transcript}<small>${m.role==="her"?"Lei":"Io"} · ${fmt(m.createdAt)}</small></div>`;
   }).join("");
-  const pending=st?.imageData?`<div class="bubble her pending-bubble has-image"><img class="chat-image" src="${escapeAttr(st.imageData)}" alt="Screenshot da inviare"><div class="pending-label">Screenshot pronto per l'invio</div></div>`:"";
+  const pendingImage=st?.imageData?`<div class="bubble her pending-bubble has-image"><img class="chat-image" src="${escapeAttr(st.imageData)}" alt="Screenshot da inviare"><div class="pending-label">Screenshot pronto per l'invio</div></div>`:"";
+  const pendingAudio=st?.audioData?`<div class="bubble her pending-bubble has-image"><audio class="chat-audio" controls preload="metadata" src="${escapeAttr(st.audioData)}"></audio><div class="pending-label">🎙️ ${escapeHtml(st.audioName||"Registrazione vocale pronta")}</div>${st.audioTranscript?`<div class="audio-transcript"><b>📝 Trascrizione</b><div>${esc(st.audioTranscript)}</div></div>`:""}</div>`:"";
+  const pending=pendingImage+pendingAudio;
   $("messages").innerHTML=(saved||pending)?saved+pending:`<div class="hint">Nessun messaggio salvato ancora.</div>`;
   $("messages").scrollTop=$("messages").scrollHeight;
 }
@@ -126,10 +135,12 @@ if($("saveMsg")) $("saveMsg").onclick=async()=>{
   if(!selectedId)return;
   const text=$("msgInput")?.value.trim()||"";
   const st=getGirlState(selectedId);
-  if(!text && !st.imageData){alert("Inserisci una risposta oppure aggiungi uno screenshot.");return;}
+  if(!text && !st.imageData && !st.audioData){alert("Inserisci una risposta oppure aggiungi uno screenshot o una registrazione vocale.");return;}
   const now=Date.now();
-  // Lo screenshot rappresenta il messaggio ricevuto da lei; la risposta scritta viene subito sotto.
-  if(st.imageData) await add("messages",{girlId:selectedId,role:"her",text:"",imageData:st.imageData,createdAt:now});
+  // Screenshot e registrazione rappresentano il messaggio ricevuto da lei; la risposta scritta viene subito sotto.
+  if(st.imageData || st.audioData){
+    await add("messages",{girlId:selectedId,role:"her",text:"",imageData:st.imageData||null,audioData:st.audioData||null,audioName:st.audioName||"",audioTranscript:st.audioTranscript||"",createdAt:now});
+  }
   if(text) await add("messages",{girlId:selectedId,role:"me",text,createdAt:now+1});
   const g=await getGirl(selectedId);g.updatedAt=Date.now();await put("girls",g);
   if($("msgInput")) if($("msgInput")) $("msgInput").value="";
@@ -139,11 +150,18 @@ if($("saveMsg")) $("saveMsg").onclick=async()=>{
   st.imageFile=null;
   st.imageData=null;
   st.imageName="Nessuno screenshot inserito";
+  st.audioFile=null;
+  st.audioData=null;
+  st.audioName="";
+  st.audioTranscript="";
   st.resultsHtml="";
   selectedImageFile=null;
+  selectedAudioFile=null;
   if($("screenshotInput")) $("screenshotInput").value="";
   if($("cameraInput")) $("cameraInput").value="";
+  if($("audioInput")) $("audioInput").value="";
   $("imageName").textContent="Nessuno screenshot inserito";
+  $("audioName").textContent="Nessuna registrazione vocale inserita";
   $("results").innerHTML="";
   await persistGirlState(selectedId);
   await renderMessages();
@@ -257,12 +275,39 @@ async function showSelectedImage(e){
  $("imageName").textContent=f ? "Screenshot: "+f.name : "Nessuno screenshot inserito";
  $("results").innerHTML="";
  await renderMessages();
-
- // Dopo aver caricato lo screenshot l'utente può aggiungere un'indicazione
- // prima dell'analisi. L'AI parte solo quando viene premuto il pulsante Analizza.
+}
+async function fileToDataUrl(file){
+  return await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result||""));
+    reader.onerror=()=>reject(reader.error||new Error("Impossibile leggere la registrazione."));
+    reader.readAsDataURL(file);
+  });
+}
+async function showSelectedAudio(e){
+ const f=e.target.files?.[0] || null;
+ selectedAudioFile=f;
+ if(f && f.size>12*1024*1024){
+   alert("La registrazione è troppo grande. Per questa versione usa un audio fino a 12 MB.");
+   e.target.value=""; selectedAudioFile=null; return;
+ }
+ if(selectedId){
+   const st=getGirlState(selectedId);
+   st.audioFile=f;
+   st.audioData=f?await fileToDataUrl(f):null;
+   st.audioName=f ? f.name : "";
+   st.audioTranscript="";
+   st.resultsHtml="";
+   await persistGirlState(selectedId);
+ }
+ $("audioName").textContent=f ? "Registrazione: "+f.name : "Nessuna registrazione vocale inserita";
+ $("results").innerHTML="";
+ await renderMessages();
 }
 $("screenshotInput")?.addEventListener("change",showSelectedImage);
 $("chooseScreenshot")?.addEventListener("click",()=> $("screenshotInput").click());
+$("audioInput")?.addEventListener("change",showSelectedAudio);
+$("chooseAudio")?.addEventListener("click",()=> $("audioInput").click());
 
 $("aiHint")?.addEventListener("input",()=>{
   if(selectedId){
@@ -444,8 +489,9 @@ $("generate").onclick=async()=>{
   const aiHint=$("aiHint")?.value.trim()||"";
   const state=getGirlState(selectedId);
   const hasImage=Boolean(selectedImageFile || state.imageData);
-  if(!hasImage){
-    alert("Aggiungi uno screenshot prima di analizzare.");
+  const hasAudio=Boolean(selectedAudioFile || state.audioData);
+  if(!hasImage && !hasAudio){
+    alert("Aggiungi uno screenshot oppure una registrazione vocale prima di analizzare.");
     return;
   }
   $("generate").disabled=true;
@@ -453,6 +499,7 @@ $("generate").onclick=async()=>{
   try{
     const context=await buildContext();
     let image=null;
+    let audio=null;
     state.message="";
     state.aiHint=aiHint;
     if(selectedImageFile){
@@ -463,6 +510,15 @@ $("generate").onclick=async()=>{
       await persistGirlState(selectedId);
     }else if(state.imageData){
       image=state.imageData;
+    }
+    if(selectedAudioFile){
+      audio=await fileToDataUrl(selectedAudioFile);
+      state.audioData=audio;
+      state.audioFile=selectedAudioFile;
+      state.audioName=selectedAudioFile.name;
+      await persistGirlState(selectedId);
+    }else if(state.audioData){
+      audio=state.audioData;
     }
     const controller=new AbortController();
     const clientTimer=setTimeout(()=>controller.abort(),26000);
@@ -477,7 +533,8 @@ $("generate").onclick=async()=>{
           message:text,
           aiHint,
           context,
-          image
+          image,
+          audio
         })
       });
     }finally{clearTimeout(clientTimer)}
@@ -486,6 +543,10 @@ $("generate").onclick=async()=>{
       throw new Error(detail || "Server AI non disponibile.");
     }
     const data=await response.json();
+    const audioTranscript=String(data.audioTranscript||"").trim();
+    if(audioTranscript){
+      state.audioTranscript=audioTranscript;
+    }
     const replies=Array.isArray(data.replies)?data.replies:[];
     if(!replies.length) throw new Error("Nessuna risposta restituita dall'AI.");
     const recommendedIndex=Number.isInteger(data.recommendedIndex)&&data.recommendedIndex>=0&&data.recommendedIndex<replies.length?data.recommendedIndex:0;
@@ -521,7 +582,8 @@ $("generate").onclick=async()=>{
     const orderedSecretIndexes=[secretRecommendedIndex,...secretIndexes.filter(i=>i!==secretRecommendedIndex)];
     const normalCards=orderedNormalIndexes.map(i=>renderCard(replies[i],i,normalRecommendedIndex)).join("");
     const secretCards=orderedSecretIndexes.map(i=>renderCard(replies[i],i,secretRecommendedIndex)).join("");
-    const columns=`${adviceHtml}<div class="reply-choice-grid">
+    const transcriptHtml=audioTranscript?`<div class="audio-transcript-card"><div class="audio-transcript-title">🎙️ Trascrizione della registrazione</div><div class="audio-transcript-text">${escapeHtml(audioTranscript)}</div></div>`:"";
+    const columns=`${transcriptHtml}${adviceHtml}<div class="reply-choice-grid">
       <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>Flirt, audaci, poetiche, ironiche…</small></span><span class="reply-choice-arrow">›</span></button>
       <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>Erotiche e Hot</small></span><span class="reply-choice-arrow">›</span></button>
     </div>
