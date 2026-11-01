@@ -521,6 +521,10 @@ $("generate").onclick=async()=>{
     }else if(state.audioData){
       audio=state.audioData;
     }
+    // Se il dispositivo è offline, mostra un messaggio chiaro invece del generico "Load failed".
+    if (navigator.onLine === false) {
+      throw new Error("Nessuna connessione internet.");
+    }
     const controller=new AbortController();
     const clientTimer=setTimeout(()=>controller.abort(),26000);
     let response;
@@ -610,7 +614,10 @@ $("generate").onclick=async()=>{
       setTimeout(()=>resultsBox.scrollIntoView({behavior:"smooth",block:"start"}),80);
     }
   }catch(err){
-    const msg=err?.name==="AbortError" ? "Il servizio AI ha impiegato troppo tempo. Riprova: la richiesta ora è ottimizzata per rispondere più velocemente." : err.message;
+    const networkError = navigator.onLine === false || err?.name === "TypeError" || /Load failed|Failed to fetch|NetworkError|network request failed/i.test(String(err?.message || ""));
+    const msg = networkError
+      ? "Nessuna connessione internet."
+      : (err?.name === "AbortError" ? "Il servizio AI ha impiegato troppo tempo. Riprova: la richiesta ora è ottimizzata per rispondere più velocemente." : err.message);
     alert("Analisi non riuscita: "+msg);
   }finally{
     $("generate").disabled=false;
