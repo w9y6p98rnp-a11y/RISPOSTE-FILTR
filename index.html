@@ -181,7 +181,25 @@
       </div>
     </div>
 
+    <button type="button" id="openAboutMe" class="setting-option account-about-btn">
+      <span class="setting-option-icon">🧑</span>
+      <span class="setting-option-copy"><b>Cose su di me</b><small>Descrivi come sei, il tuo carattere e il tuo stile</small></span>
+      <span class="setting-option-arrow">›</span>
+    </button>
+
     <button type="button" id="logoutBtn" class="danger account-logout">↪️ Esci dall'account</button>
+  </div>
+</div>
+
+<div id="aboutMeModal" class="modal hidden">
+  <div class="modal-card about-me-card">
+    <div class="settings-head">
+      <div><h2>🧑 Cose su di me</h2><p class="hint">Scrivi come sei fatto e come vuoi che l'AI costruisca le risposte.</p></div>
+      <button type="button" id="closeAboutMe" class="memory-close">×</button>
+    </div>
+    <textarea id="aboutMeInput" rows="10" placeholder="Esempio: sono ironico, mi piace stuzzicare ma senza esagerare, preferisco essere elegante e sicuro di me, non mi piace sembrare insistente..."></textarea>
+    <div class="memory-help">Queste informazioni vengono usate insieme alla conversazione e alle “Cose da ricordare” di ogni ragazza per rendere le risposte più adatte a te.</div>
+    <div class="modal-actions"><button type="button" id="cancelAboutMe" class="secondary">Annulla</button><button type="button" id="saveAboutMe" class="primary">Salva</button></div>
   </div>
 </div>
 
@@ -223,6 +241,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20261101-autoscroll3"></script>
+<script src="app.js?v=20261101-aboutme1"></script>
 </body>
 </html>

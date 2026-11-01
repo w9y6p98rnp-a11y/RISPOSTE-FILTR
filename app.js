@@ -403,7 +403,7 @@ $("closeMemory").onclick=closeMemoryModal;
 $("cancelMemory").onclick=closeMemoryModal;
 $("memoryModal").addEventListener("click",e=>{if(e.target===$("memoryModal"))closeMemoryModal()});
 
-async function buildContext(){const g=await getGirl(selectedId),ms=await messagesFor(selectedId);return {girl:{id:g?.id,name:g?.name,note:g?.note||"",memory:g?.memory||""},memory:g?.memory||"",conversation:ms.slice(-16),previousReplies:ms.filter(x=>x.role==="me").map(x=>x.text).slice(-12)}}
+async function buildContext(){const g=await getGirl(selectedId),ms=await messagesFor(selectedId),settings=loadSettings();return {aboutMe:settings.aboutMe||"",girl:{id:g?.id,name:g?.name,note:g?.note||"",memory:g?.memory||""},memory:g?.memory||"",conversation:ms.slice(-16),previousReplies:ms.filter(x=>x.role==="me").map(x=>x.text).slice(-12)}}
 function demoReplies(style){const base={flirt:["Hai un modo tutto tuo di farti notare… e direi che funziona.","Con te rischio di prendere gusto a queste conversazioni.","Non so se sei più pericolosa quando sorridi o quando fai finta di niente."],stuzzica:["Tu fai sempre così o oggi ti sei impegnata apposta?","Mi sa che ti piace mettermi alla prova.","Attenta, che prima o poi ti rispondo come meriti."],poeta:["Ci sono persone che arrivano in una conversazione e cambiano subito il ritmo.","Alcune parole restano, anche quando la chat finisce.","Hai quel tipo di presenza che si nota senza chiedere attenzione."],ironico:["Va bene, segno tutto: oggi hai deciso di rendermi il lavoro difficile.","Ottimo, anche oggi la normalità è ufficialmente saltata.","Tranquilla, faccio finta di non aver capito quanto sei furba."],dolce:["Mi piace quando mi racconti queste cose.","Con te parlare viene abbastanza naturale.","Mi fai sorridere più spesso di quanto dovresti."],audace:["Potrei dirti quello che penso, ma rischierei di farti sorridere troppo.","Se continuo così, prima o poi dovrai concedermi un caffè.","Non provocarmi se poi non vuoi vedere dove porta la curiosità."],erotica:["Con te la fantasia prende una piega decisamente interessante…","Hai quel modo di provocare che rende difficile restare innocenti.","Se continui a guardarmi così, la conversazione potrebbe diventare molto più intrigante."]};return base[style]||base.flirt}
 
 async function compressImageForAI(file){
@@ -673,7 +673,7 @@ const FONT_OPTIONS=[
 let pendingFontId="system";
 function getFontOption(id){return FONT_OPTIONS.find(f=>f.id===id)||FONT_OPTIONS[0];}
 function settingsKey(){return `RispostaFlirtSettings_${currentUser?.id||"local"}`;}
-function loadSettings(){try{return {...{theme:"dark",replyZoom:100,font:"system"},...(JSON.parse(localStorage.getItem(settingsKey())||"{}"))}}catch(e){return {theme:"dark",replyZoom:100,font:"system"}}}
+function loadSettings(){try{return {...{theme:"dark",replyZoom:100,font:"system",aboutMe:""},...(JSON.parse(localStorage.getItem(settingsKey())||"{}"))}}catch(e){return {theme:"dark",replyZoom:100,font:"system",aboutMe:""}}}
 function applySettings(){const s=loadSettings();document.body.classList.toggle("light-theme",s.theme==="light");const zoom=String((Number(s.replyZoom)||100)/100);document.documentElement.style.setProperty("--ui-zoom",zoom);const r=$("results");if(r)r.style.setProperty("--reply-zoom",zoom);const font=getFontOption(s.font);document.documentElement.style.setProperty("--app-font",font.stack);document.querySelectorAll(".theme-option").forEach(b=>b.classList.toggle("active",b.dataset.theme===s.theme));if($("replyZoom"))$("replyZoom").value=String(s.replyZoom||100);if($("replyZoomValue"))$("replyZoomValue").textContent=(s.replyZoom||100)+"%";if($("fontSettingValue"))$("fontSettingValue").textContent=font.name;}
 function saveSettings(patch){const next={...loadSettings(),...patch};localStorage.setItem(settingsKey(),JSON.stringify(next));if(serverSyncEnabled) scheduleServerSync();applySettings()}
 function renderFontList(){const current=getFontOption(pendingFontId);$("fontList").innerHTML=FONT_OPTIONS.map(f=>`<button type="button" class="font-option ${f.id===current.id?"selected":""}" data-font-id="${f.id}"><span class="font-option-name">${esc(f.name)}</span><span class="font-option-preview" style="font-family:${f.stack}">Aa — RispostaFlirt</span><span class="font-option-check">✓</span></button>`).join("");document.querySelectorAll(".font-option").forEach(b=>b.onclick=()=>{pendingFontId=b.dataset.fontId;renderFontList()});}
@@ -703,7 +703,7 @@ async function localSnapshot(){
   return { girls:await getAll("girls"), messages:await getAll("messages"), girlStates:await getAll("girlStates"), settings:loadSettings() };
 }
 function hasLocalData(s){return Boolean(s.girls?.length || s.messages?.length || s.girlStates?.length);}
-function hasRemoteData(d){return Boolean(d.girls?.length || d.messages?.length || d.girlStates?.length);}
+function hasRemoteData(d){return Boolean(d.girls?.length || d.messages?.length || d.girlStates?.length || d.settings);}
 
 async function importRemoteData(data){
   serverSyncPaused=true;
@@ -751,6 +751,16 @@ async function showAccount(){
   const nickname=currentUser.nickname||"Il tuo nickname"; const email=currentUser.email||"";
   $("accountNickname").textContent=nickname; $("accountEmail").textContent=email; $("accountAvatar").textContent=(nickname.trim().charAt(0)||"?").toUpperCase();
   $("accountModal").classList.remove("hidden");
+}
+function openAboutMe(){
+  if($("aboutMeInput")) $("aboutMeInput").value=loadSettings().aboutMe||"";
+  $("aboutMeModal").classList.remove("hidden");
+  setTimeout(()=>$("aboutMeInput")?.focus(),0);
+}
+function closeAboutMe(){$("aboutMeModal").classList.add("hidden");}
+function saveAboutMe(){
+  saveSettings({aboutMe:($("aboutMeInput")?.value||"").trim()});
+  closeAboutMe();
 }
 async function startUserApp(user){
   currentUser=user;
@@ -820,6 +830,7 @@ initPasswordToggles();
 $("accountBtn")?.addEventListener("click",()=>showAccount());
 $("closeAccount")?.addEventListener("click",()=>$("accountModal").classList.add("hidden"));
 $("accountModal")?.addEventListener("click",e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add("hidden")});
+$("openAboutMe")?.addEventListener("click",openAboutMe);$("closeAboutMe")?.addEventListener("click",closeAboutMe);$("cancelAboutMe")?.addEventListener("click",closeAboutMe);$("saveAboutMe")?.addEventListener("click",saveAboutMe);$("aboutMeModal")?.addEventListener("click",e=>{if(e.target.id==="aboutMeModal")closeAboutMe();});
 $("logoutBtn")?.addEventListener("click",async()=>{
   try{await syncLocalToServer(); await api("/api/auth/logout",{method:"POST"});}catch{}
   $("accountModal").classList.add("hidden");

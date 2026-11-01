@@ -112,6 +112,12 @@ recommendedIndex, recommendedNormalIndex e recommendedSecretIndex sono gli indic
 CONTESTO:
 ${JSON.stringify(context || {})}
 
+COSE DA SAPERE SULL'UTENTE:
+${context?.aboutMe || 'Nessuna informazione personale salvata.'}
+
+REGOLA SUL PROFILO DELL'UTENTE:
+Le informazioni sopra descrivono come è fatto l'utente, il suo carattere e il modo in cui preferisce comunicare. Usale per rendere le risposte coerenti con lui. Non inventare caratteristiche che non sono presenti e non trasformare il profilo in un elenco esplicito: applicalo naturalmente al tono, alle parole, all'iniziativa e allo stile delle risposte.
+
 MEMORIA DA RICORDARE SULLA RAGAZZA:
 ${context?.memory || context?.girl?.memory || "Nessuna memoria salvata."}
 

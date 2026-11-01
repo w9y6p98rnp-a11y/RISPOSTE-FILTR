@@ -204,3 +204,5 @@ body.light-theme .audio-transcript{background:#f8fafc;color:#334155;border-color
 body.light-theme .audio-transcript b,body.light-theme .audio-transcript-title{color:#2563eb}
 body.light-theme .audio-transcript-card{background:#fff;color:#172033;border-color:#d8dee8}
 @media(max-width:760px){.chat-audio{width:100%}}
+
+.about-me-card textarea{min-height:220px;font-family:var(--app-font,inherit);font-size:calc(15px * var(--ui-zoom));line-height:1.45;padding:calc(12px * var(--ui-zoom));border-radius:calc(12px * var(--ui-zoom))}.account-about-btn{margin-top:2px}.account-about-btn .setting-option-copy small{white-space:normal;line-height:1.3}
