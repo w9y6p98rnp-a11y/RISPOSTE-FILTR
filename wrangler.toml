@@ -2,6 +2,11 @@ name = "rispostaflirt"
 main = "worker.js"
 compatibility_date = "2026-10-31"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "rispostaflirt-auth"
+database_id = "9372e6cb-0118-412f-b7f2-9c37e7911b94"
+
 [assets]
 directory = "."
 binding = "ASSETS"
