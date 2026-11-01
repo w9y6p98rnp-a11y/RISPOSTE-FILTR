@@ -15,9 +15,3 @@ GEMINI_API_KEY
 OPENROUTER_API_KEY
 
 NON inserire le chiavi nel repository GitHub.
-
-
-CORREZIONE CONSIGLIO AI
-- Questa versione forza il blocco 'Consiglio dell'AI' prima delle risposte.
-- I risultati HTML delle versioni precedenti vengono invalidati una sola volta, così non resta visualizzato un vecchio risultato senza il consiglio.
-- Dopo il deploy, eseguire una nuova analisi della chat.

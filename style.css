@@ -82,3 +82,52 @@ body.light-theme .memory-girl-option{background:#f8fafc;color:#172033;border-col
 body.light-theme .memory-girl-option.active{background:#eef5ff;border-color:#60a5fa}
 body.light-theme .memory-selected-girl,.light-theme .memory-select-label{color:#2563eb}
 body.light-theme .memory-help{color:#64748b}
+
+
+/* Profilo account: sostituisce il vecchio pulsante + in alto a destra. */
+.account-btn{
+  margin-left:auto;
+  width:44px;
+  height:44px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:#1a2435;
+  color:#f8fafc;
+  border:1px solid #334155;
+  font-size:20px;
+  box-shadow:0 2px 8px #00000025;
+}
+.account-btn:hover{background:#243149;border-color:#4b6080}
+.account-card{width:min(430px,100%)}
+.account-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.account-head h2{margin:0 0 4px}
+.account-profile{
+  display:flex;
+  align-items:center;
+  gap:13px;
+  padding:14px;
+  border:1px solid #334155;
+  background:#0d1624;
+  border-radius:16px;
+}
+.account-avatar{
+  width:52px;
+  height:52px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:#2563eb;
+  color:#fff;
+  font-size:22px;
+  font-weight:900;
+  flex:none;
+}
+.account-profile-info{min-width:0}
+.account-nickname{font-size:17px;font-weight:900;overflow-wrap:anywhere}
+.account-email{margin-top:3px;color:#9ca3af;font-size:13px;overflow-wrap:anywhere}
+.account-logout{width:100%;margin-top:2px}
+body.light-theme .account-btn{background:#eef2f7;color:#334155;border-color:#cbd5e1}
+body.light-theme .account-btn:hover{background:#e2e8f0}
+body.light-theme .account-profile{background:#f8fafc;border-color:#d8dee8}
+body.light-theme .account-email{color:#64748b}

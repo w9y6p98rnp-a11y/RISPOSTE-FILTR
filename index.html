@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b1220">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20261101-account1">
 <title>RispostaFlirt</title>
 </head>
 <body>
@@ -20,7 +20,7 @@
       <button id="deleteChat" class="danger side-delete">🗑️ Elimina chat</button>
       <button id="openSettings" class="side-settings" title="Altre impostazioni">⚙️ <span>Altre impostazioni</span></button>
     </div>
-    <div class="privacy">Memoria salvata sul dispositivo.<br>Nessun account richiesto.</div>
+    <div class="privacy">I tuoi dati saranno associati al tuo account.</div>
   </aside>
   <div id="overlay"></div>
   <main class="main">
@@ -30,7 +30,7 @@
         <div id="girlTitle" class="title">Seleziona una ragazza</div>
         <div id="girlSub" class="sub">Le conversazioni restano separate</div>
       </div>
-      <button id="installBtn" class="icon" title="Installa">＋</button>
+      <button id="accountBtn" class="account-btn" title="Profilo account" aria-label="Apri profilo account">👤</button>
     </header>
 
     <section id="empty" class="empty">
@@ -107,6 +107,29 @@
   </div>
 </div>
 
+
+<div id="accountModal" class="modal hidden">
+  <div class="modal-card account-card">
+    <div class="account-head">
+      <div>
+        <h2>👤 Il mio profilo</h2>
+        <p class="hint">Il tuo account RispostaFlirt</p>
+      </div>
+      <button type="button" id="closeAccount" class="memory-close">×</button>
+    </div>
+
+    <div class="account-profile">
+      <div id="accountAvatar" class="account-avatar">?</div>
+      <div class="account-profile-info">
+        <div id="accountNickname" class="account-nickname">Il tuo nickname</div>
+        <div id="accountEmail" class="account-email">La tua email</div>
+      </div>
+    </div>
+
+    <button type="button" id="logoutBtn" class="danger account-logout">↪️ Esci dall'account</button>
+  </div>
+</div>
+
 <div id="settingsModal" class="modal hidden">
   <div class="modal-card settings-card">
     <div class="settings-head"><div><h2>⚙️ Altre impostazioni</h2><p class="hint">Personalizza l’aspetto dell’app e la dimensione delle sole risposte.</p></div><button type="button" id="closeSettings" class="memory-close">×</button></div>
@@ -132,6 +155,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20261101-advice7"></script>
+<script src="app.js?v=20261101-zoom5"></script>
 </body>
 </html>

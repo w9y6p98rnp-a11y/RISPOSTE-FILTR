@@ -1,5 +1,4 @@
 const DB_NAME="RispostaFlirtDB", DB_VERSION=2;
-const RESULTS_VERSION="advice-fix-20261101";
 let db, girls=[], selectedId=null, currentRole="her", deferredInstall=null, selectedImageFile=null;
 // Stato temporaneo separato per ogni ragazza: screenshot, testo e risultati non vengono condivisi tra chat.
 const girlStates = new Map();
@@ -17,16 +16,14 @@ function fmt(t){return new Date(t).toLocaleString("it-IT",{day:"2-digit",month:"
 
 async function renderGirls(){girls=await getAll("girls");girls.sort((a,b)=>b.updatedAt-a.updatedAt);$("girlList").innerHTML=girls.map(g=>`<button class="girl ${g.id===selectedId?"active":""}" data-id="${g.id}"><span class="avatar">${esc((g.name||"?")[0].toUpperCase())}</span><span class="girl-meta"><span class="girl-name">${esc(g.name)}</span></span></button>`).join("");document.querySelectorAll(".girl").forEach(b=>b.onclick=()=>selectGirl(b.dataset.id))}
 function getGirlState(id){
-  if(!girlStates.has(id)) girlStates.set(id,{message:"",imageFile:null,imageData:null,imageName:"",resultsHtml:"",resultsVersion:RESULTS_VERSION,role:"her",aiHint:""});
+  if(!girlStates.has(id)) girlStates.set(id,{message:"",imageFile:null,imageData:null,imageName:"",resultsHtml:"",role:"her",aiHint:""});
   return girlStates.get(id);
 }
 async function loadGirlState(id){
-  const base={message:"",imageFile:null,imageData:null,imageName:"",resultsHtml:"",resultsVersion:RESULTS_VERSION,role:"her",aiHint:""};
+  const base={message:"",imageFile:null,imageData:null,imageName:"",resultsHtml:"",role:"her",aiHint:""};
   try{
     const saved=await new Promise((res,rej)=>{const r=tx("girlStates").get(id);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
     const st={...base,...(saved||{})};
-    // Elimina i risultati HTML salvati dalle versioni precedenti: erano privi del blocco Consiglio dell'AI.
-    if(st.resultsVersion!==RESULTS_VERSION){ st.resultsHtml=""; st.resultsVersion=RESULTS_VERSION; }
     st.imageFile=null;
     girlStates.set(id,st);
     return st;
@@ -38,7 +35,7 @@ async function loadGirlState(id){
 async function persistGirlState(id){
   if(!id)return;
   const st=getGirlState(id);
-  await put("girlStates",{girlId:id,message:st.message||"",imageData:st.imageData||null,imageName:st.imageName||"",resultsHtml:st.resultsHtml||"",resultsVersion:RESULTS_VERSION,role:st.role||"her",aiHint:st.aiHint||"",updatedAt:Date.now()});
+  await put("girlStates",{girlId:id,message:st.message||"",imageData:st.imageData||null,imageName:st.imageName||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",aiHint:st.aiHint||"",updatedAt:Date.now()});
 }
 async function clearGirlState(id){
   girlStates.delete(id);
@@ -142,7 +139,6 @@ if($("saveMsg")) $("saveMsg").onclick=async()=>{
   st.imageData=null;
   st.imageName="Nessuno screenshot inserito";
   st.resultsHtml="";
-  st.resultsVersion=RESULTS_VERSION;
   selectedImageFile=null;
   if($("screenshotInput")) $("screenshotInput").value="";
   if($("cameraInput")) $("cameraInput").value="";
@@ -532,7 +528,6 @@ $("generate").onclick=async()=>{
     $("results").innerHTML=columns;
     applySettings();
     state.resultsHtml=$("results").innerHTML;
-    state.resultsVersion=RESULTS_VERSION;
     await persistGirlState(selectedId);
     bindResultButtons();
     // Dopo l'analisi apri automaticamente solo la prima casella: Risposte normali.
@@ -583,4 +578,36 @@ $("openSettings").onclick=openSettings;$("closeSettings").onclick=closeSettings;
     console.error("Errore avvio RispostaFlirt:",err);
     alert("Non riesco ad avviare l'archivio delle conversazioni. Ricarica la pagina e riprova.");
   }
+})();
+
+
+/* Account UI placeholder: sarà collegata al login email/Google nella fase autenticazione. */
+(function initAccountUI(){
+  const accountBtn = $("accountBtn");
+  const accountModal = $("accountModal");
+  const closeAccount = $("closeAccount");
+  const logoutBtn = $("logoutBtn");
+  if(!accountBtn || !accountModal) return;
+
+  function closeAccountModal(){ accountModal.classList.add("hidden"); }
+
+  accountBtn.onclick = () => {
+    // Per ora mostra la struttura del profilo; i dati reali arriveranno dal sistema di autenticazione.
+    const nickname = localStorage.getItem("rispostaFlirtNickname") || "Il tuo nickname";
+    const email = localStorage.getItem("rispostaFlirtEmail") || "Account non ancora collegato";
+    const first = (nickname.trim().charAt(0) || "?").toUpperCase();
+    $("accountNickname").textContent = nickname;
+    $("accountEmail").textContent = email;
+    $("accountAvatar").textContent = first;
+    accountModal.classList.remove("hidden");
+  };
+
+  closeAccount && (closeAccount.onclick = closeAccountModal);
+  accountModal.addEventListener("click", e => {
+    if(e.target === accountModal) closeAccountModal();
+  });
+
+  logoutBtn && (logoutBtn.onclick = () => {
+    alert("Il logout sarà attivo quando collegheremo il sistema di accesso email/Google.");
+  });
 })();
