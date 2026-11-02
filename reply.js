@@ -28,7 +28,7 @@ function extractJson(raw) {
         if (style && text) replies.push({ style, text });
       } catch (_) {}
     }
-    if (replies.length >= 12) {
+    if (replies.length >= 1) {
       const idxMatch = candidate.match(/\"recommendedIndex\"\s*:\s*(\d+)/);
       const reasonMatch = candidate.match(/\"recommendationReason\"\s*:\s*\"((?:\\.|[^\"\\])*)\"/);
       let reason = 'Questa è la risposta che si adatta meglio al tono e al momento della conversazione.';
