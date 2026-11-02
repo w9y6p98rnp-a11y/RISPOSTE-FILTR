@@ -18,11 +18,11 @@ function fmt(t){return new Date(t).toLocaleString("it-IT",{day:"2-digit",month:"
 
 async function renderGirls(){girls=await getAll("girls");girls.sort((a,b)=>b.updatedAt-a.updatedAt);$("girlList").innerHTML=girls.map(g=>`<button class="girl ${g.id===selectedId?"active":""}" data-id="${g.id}"><span class="avatar">${esc((g.name||"?")[0].toUpperCase())}</span><span class="girl-meta"><span class="girl-name">${esc(g.name)}</span></span></button>`).join("");document.querySelectorAll(".girl").forEach(b=>b.onclick=()=>selectGirl(b.dataset.id))}
 function getGirlState(id){
-  if(!girlStates.has(id)) girlStates.set(id,{message:"",imageFile:null,imageData:null,imageName:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""});
+  if(!girlStates.has(id)) girlStates.set(id,{message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""});
   return girlStates.get(id);
 }
 async function loadGirlState(id){
-  const base={message:"",imageFile:null,imageData:null,imageName:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""};
+  const base={message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""};
   try{
     const saved=await new Promise((res,rej)=>{const r=tx("girlStates").get(id);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
     const st={...base,...(saved||{})};
@@ -38,7 +38,7 @@ async function loadGirlState(id){
 async function persistGirlState(id){
   if(!id)return;
   const st=getGirlState(id);
-  await put("girlStates",{girlId:id,message:st.message||"",imageData:st.imageData||null,imageName:st.imageName||"",audioData:st.audioData||null,audioName:st.audioName||"",audioTranscript:st.audioTranscript||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",aiHint:st.aiHint||"",updatedAt:Date.now()});
+  await put("girlStates",{girlId:id,message:st.message||"",lastAnalysisMessage:st.lastAnalysisMessage||"",imageData:st.imageData||null,imageName:st.imageName||"",audioData:st.audioData||null,audioName:st.audioName||"",audioTranscript:st.audioTranscript||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",aiHint:st.aiHint||"",updatedAt:Date.now()});
 }
 async function clearGirlState(id){
   girlStates.delete(id);
@@ -64,6 +64,20 @@ function restoreGirlState(id){
   if($("cameraInput")) $("cameraInput").value="";
   $("imageName").textContent=st.imageName||"Nessuno screenshot inserito";
   $("results").innerHTML=st.resultsHtml||"";
+  // Ricostruisce il contesto dell'ultima analisi anche dopo aver cambiato ragazza
+  // o riaperto la PWA: le risposte segrete devono poter partire automaticamente.
+  if(st.resultsHtml){
+    window.__rfLastAnalysis = {
+      girlId: id,
+      message: st.lastAnalysisMessage || st.message || "",
+      aiHint: st.aiHint || "",
+      image: st.imageData || null,
+      audio: st.audioData || null,
+      audioTranscript: st.audioTranscript || ""
+    };
+  }else if(window.__rfLastAnalysis?.girlId === id){
+    window.__rfLastAnalysis = null;
+  }
   applySettings();
   document.querySelectorAll(".role").forEach(x=>x.classList.toggle("active",x.dataset.role===currentRole));
   bindResultButtons();
@@ -453,6 +467,21 @@ async function saveReplyToChat(text){
   await renderGirls();
 }
 
+function getLastAnalysisContext(){
+  const a=window.__rfLastAnalysis;
+  if(a?.girlId===selectedId) return a;
+  const st=selectedId?getGirlState(selectedId):null;
+  if(!st || !st.resultsHtml) return null;
+  const recovered={girlId:selectedId,message:st.lastAnalysisMessage||st.message||"",aiHint:st.aiHint||"",image:st.imageData||null,audio:st.audioData||null,audioTranscript:st.audioTranscript||""};
+  window.__rfLastAnalysis=recovered;
+  return recovered;
+}
+
+function showSecretLoadingState(content){
+  if(!content) return;
+  content.innerHTML=`<div class="secret-loading-card"><div class="secret-spinner" aria-hidden="true"></div><div class="secret-loading-title">Genero le risposte segrete...</div><div class="secret-loading-text">Sto preparando Erotica e Hot. Non devi premere altro.</div></div>`;
+}
+
 function bindResultButtons(){
   document.querySelectorAll(".copy-recommended").forEach(b=>b.onclick=async()=>{
     await navigator.clipboard.writeText(b.dataset.text); b.textContent="Copiato";
@@ -501,12 +530,14 @@ function bindResultButtons(){
 async function loadSecretRepliesLazy(){
   const btn=document.getElementById("loadSecretReplies");
   const content=document.getElementById("secretRepliesContent");
-  const a=window.__rfLastAnalysis;
-  if(!btn || !content || !a || btn.dataset.loading==="1") return;
-  btn.dataset.loading="1"; btn.disabled=true; btn.textContent="Genero le risposte segrete...";
-  // Feedback visivo immediato: la generazione parte da sola e la rotellina
-  // resta visibile per tutta la durata della richiesta AI.
-  content.innerHTML=`<div class="secret-loading-card"><div class="secret-spinner" aria-hidden="true"></div><div class="secret-loading-title">Genero le risposte segrete...</div><div class="secret-loading-text">Sto preparando Erotica e Hot. Non devi premere altro.</div></div>`;
+  const a=getLastAnalysisContext();
+  if(!content || !a || (btn && btn.dataset.loading==="1")) return;
+  // Se le risposte segrete sono già state generate e salvate, non rifare la richiesta ogni volta che si apre la sezione.
+  if(content.querySelector(".secret-category-group")) return;
+  if(btn){ btn.dataset.loading="1"; btn.disabled=true; }
+  // Il vecchio pulsante può essere rimasto nel risultato salvato da una versione precedente.
+  // Appena si apre la sezione viene sostituito dalla rotella e la richiesta parte senza altri tap.
+  showSecretLoadingState(content);
   try{
     if(navigator.onLine===false) throw new Error("Nessuna connessione internet.");
     const controller=new AbortController();
@@ -673,7 +704,7 @@ $("generate").onclick=async()=>{
       <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>5 Erotiche + 5 Hot • vengono generate quando le apri</small></span><span class="reply-choice-arrow">›</span></button>
     </div>
     <section id="normalRepliesPanel" class="reply-panel hidden"><div class="reply-panel-head"><div><b>💬 Risposte normali</b><small>Quella consigliata è evidenziata.</small></div><button type="button" class="reply-panel-close" data-close-panel="normalRepliesPanel">×</button></div><div class="reply-panel-list">${normalCards}</div></section>
-    <section id="secretRepliesPanel" class="reply-panel secret-panel hidden"><div class="reply-panel-head"><div><b>🔒 Risposte segrete</b><small>Vengono generate solo quando le apri.</small></div><button type="button" class="reply-panel-close" data-close-panel="secretRepliesPanel">×</button></div><div id="secretRepliesContent" class="reply-panel-list"><div class="secret-lazy-card"><div class="secret-lazy-title">🔥 Risposte segrete</div><div class="secret-lazy-text">Le 10 risposte segrete non vengono generate insieme alle normali, così l’analisi iniziale è più veloce.</div><button type="button" id="loadSecretReplies" class="primary">Genera risposte segrete</button></div></div></section>`;
+    <section id="secretRepliesPanel" class="reply-panel secret-panel hidden"><div class="reply-panel-head"><div><b>🔒 Risposte segrete</b><small>Vengono generate solo quando le apri.</small></div><button type="button" class="reply-panel-close" data-close-panel="secretRepliesPanel">×</button></div><div id="secretRepliesContent" class="reply-panel-list"><div class="secret-lazy-card"><div class="secret-lazy-title">🔥 Risposte segrete</div><div class="secret-lazy-text">Le 10 risposte segrete vengono generate automaticamente quando apri questa sezione.</div></div></div></section>`;
     $("results").innerHTML=columns;
     applySettings();
     state.resultsHtml=$("results").innerHTML;
