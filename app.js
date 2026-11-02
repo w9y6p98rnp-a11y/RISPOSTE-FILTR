@@ -546,7 +546,6 @@ $("generate").onclick=async()=>{
           girlId:selectedId,
           message:text,
           aiHint,
-          context,
           image,
           audio
         })

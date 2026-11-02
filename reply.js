@@ -95,7 +95,7 @@ function promptFor(context, message, aiHint = "", audioTranscript = "", previous
   const styleOrder = [...normalOrder, ...secretOrder];
   const categoryExample = Object.fromEntries(styleOrder.map(style => [style, {index:0, reason:"..."}]));
   const prev = Array.isArray(previousGeneratedReplies)
-    ? [...new Set(previousGeneratedReplies.map(x => String(x).trim()).filter(Boolean))].slice(-24)
+    ? [...new Set(previousGeneratedReplies.map(x => String(x).trim()).filter(Boolean))].slice(-12)
     : [];
   return `Sei RispostaFlirt. Analizza con precisione lo screenshot, la cronologia e soprattutto l'INDICAZIONE DELL'UTENTE. Devi distinguere SEMPRE e senza eccezioni IO (l'utente che sta usando l'app) da LEI (la persona con cui sta parlando). Rispondi ESCLUSIVAMENTE all'ultimo messaggio realmente ricevuto da LEI.
 
@@ -115,6 +115,8 @@ ISTRUZIONI PERSONALIZZATE DELLE VOCI:
 ${JSON.stringify(context?.voiceSettings || {})}
 
 PRIORITÀ DELLE ISTRUZIONI PERSONALIZZATE: le istruzioni scritte dall'utente per una voce sono vincolanti e hanno priorità sulle regole generali di stile e lunghezza, purché siano compatibili con il contesto, la memoria, i vincoli dell'utente e la sicurezza. Non ignorarle e non ridurle a un semplice suggerimento. Se l'utente chiede esplicitamente "risposte più lunghe", "più corte", "più dirette", "più dolci", "più provocatorie" o qualcosa di analogo, applica quella richiesta in modo concreto a TUTTE le 5 risposte di quella voce.
+
+OUTPUT E VELOCITÀ: mantieni il JSON compatto. I reason delle categorie devono essere brevi (una frase), advice e sendWhen devono essere sintetici. Non aggiungere spiegazioni fuori dal JSON.
 
 LUNGHEZZA: varia naturalmente solo quando l'utente non ha imposto una preferenza precisa per quella voce. Se una voce personalizzata richiede risposte più lunghe, produci normalmente circa 25-45 parole per ciascuna delle 5 risposte quando il contesto lo permette; non tornare a una sola frase breve solo perché il messaggio di lei è semplice. Se richiede risposte più corte, mantienile brevi. Se dice solo "più lunghe" senza numeri, interpreta la richiesta come un aumento evidente rispetto alle risposte standard, non come una modifica minima.
 
@@ -229,7 +231,7 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 55000) {
     body: JSON.stringify({
       contents: [{ role: 'user', parts }],
       generationConfig: {
-        maxOutputTokens: 4200,
+        maxOutputTokens: 3600,
         responseMimeType: 'application/json',
         thinkingConfig: {
           thinkingLevel: 'minimal'
@@ -294,11 +296,11 @@ export async function onRequestPost(context) {
     if (!girl) return json(404, { error: 'Conversazione non trovata.' });
 
     const history = await env.DB.prepare(
-      'SELECT role,text,created_at AS createdAt FROM messages WHERE user_id=? AND girl_id=? ORDER BY created_at DESC LIMIT 16'
+      'SELECT role,text,created_at AS createdAt FROM messages WHERE user_id=? AND girl_id=? ORDER BY created_at DESC LIMIT 10'
     ).bind(context.user.id, String(girlId)).all();
     const conversation = (history.results || []).reverse();
     const previous = await env.DB.prepare(
-      "SELECT text FROM messages WHERE user_id=? AND girl_id=? AND role='me' ORDER BY created_at DESC LIMIT 12"
+      "SELECT text FROM messages WHERE user_id=? AND girl_id=? AND role='me' ORDER BY created_at DESC LIMIT 8"
     ).bind(context.user.id, String(girlId)).all();
     const previousState = await env.DB.prepare(
       'SELECT results_html AS resultsHtml FROM girl_states WHERE user_id=? AND girl_id=? LIMIT 1'
@@ -308,7 +310,7 @@ export async function onRequestPost(context) {
     ).bind(context.user.id, 'app').first();
     let accountSettings = {};
     try { accountSettings = settingsRow?.value ? JSON.parse(settingsRow.value) : {}; } catch (_) { accountSettings = {}; }
-    const previousGeneratedReplies = extractPreviousGeneratedReplies(previousState?.resultsHtml || '').slice(-24);
+    const previousGeneratedReplies = extractPreviousGeneratedReplies(previousState?.resultsHtml || '').slice(-12);
 
     const serverContext = {
       aboutMe: String(accountSettings?.aboutMe || ''),
