@@ -244,7 +244,11 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 55000) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(`Gemini ${model}: servizio non disponibile`);
+    const apiMessage = data?.error?.message || data?.error?.status || `HTTP ${response.status}`;
+    const err = new Error(`Gemini ${model}: ${apiMessage}`);
+    err.status = response.status;
+    err.apiStatus = data?.error?.status || '';
+    throw err;
   }
 
   const raw = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
@@ -345,7 +349,7 @@ export async function onRequestPost(context) {
 
     if (env.GEMINI_API_KEY) {
       // Ordine: modello economico/free prima, poi fallback più robusti.
-      for (const model of ['gemini-3.5-flash-lite']) {
+      for (const model of ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash']) {
         attempts.push(async () => {
           try {
             const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 55000);
@@ -381,7 +385,13 @@ export async function onRequestPost(context) {
       }
     }
 
-    return new Response(JSON.stringify({ error: 'Nessun servizio AI gratuito disponibile in questo momento.', details: errors }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+    const retryable = errors.some(e => /429|RESOURCE_EXHAUSTED|quota|rate limit|temporarily|unavailable|503/i.test(String(e)));
+    return new Response(JSON.stringify({
+      error: retryable
+        ? 'Il servizio AI gratuito è momentaneamente saturo o ha raggiunto un limite. Riprova tra poco.'
+        : 'Nessun servizio AI gratuito disponibile in questo momento.',
+      details: errors
+    }), { status: 503, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
     return new Response(JSON.stringify({ error: error?.message || 'Errore del server AI.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
