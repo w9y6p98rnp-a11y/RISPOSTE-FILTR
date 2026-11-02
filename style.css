@@ -231,3 +231,10 @@ body.light-theme .voice-choice{background:#f8fafc;color:#172033;border-color:#cb
 /* Fix: the voice editor must always sit above the voice chooser/settings modal. */
 #voiceChoiceModal{z-index:21}
 #voiceEditorModal{z-index:30}
+
+/* Priorità assoluta ai controlli Modifica voci su dispositivi touch */
+#voiceChoiceModal{z-index:1000;pointer-events:auto}
+#voiceChoiceModal .modal-card{position:relative;z-index:1001;pointer-events:auto}
+#voiceChoiceModal .voice-choice{position:relative;z-index:1002;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#voiceEditorModal{z-index:1003;pointer-events:auto}
+#voiceEditorModal .modal-card{position:relative;z-index:1004;pointer-events:auto}
