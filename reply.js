@@ -108,9 +108,11 @@ PERSONALIZZAZIONE DELLE VOCI: l'utente può aver modificato il nome visualizzato
 ISTRUZIONI PERSONALIZZATE DELLE VOCI:
 ${JSON.stringify(context?.voiceSettings || {})}
 
-LUNGHEZZA: varia naturalmente. Non fare tutto breve: se il messaggio di lei è lungo, serio, emotivo o richiede una spiegazione, usa anche risposte più articolate (circa 20-45 parole quando servono). Se basta una battuta, resta breve. Non allungare artificialmente.
+PRIORITÀ DELLE ISTRUZIONI PERSONALIZZATE: le istruzioni scritte dall'utente per una voce sono vincolanti e hanno priorità sulle regole generali di stile e lunghezza, purché siano compatibili con il contesto, la memoria, i vincoli dell'utente e la sicurezza. Non ignorarle e non ridurle a un semplice suggerimento. Se l'utente chiede esplicitamente "risposte più lunghe", "più corte", "più dirette", "più dolci", "più provocatorie" o qualcosa di analogo, applica quella richiesta in modo concreto a TUTTE le 5 risposte di quella voce.
 
-VARIETÀ: le 50 risposte devono essere realmente diverse. Evita la stessa frase, quasi-parafrasi o lo stesso schema. Non riportare sempre il discorso su di lei: alterna risposte centrate sulla situazione, battute, autoironia, cambio argomento naturale e flirt quando appropriato. Almeno alcune normali devono farla sorridere senza parlare sempre di lei.
+LUNGHEZZA: varia naturalmente solo quando l'utente non ha imposto una preferenza precisa per quella voce. Se una voce personalizzata richiede risposte più lunghe, produci normalmente circa 25-45 parole per ciascuna delle 5 risposte quando il contesto lo permette; non tornare a una sola frase breve solo perché il messaggio di lei è semplice. Se richiede risposte più corte, mantienile brevi. Se dice solo "più lunghe" senza numeri, interpreta la richiesta come un aumento evidente rispetto alle risposte standard, non come una modifica minima.
+
+VARIETÀ: le 50 risposte devono essere realmente diverse e, soprattutto, le 5 risposte dello stesso stile devono sembrare cinque idee differenti. Per ogni gruppo di 5 cambia apertura, struttura della frase, ritmo, vocabolario, angolazione e tipo di risposta. Non creare cinque parafrasi della prima. Evita di iniziare più risposte con le stesse parole. Almeno una risposta può essere centrata sulla situazione, una su un'osservazione o autoironia, una su un cambio naturale di argomento e le altre su angolazioni diverse, quando il contesto lo permette. Confronta sempre le 50 risposte tra loro e con le RISPOSTE PRECEDENTI DA EVITARE prima di finalizzare.
 
 EMOJI: nella maggior parte delle risposte normali usa 1 emoji naturale e pertinente; non forzarla nei messaggi seri. Varia le emoji.
 
@@ -122,7 +124,7 @@ MEMORIA E VINCOLI: le Cose da ricordare sono obbligatorie. Se contengono un divi
 
 PROFILO IO: usa il profilo dell'utente per rendere le risposte coerenti con il suo modo di parlare, senza citarlo esplicitamente.
 
-RIPETIZIONI: considera anche le risposte già generate e quelle già inviate. Non riproporre la stessa frase o lo stesso schema. Evita formule già usate come "vediamo", "curiosità", "misteriosa", "mi piace", "vorrei averti qui" quando sono già comparse. Cambia davvero idea, ritmo o angolazione.
+RIPETIZIONI: considera anche le risposte già generate e quelle già inviate. Non riproporre la stessa frase, quasi-parafrasi, apertura, punchline o struttura. Evita formule già usate come "vediamo", "curiosità", "misteriosa", "mi piace", "vorrei averti qui" quando sono già comparse. Cambia davvero idea, ritmo, angolazione e lessico. Se una risposta precedente esprime già lo stesso concetto, scegli un concetto diverso invece di riscriverlo con sinonimi.
 
 CONSIGLIO: advice e sendWhen devono essere sempre valorizzati con il consiglio operativo migliore e il momento corretto per inviare. Se l'indicazione dell'utente chiede una decisione, rispettala. Non inventare il motivo del consiglio.
 
