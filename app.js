@@ -494,6 +494,53 @@ function bindResultButtons(){
   });
 }
 
+async function loadSecretRepliesLazy(){
+  const btn=document.getElementById("loadSecretReplies");
+  const content=document.getElementById("secretRepliesContent");
+  const a=window.__rfLastAnalysis;
+  if(!btn || !content || !a || btn.dataset.loading==="1") return;
+  btn.dataset.loading="1"; btn.disabled=true; btn.textContent="Genero le risposte segrete...";
+  try{
+    if(navigator.onLine===false) throw new Error("Nessuna connessione internet.");
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),45000);
+    let response;
+    try{
+      response=await fetch("/api/reply",{method:"POST",headers:{"Content-Type":"application/json"},signal:controller.signal,body:JSON.stringify({
+        girlId:a.girlId,message:a.message,aiHint:a.aiHint,image:a.image,audio:a.audio,audioTranscript:a.audioTranscript||"",mode:"secret"
+      })});
+    }finally{clearTimeout(timer)}
+    if(!response.ok){ const detail=await response.text().catch(()=>""); throw new Error(detail||"Server AI non disponibile."); }
+    const data=await response.json();
+    const replies=Array.isArray(data.replies)?data.replies:[];
+    if(!replies.length) throw new Error("Nessuna risposta segreta restituita dall'AI.");
+    const voiceOrder=loadVoiceSettings();
+    const secretOrder=voiceOrder.secret.map(v=>v.id);
+    const recMap=data.categoryRecommendations&&typeof data.categoryRecommendations==="object"?data.categoryRecommendations:{};
+    const groups=secretOrder.map(style=>{
+      const cat=replies.map((r,i)=>({r,i})).filter(x=>x.r&&x.r.style===style);
+      if(!cat.length) return "";
+      const wanted=Number.isInteger(Number(recMap?.[style]?.index))?Number(recMap[style].index):0;
+      const rec=Math.max(0,Math.min(wanted,cat.length-1));
+      const ordered=[cat[rec],...cat.filter((_,i)=>i!==rec)];
+      const cards=ordered.map((x,i)=>{
+        const t=typeof x.r==="string"?x.r:(x.r.text||"");
+        const reason=i===0?String(recMap?.[style]?.reason||""):"";
+        return `<div class="reply-card${i===0?" recommended-card":""}"><div class="reply-style">${escapeHtml(getVoiceLabel(style))}${i===0?` <span class="best-badge">Consigliata</span>`:""}</div><div class="reply-text">${escapeHtml(t)}</div><div class="reply-actions"><button class="secondary copy-reply" data-text="${escapeAttr(t)}">Copia</button></div>${reason?`<div class="category-reason">💡 ${escapeHtml(reason)}</div>`:""}</div>`;
+      }).join("");
+      return `<div class="reply-category-group secret-category-group"><div class="reply-category-title">${escapeHtml(getVoiceLabel(style))} <span class="reply-category-count">${cat.length} risposte</span></div>${cards}</div>`;
+    }).join("");
+    content.innerHTML=groups||"<div class='secret-lazy-text'>Nessuna risposta segreta disponibile.</div>";
+    bindResultButtons();
+    const state=getGirlState(a.girlId);
+    if(state){ state.resultsHtml=document.getElementById("results")?.innerHTML||state.resultsHtml; await persistGirlState(a.girlId); }
+  }catch(err){
+    const msg=err?.name==="AbortError"?"Il servizio AI ha impiegato troppo tempo.":(err?.message||"Errore");
+    content.innerHTML=`<div class="secret-lazy-card"><div class="secret-lazy-title">⚠️ Non sono riuscito a generarle</div><div class="secret-lazy-text">${escapeHtml(msg)}</div><button type="button" id="loadSecretReplies" class="primary">Riprova</button></div>`;
+    bindResultButtons();
+  }
+}
+
 $("generate").onclick=async()=>{
   const text="";
   const aiHint=$("aiHint")?.value.trim()||"";
@@ -511,6 +558,7 @@ $("generate").onclick=async()=>{
     let image=null;
     let audio=null;
     state.message="";
+    state.lastAnalysisMessage=text;
     state.aiHint=aiHint;
     if(selectedImageFile){
       image=await compressImageForAI(selectedImageFile);
@@ -547,7 +595,8 @@ $("generate").onclick=async()=>{
           message:text,
           aiHint,
           image,
-          audio
+          audio,
+          mode:"normal"
         })
       });
     }finally{clearTimeout(clientTimer)}
@@ -614,14 +663,15 @@ $("generate").onclick=async()=>{
     const transcriptHtml=audioTranscript?`<div class="audio-transcript-card"><div class="audio-transcript-title">🎙️ Trascrizione della registrazione</div><div class="audio-transcript-text">${escapeHtml(audioTranscript)}</div></div>`:"";
     const columns=`${transcriptHtml}${adviceHtml}<div class="reply-choice-grid">
       <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>5 per stile: Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Battuta, Poeta</small></span><span class="reply-choice-arrow">›</span></button>
-      <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>5 Erotiche + 5 Hot</small></span><span class="reply-choice-arrow">›</span></button>
+      <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>5 Erotiche + 5 Hot • vengono generate quando le apri</small></span><span class="reply-choice-arrow">›</span></button>
     </div>
     <section id="normalRepliesPanel" class="reply-panel hidden"><div class="reply-panel-head"><div><b>💬 Risposte normali</b><small>Quella consigliata è evidenziata.</small></div><button type="button" class="reply-panel-close" data-close-panel="normalRepliesPanel">×</button></div><div class="reply-panel-list">${normalCards}</div></section>
-    <section id="secretRepliesPanel" class="reply-panel secret-panel hidden"><div class="reply-panel-head"><div><b>🔒 Risposte segrete</b><small>Quella consigliata è evidenziata.</small></div><button type="button" class="reply-panel-close" data-close-panel="secretRepliesPanel">×</button></div><div class="reply-panel-list">${secretCards}</div></section>`;
+    <section id="secretRepliesPanel" class="reply-panel secret-panel hidden"><div class="reply-panel-head"><div><b>🔒 Risposte segrete</b><small>Vengono generate solo quando le apri.</small></div><button type="button" class="reply-panel-close" data-close-panel="secretRepliesPanel">×</button></div><div id="secretRepliesContent" class="reply-panel-list"><div class="secret-lazy-card"><div class="secret-lazy-title">🔥 Risposte segrete</div><div class="secret-lazy-text">Le 10 risposte segrete non vengono generate insieme alle normali, così l’analisi iniziale è più veloce.</div><button type="button" id="loadSecretReplies" class="primary">Genera risposte segrete</button></div></div></section>`;
     $("results").innerHTML=columns;
     applySettings();
     state.resultsHtml=$("results").innerHTML;
     await persistGirlState(selectedId);
+    window.__rfLastAnalysis = { girlId: selectedId, message: text, aiHint, image, audio, audioTranscript };
     bindResultButtons();
     // Dopo l'analisi apri automaticamente solo la prima casella: Risposte normali.
     const normalChoice=document.querySelector('.reply-choice[data-target="normalRepliesPanel"]');

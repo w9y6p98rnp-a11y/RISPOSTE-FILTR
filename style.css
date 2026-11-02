@@ -250,3 +250,5 @@ body.light-theme .voice-order-btn{background:#eef2f7;color:#172033;border-color:
 .voice-choice-actions{display:flex;justify-content:space-between;gap:10px}
 #continueVoiceChoice:disabled{opacity:.45;cursor:not-allowed;filter:saturate(.5)}
 body.light-theme .voice-choice.selected{background:#eaf3ff;border-color:#6ea7e8}
+
+.secret-lazy-card{padding:28px;text-align:center;border:1px solid rgba(120,160,220,.25);border-radius:18px;background:rgba(20,35,60,.35)}.secret-lazy-title{font-weight:800;font-size:20px;margin-bottom:10px}.secret-lazy-text{opacity:.78;line-height:1.45;margin-bottom:18px}.secret-lazy-card .primary{margin-top:6px}
