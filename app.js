@@ -403,7 +403,7 @@ $("closeMemory").onclick=closeMemoryModal;
 $("cancelMemory").onclick=closeMemoryModal;
 $("memoryModal").addEventListener("click",e=>{if(e.target===$("memoryModal"))closeMemoryModal()});
 
-async function buildContext(){const g=await getGirl(selectedId),ms=await messagesFor(selectedId),settings=loadSettings();return {aboutMe:settings.aboutMe||"",girl:{id:g?.id,name:g?.name,note:g?.note||"",memory:g?.memory||""},memory:g?.memory||"",conversation:ms.slice(-16),previousReplies:ms.filter(x=>x.role==="me").map(x=>x.text).slice(-12)}}
+async function buildContext(){const g=await getGirl(selectedId),ms=await messagesFor(selectedId),settings=loadSettings();return {aboutMe:settings.aboutMe||"",voiceSettings:loadVoiceSettings(),girl:{id:g?.id,name:g?.name,note:g?.note||"",memory:g?.memory||""},memory:g?.memory||"",conversation:ms.slice(-16),previousReplies:ms.filter(x=>x.role==="me").map(x=>x.text).slice(-12)}}
 function demoReplies(style){const base={flirt:["Hai un modo tutto tuo di farti notare… e direi che funziona.","Con te rischio di prendere gusto a queste conversazioni.","Non so se sei più pericolosa quando sorridi o quando fai finta di niente."],stuzzica:["Tu fai sempre così o oggi ti sei impegnata apposta?","Mi sa che ti piace mettermi alla prova.","Attenta, che prima o poi ti rispondo come meriti."],poeta:["Ci sono persone che arrivano in una conversazione e cambiano subito il ritmo.","Alcune parole restano, anche quando la chat finisce.","Hai quel tipo di presenza che si nota senza chiedere attenzione."],ironico:["Va bene, segno tutto: oggi hai deciso di rendermi il lavoro difficile.","Ottimo, anche oggi la normalità è ufficialmente saltata.","Tranquilla, faccio finta di non aver capito quanto sei furba."],dolce:["Mi piace quando mi racconti queste cose.","Con te parlare viene abbastanza naturale.","Mi fai sorridere più spesso di quanto dovresti."],audace:["Potrei dirti quello che penso, ma rischierei di farti sorridere troppo.","Se continuo così, prima o poi dovrai concedermi un caffè.","Non provocarmi se poi non vuoi vedere dove porta la curiosità."],erotica:["Con te la fantasia prende una piega decisamente interessante…","Hai quel modo di provocare che rende difficile restare innocenti.","Se continui a guardarmi così, la conversazione potrebbe diventare molto più intrigante."]};return base[style]||base.flirt}
 
 async function compressImageForAI(file){
@@ -590,7 +590,7 @@ $("generate").onclick=async()=>{
       const t=typeof r==="string"?r:(r.text||"");
       const style=typeof r==="string"?"Risposta "+(i+1):(r.style||"Risposta "+(i+1));
       const recommended=i===categoryRecommendedIndex?" recommended-card":"";
-      return `<div class="reply-card${recommended}"><div class="reply-style">${escapeHtml(style)}${i===categoryRecommendedIndex?` <span class="best-badge">Consigliata</span>`:""}</div><div class="reply-text">${escapeHtml(t)}</div><div class="reply-actions"><button class="secondary copy-reply" data-text="${escapeAttr(t)}">Copia</button></div>${i===categoryRecommendedIndex&&categoryReason?`<div class="category-reason">💡 ${escapeHtml(categoryReason)}</div>`:""}</div>`;
+      return `<div class="reply-card${recommended}"><div class="reply-style">${escapeHtml(getVoiceLabel(style))}${i===categoryRecommendedIndex?` <span class="best-badge">Consigliata</span>`:""}</div><div class="reply-text">${escapeHtml(t)}</div><div class="reply-actions"><button class="secondary copy-reply" data-text="${escapeAttr(t)}">Copia</button></div>${i===categoryRecommendedIndex&&categoryReason?`<div class="category-reason">💡 ${escapeHtml(categoryReason)}</div>`:""}</div>`;
     };
     const renderCategory=(style, indexes, isSecret=false)=>{
       const cat=indexes.filter(i=>{
@@ -693,8 +693,46 @@ const FONT_OPTIONS=[
   {id:"papyrus",name:"Papyrus",stack:'Papyrus,fantasy'},
   {id:"copperplate",name:"Copperplate",stack:'Copperplate,"Copperplate Gothic Light",fantasy'}
 ];
+const DEFAULT_VOICE_SETTINGS={
+  normal:[
+    {id:"Dolce",label:"Dolce",instruction:"Calda, gentile e affettuosa. Deve trasmettere interesse senza risultare sdolcinata o appiccicosa."},
+    {id:"Stuzzica",label:"Stuzzica",instruction:"Provocatoria e giocosa, con una piccola sfida o un doppio senso leggero quando il contesto lo permette."},
+    {id:"Ironico",label:"Ironico",instruction:"Ironia intelligente e naturale, senza prendere in giro in modo pesante e senza trasformare tutto in flirt."},
+    {id:"Flirt",label:"Flirt",instruction:"Sicura, magnetica e ammiccante. Deve creare tensione e interesse senza essere insistente."},
+    {id:"Seria",label:"Seria",instruction:"Matura, sincera e rispettosa. Quando il contesto è serio deve evitare battute, sesso e flirt forzato."},
+    {id:"Audace",label:"Audace",instruction:"Diretta e sicura, con più coraggio del normale ma sempre coerente con il contesto e con i limiti espressi da lei."},
+    {id:"Battuta",label:"Battuta",instruction:"Punta soprattutto a farla sorridere con una battuta breve e spontanea, senza confonderla con l'ironia pungente."},
+    {id:"Poeta",label:"Poeta",instruction:"Elegante, evocativa e un po' poetica, con immagini originali ma senza frasi banali o troppo teatrali."}
+  ],
+  secret:[
+    {id:"Erotica",label:"Erotica",instruction:"Sensuale e provocante, con tensione romantica e allusiva ma senza descrizioni sessuali grafiche."},
+    {id:"Hot",label:"Hot",instruction:"Più intensa e audace della voce Erotica, molto provocante ma sempre non grafica e adatta al contesto."}
+  ]
+};
 let pendingFontId="system";
+let pendingVoiceGroup="normal";
+let pendingVoiceSettings=null;
+function cloneVoiceSettings(){return JSON.parse(JSON.stringify(DEFAULT_VOICE_SETTINGS));}
+function loadVoiceSettings(){const s=loadSettings();const saved=s.voiceSettings||{};const base=cloneVoiceSettings();for(const group of ["normal","secret"]){for(const def of base[group]){const custom=Array.isArray(saved[group])?saved[group].find(v=>v&&v.id===def.id):null;if(custom){def.label=String(custom.label||def.label).slice(0,40);def.instruction=String(custom.instruction||def.instruction).slice(0,500);}}}return base;}
+function getVoiceLabel(id){const all=loadVoiceSettings();const item=[...all.normal,...all.secret].find(v=>v.id===id);return item?.label||id;}
 function getFontOption(id){return FONT_OPTIONS.find(f=>f.id===id)||FONT_OPTIONS[0];}
+function renderVoiceEditor(){
+  const defs=pendingVoiceSettings?.[pendingVoiceGroup]||[];
+  const title=pendingVoiceGroup==="normal"?"💬 Risposte normali":"🔥 Risposte segrete";
+  $("voiceEditorTitle").textContent=title;
+  $("voiceEditorList").innerHTML=defs.map((v,i)=>`<div class="voice-editor-item"><div class="voice-editor-item-head"><span class="voice-editor-number">${i+1}</span><div><b>${esc(v.id)}</b><small>Voce ${i+1}</small></div></div><label>Nome visualizzato<input class="voice-label-input" data-voice-id="${escapeAttr(v.id)}" maxlength="40" value="${escAttr(v.label)}"></label><label>Come deve rispondere l'AI<textarea class="voice-instruction-input" data-voice-id="${escapeAttr(v.id)}" maxlength="500" rows="3">${esc(v.instruction)}</textarea></label></div>`).join("");
+}
+function openVoiceChoice(){$("voiceChoiceModal").classList.remove("hidden");}
+function closeVoiceChoice(){$("voiceChoiceModal").classList.add("hidden");}
+function openVoiceEditor(group){pendingVoiceGroup=group;pendingVoiceSettings=loadVoiceSettings();renderVoiceEditor();$("voiceChoiceModal").classList.add("hidden");$("voiceEditorModal").classList.remove("hidden");}
+function closeVoiceEditor(){$("voiceEditorModal").classList.add("hidden");pendingVoiceSettings=null;}
+function resetVoiceEditor(){pendingVoiceSettings=cloneVoiceSettings();renderVoiceEditor();}
+function saveVoiceEditor(){
+  if(!pendingVoiceSettings)return;
+  document.querySelectorAll(".voice-label-input").forEach(el=>{const v=pendingVoiceSettings[pendingVoiceGroup]?.find(x=>x.id===el.dataset.voiceId);if(v)v.label=el.value.trim()||v.label;});
+  document.querySelectorAll(".voice-instruction-input").forEach(el=>{const v=pendingVoiceSettings[pendingVoiceGroup]?.find(x=>x.id===el.dataset.voiceId);if(v)v.instruction=el.value.trim()||v.instruction;});
+  const existing=loadSettings();saveSettings({voiceSettings:pendingVoiceSettings});closeVoiceEditor();
+}
 function settingsKey(){return `RispostaFlirtSettings_${currentUser?.id||"local"}`;}
 function loadSettings(){try{return {...{theme:"dark",replyZoom:100,font:"system",aboutMe:""},...(JSON.parse(localStorage.getItem(settingsKey())||"{}"))}}catch(e){return {theme:"dark",replyZoom:100,font:"system",aboutMe:""}}}
 function applySettings(){const s=loadSettings();document.body.classList.toggle("light-theme",s.theme==="light");const zoom=String((Number(s.replyZoom)||100)/100);document.documentElement.style.setProperty("--ui-zoom",zoom);const r=$("results");if(r)r.style.setProperty("--reply-zoom",zoom);const font=getFontOption(s.font);document.documentElement.style.setProperty("--app-font",font.stack);document.querySelectorAll(".theme-option").forEach(b=>b.classList.toggle("active",b.dataset.theme===s.theme));if($("replyZoom"))$("replyZoom").value=String(s.replyZoom||100);if($("replyZoomValue"))$("replyZoomValue").textContent=(s.replyZoom||100)+"%";if($("fontSettingValue"))$("fontSettingValue").textContent=font.name;}
@@ -704,7 +742,7 @@ function openFontModal(){pendingFontId=loadSettings().font||"system";renderFontL
 function closeFontModal(){$("fontModal").classList.add("hidden")}
 function openSettings(){applySettings();$("settingsModal").classList.remove("hidden")}
 function closeSettings(){$("settingsModal").classList.add("hidden")}
-$("openSettings").onclick=openSettings;$("closeSettings").onclick=closeSettings;$("closeSettingsBottom").onclick=closeSettings;$("settingsModal").addEventListener("click",e=>{if(e.target.id==="settingsModal")closeSettings()});document.querySelectorAll(".theme-option").forEach(b=>b.onclick=()=>saveSettings({theme:b.dataset.theme}));$("replyZoom").addEventListener("input",e=>saveSettings({replyZoom:Number(e.target.value)}));$("openFontSettings").onclick=openFontModal;$("closeFontModal").onclick=closeFontModal;$("cancelFont").onclick=closeFontModal;$("fontModal").addEventListener("click",e=>{if(e.target.id==="fontModal")closeFontModal()});$("saveFont").onclick=()=>{saveSettings({font:pendingFontId});closeFontModal()};applySettings();
+$("openSettings").onclick=openSettings;$("closeSettings").onclick=closeSettings;$("closeSettingsBottom").onclick=closeSettings;$("settingsModal").addEventListener("click",e=>{if(e.target.id==="settingsModal")closeSettings()});document.querySelectorAll(".theme-option").forEach(b=>b.onclick=()=>saveSettings({theme:b.dataset.theme}));$("replyZoom").addEventListener("input",e=>saveSettings({replyZoom:Number(e.target.value)}));$("openFontSettings").onclick=openFontModal;$("closeFontModal").onclick=closeFontModal;$("cancelFont").onclick=closeFontModal;$("fontModal").addEventListener("click",e=>{if(e.target.id==="fontModal")closeFontModal()});$("saveFont").onclick=()=>{saveSettings({font:pendingFontId});closeFontModal()};$("openVoiceSettings").onclick=openVoiceChoice;$("closeVoiceChoice").onclick=closeVoiceChoice;$("cancelVoiceChoice").onclick=closeVoiceChoice;$("voiceChoiceModal").addEventListener("click",e=>{if(e.target.id==="voiceChoiceModal")closeVoiceChoice()});$("editNormalVoices").onclick=()=>openVoiceEditor("normal");$("editSecretVoices").onclick=()=>openVoiceEditor("secret");$("closeVoiceEditor").onclick=closeVoiceEditor;$("cancelVoiceEditor").onclick=closeVoiceEditor;$("voiceEditorModal").addEventListener("click",e=>{if(e.target.id==="voiceEditorModal")closeVoiceEditor()});$("resetVoiceSettings").onclick=resetVoiceEditor;$("saveVoiceSettings").onclick=saveVoiceEditor;applySettings();
 
 // -------------------------
 // Autenticazione e sincronizzazione multiutente

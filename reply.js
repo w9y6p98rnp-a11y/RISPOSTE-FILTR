@@ -107,6 +107,11 @@ GENERA ESATTAMENTE 50 RISPOSTE, 5 PER STILE, in questo ordine:
 10 Hot
 Le prime 40 sono normali; le ultime 10 sono segrete. La prima risposta di OGNI stile deve essere la migliore di quello stile.
 
+PERSONALIZZAZIONE DELLE VOCI: l'utente può aver modificato il nome visualizzato e/o l'istruzione di ciascuna voce. Devi rispettare le istruzioni personalizzate qui sotto quando generi quella voce. Mantieni però nei campi JSON "style" i nomi tecnici esatti Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Battuta, Poeta, Erotica, Hot, così l'app può riconoscere correttamente ogni categoria.
+
+ISTRUZIONI PERSONALIZZATE DELLE VOCI:
+${JSON.stringify(context?.voiceSettings || {})}
+
 LUNGHEZZA: varia naturalmente. Non fare tutto breve: se il messaggio di lei è lungo, serio, emotivo o richiede una spiegazione, usa anche risposte più articolate (circa 20-45 parole quando servono). Se basta una battuta, resta breve. Non allungare artificialmente.
 
 VARIETÀ: le 50 risposte devono essere realmente diverse. Evita la stessa frase, quasi-parafrasi o lo stesso schema. Non riportare sempre il discorso su di lei: alterna risposte centrate sulla situazione, battute, autoironia, cambio argomento naturale e flirt quando appropriato. Almeno alcune normali devono farla sorridere senza parlare sempre di lei.

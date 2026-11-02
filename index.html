@@ -213,7 +213,32 @@
       <span class="setting-option-copy"><b>Font della scrittura</b><small id="fontSettingValue">Sistema</small></span>
       <span class="setting-option-arrow">›</span>
     </button>
+    <button type="button" id="openVoiceSettings" class="setting-option">
+      <span class="setting-option-icon">🎙️</span>
+      <span class="setting-option-copy"><b>Modifica voci</b><small>Personalizza le risposte normali e segrete</small></span>
+      <span class="setting-option-arrow">›</span>
+    </button>
     <div class="modal-actions"><button type="button" id="closeSettingsBottom" class="primary">Fatto</button></div>
+  </div>
+</div>
+
+<div id="voiceChoiceModal" class="modal hidden">
+  <div class="modal-card voice-choice-card">
+    <div class="settings-head"><div><h2>🎙️ Modifica voci</h2><p class="hint">Scegli quali risposte vuoi personalizzare.</p></div><button type="button" id="closeVoiceChoice" class="memory-close">×</button></div>
+    <div class="voice-choice-list">
+      <button type="button" class="voice-choice" id="editNormalVoices"><span>💬</span><div><b>Risposte normali</b><small>Modifica Dolce, Flirt, Seria, Battuta e le altre voci normali.</small></div><strong>›</strong></button>
+      <button type="button" class="voice-choice" id="editSecretVoices"><span>🔥</span><div><b>Risposte segrete</b><small>Modifica Erotica e Hot come preferisci.</small></div><strong>›</strong></button>
+    </div>
+    <div class="modal-actions"><button type="button" id="cancelVoiceChoice" class="secondary">Annulla</button></div>
+  </div>
+</div>
+
+<div id="voiceEditorModal" class="modal hidden">
+  <div class="modal-card voice-editor-card">
+    <div class="settings-head"><div><h2 id="voiceEditorTitle">💬 Risposte normali</h2><p class="hint">Puoi cambiare il nome della voce e spiegare all’AI esattamente come vuoi che risponda.</p></div><button type="button" id="closeVoiceEditor" class="memory-close">×</button></div>
+    <div id="voiceEditorList" class="voice-editor-list"></div>
+    <div class="voice-editor-note">Queste preferenze vengono salvate nel tuo account e usate nelle analisi future. I nomi personalizzati cambiano ciò che vedi nell’app, mentre l’AI mantiene la funzione di ogni voce.</div>
+    <div class="modal-actions"><button type="button" id="resetVoiceSettings" class="secondary">Ripristina</button><button type="button" id="cancelVoiceEditor" class="secondary">Annulla</button><button type="button" id="saveVoiceSettings" class="primary">Salva</button></div>
   </div>
 </div>
 
@@ -241,6 +266,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20261101-battuta2"></script>
+<script src="app.js?v=20261102-voci1"></script>
 </body>
 </html>
