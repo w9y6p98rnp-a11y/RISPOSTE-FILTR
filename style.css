@@ -227,3 +227,7 @@ body.light-theme .category-more-toggle{background:#eef2f7;color:#2563eb;border-c
 .voice-editor-note{font-size:calc(11px * var(--ui-zoom));line-height:1.45;color:#94a3b8;margin-top:calc(7px * var(--ui-zoom))}
 body.light-theme .voice-choice{background:#f8fafc;color:#172033;border-color:#cbd5e1}body.light-theme .voice-choice:hover{background:#eef2f7;border-color:#93b4df}body.light-theme .voice-choice small{color:#64748b}body.light-theme .voice-editor-item{background:#f8fafc;border-color:#cbd5e1}body.light-theme .voice-editor-item-head small,body.light-theme .voice-editor-note{color:#64748b}body.light-theme .voice-editor-item label{color:#334155}body.light-theme .voice-editor-item input,body.light-theme .voice-editor-item textarea{background:#fff;color:#172033;border-color:#cbd5e1}
 @media(max-width:760px){.voice-editor-card{max-height:92vh}.voice-editor-list{max-height:66vh}}
+
+/* Fix: the voice editor must always sit above the voice chooser/settings modal. */
+#voiceChoiceModal{z-index:21}
+#voiceEditorModal{z-index:30}

@@ -724,7 +724,7 @@ function renderVoiceEditor(){
 }
 function openVoiceChoice(){$("voiceChoiceModal").classList.remove("hidden");}
 function closeVoiceChoice(){$("voiceChoiceModal").classList.add("hidden");}
-function openVoiceEditor(group){pendingVoiceGroup=group;pendingVoiceSettings=loadVoiceSettings();renderVoiceEditor();$("voiceChoiceModal").classList.add("hidden");$("voiceEditorModal").classList.remove("hidden");}
+function openVoiceEditor(group){pendingVoiceGroup=group;pendingVoiceSettings=loadVoiceSettings();renderVoiceEditor();const choice=$("voiceChoiceModal"),editor=$("voiceEditorModal");if(choice)choice.classList.add("hidden");if(editor){editor.classList.remove("hidden");editor.style.zIndex="30";}}
 function closeVoiceEditor(){$("voiceEditorModal").classList.add("hidden");pendingVoiceSettings=null;}
 function resetVoiceEditor(){pendingVoiceSettings=cloneVoiceSettings();renderVoiceEditor();}
 function saveVoiceEditor(){
