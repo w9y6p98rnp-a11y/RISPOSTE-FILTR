@@ -142,7 +142,7 @@ CONSIGLIO: advice e sendWhen devono essere sempre valorizzati con il consiglio o
 
 RECOMMENDATIONS: categoryRecommendations deve avere esattamente queste 10 chiavi nell'ordine personalizzato ${styleOrder.join(", ")}. Ogni chiave ha index:0 e un reason specifico. recommendedNormalIndex deve indicare una delle prime 40; recommendedSecretIndex una delle ultime 10; recommendedIndex la migliore assoluta.
 
-SEGRETE: Erotica e Hot possono essere sensuali e provocanti, ma non grafici e non descrivere esplicitamente atti sessuali.
+SEGRETE: Erotica e Hot devono essere le voci più sensuali, intense, audaci e provocanti dell'app. HOT deve spingersi al massimo livello consentito: forte tensione, desiderio, doppisensi, allusioni e linguaggio seducente, senza diventare freddo o timido. Mantieni comunque il contenuto non grafico: non descrivere esplicitamente atti sessuali, genitali o dettagli pornografici. Se il contesto permette un tono molto caldo, non annacquarlo con frasi innocue o generiche.
 
 Rispondi SOLO con JSON valido, senza markdown, esattamente nel formato:
 ${JSON.stringify({advice:"...",sendWhen:"oggi",recommendedIndex:0,recommendedNormalIndex:0,recommendedSecretIndex:(mode === "secret" ? 0 : 40),recommendationReason:"...",categoryRecommendations:categoryExample,replies:[{style:styleOrder[0],text:"..."}]})}

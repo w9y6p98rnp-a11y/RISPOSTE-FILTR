@@ -561,12 +561,17 @@ async function loadSecretRepliesLazy(){
       const wanted=Number.isInteger(Number(recMap?.[style]?.index))?Number(recMap[style].index):0;
       const rec=Math.max(0,Math.min(wanted,cat.length-1));
       const ordered=[cat[rec],...cat.filter((_,i)=>i!==rec)];
-      const cards=ordered.map((x,i)=>{
+      const renderSecretCard=(x,i)=>{
         const t=typeof x.r==="string"?x.r:(x.r.text||"");
         const reason=i===0?String(recMap?.[style]?.reason||""):"";
         return `<div class="reply-card${i===0?" recommended-card":""}"><div class="reply-style">${escapeHtml(getVoiceLabel(style))}${i===0?` <span class="best-badge">Consigliata</span>`:""}</div><div class="reply-text">${escapeHtml(t)}</div><div class="reply-actions"><button class="secondary copy-reply" data-text="${escapeAttr(t)}">Copia</button></div>${reason?`<div class="category-reason">💡 ${escapeHtml(reason)}</div>`:""}</div>`;
-      }).join("");
-      return `<div class="reply-category-group secret-category-group"><div class="reply-category-title">${escapeHtml(getVoiceLabel(style))} <span class="reply-category-count">${cat.length} risposte</span></div>${cards}</div>`;
+      };
+      const recommendedCard=renderSecretCard(ordered[0],0);
+      const otherCards=ordered.slice(1).map((x,i)=>renderSecretCard(x,i+1)).join("");
+      const groupId=`secretReplyGroup_${style.replace(/[^a-zA-Z0-9]/g,"_")}`;
+      const moreCount=Math.max(0,ordered.length-1);
+      const moreBlock=moreCount?`<div id="${groupId}_more" class="reply-category-more hidden">${otherCards}</div><button type="button" class="category-more-toggle" data-target="${groupId}_more" data-count="${moreCount}">⌄ Mostra le altre ${moreCount} risposte</button>`:"";
+      return `<div id="${groupId}" class="reply-category-group secret-category-group"><div class="reply-category-title">${escapeHtml(getVoiceLabel(style))} <span class="reply-category-count">${cat.length} risposte</span></div>${recommendedCard}${moreBlock}</div>`;
     }).join("");
     content.innerHTML=groups||"<div class='secret-lazy-text'>Nessuna risposta segreta disponibile.</div>";
     bindResultButtons();
