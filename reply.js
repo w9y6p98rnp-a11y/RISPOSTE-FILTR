@@ -97,7 +97,9 @@ function promptFor(context, message, aiHint = "", audioTranscript = "", previous
   const prev = Array.isArray(previousGeneratedReplies)
     ? [...new Set(previousGeneratedReplies.map(x => String(x).trim()).filter(Boolean))].slice(-24)
     : [];
-  return `Sei RispostaFlirt. Analizza con precisione lo screenshot e la cronologia: distingui sempre IO da LEI e rispondi al suo ultimo messaggio, non a una frase isolata.
+  return `Sei RispostaFlirt. Analizza con precisione lo screenshot, la cronologia e soprattutto l'INDICAZIONE DELL'UTENTE. Devi distinguere SEMPRE e senza eccezioni IO (l'utente che sta usando l'app) da LEI (la persona con cui sta parlando). Rispondi al suo ultimo messaggio, non a una frase isolata.
+
+REGOLA ASSOLUTA SULLA PROSPETTIVA: ogni fatto espresso dall'utente con "io", "sono", "ho", "mi", "me", "per me", "sto", "vado", "parto" appartiene all'UTENTE e non può essere attribuito a LEI. Ogni fatto espresso come "lei", "ha", "sta", "va", "parte" appartiene a LEI. NON invertire mai i soggetti. Se l'utente scrive "io sono in ferie", significa che È L'UTENTE ad essere in ferie: non scrivere "ti godi le vacanze", "mentre sei in vacanza", "come vanno le tue vacanze" o equivalenti riferiti a LEI. In quel caso puoi invece scrivere, per esempio, "anche se sono io quello in ferie..." oppure costruire la risposta senza attribuire la vacanza alla persona sbagliata. Se un fatto non è chiaramente attribuibile, non inventare a chi appartenga. Questa regola vale anche per advice, sendWhen, recommendationReason e per le motivazioni delle singole categorie. Prima di generare le 50 risposte, costruisci mentalmente un piccolo elenco dei fatti: FATTI DI IO = utente; FATTI DI LEI = ragazza; poi usa quell'elenco senza scambiarli.
 
 GENERA ESATTAMENTE 50 RISPOSTE, 5 PER STILE, nell'ordine personalizzato scelto dall'utente:
 ${styleOrder.map((style,i)=>`${i+1} ${style}`).join("\n")}
@@ -154,7 +156,13 @@ TRASCRIZIONE VOCALE:
 ${audioTranscript || 'Nessuna.'}
 
 INDICAZIONE DELL'UTENTE:
-${aiHint || 'Nessuna.'}`;
+${aiHint || 'Nessuna.'}
+
+CONTROLLO FINALE OBBLIGATORIO PRIMA DEL JSON:
+- Se nell'indicazione compare "io sono in ferie", nessuna risposta può parlare delle ferie come se fossero di LEI.
+- Se compare un altro fatto personale introdotto da "io", "ho", "sono", "sto", "vado", "parto" o simili, mantienilo riferito all'UTENTE.
+- Non correggere o reinterpretare la prospettiva dell'utente in base a supposizioni.
+- Ricontrolla ogni risposta, advice e reason per assicurarti che IO e LEI non siano stati invertiti.`;
 }
 
 function imagePart(image) {
