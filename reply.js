@@ -89,23 +89,19 @@ function extractPreviousGeneratedReplies(html) {
 }
 
 function promptFor(context, message, aiHint = "", audioTranscript = "", previousGeneratedReplies = []) {
+  const defaultOrder = ["Dolce","Stuzzica","Ironico","Flirt","Seria","Audace","Battuta","Poeta","Erotica","Hot"];
+  const normalOrder = Array.isArray(context?.voiceSettings?.normal) && context.voiceSettings.normal.length ? context.voiceSettings.normal.map(v => String(v.id || "")).filter(Boolean) : defaultOrder.slice(0,8);
+  const secretOrder = Array.isArray(context?.voiceSettings?.secret) && context.voiceSettings.secret.length ? context.voiceSettings.secret.map(v => String(v.id || "")).filter(Boolean) : defaultOrder.slice(8);
+  const styleOrder = [...normalOrder, ...secretOrder];
+  const categoryExample = Object.fromEntries(styleOrder.map(style => [style, {index:0, reason:"..."}]));
   const prev = Array.isArray(previousGeneratedReplies)
     ? [...new Set(previousGeneratedReplies.map(x => String(x).trim()).filter(Boolean))].slice(-24)
     : [];
   return `Sei RispostaFlirt. Analizza con precisione lo screenshot e la cronologia: distingui sempre IO da LEI e rispondi al suo ultimo messaggio, non a una frase isolata.
 
-GENERA ESATTAMENTE 50 RISPOSTE, 5 PER STILE, in questo ordine:
-1 Dolce
-2 Stuzzica
-3 Ironico
-4 Flirt
-5 Seria
-6 Audace
-7 Battuta
-8 Poeta
-9 Erotica
-10 Hot
-Le prime 40 sono normali; le ultime 10 sono segrete. La prima risposta di OGNI stile deve essere la migliore di quello stile.
+GENERA ESATTAMENTE 50 RISPOSTE, 5 PER STILE, nell'ordine personalizzato scelto dall'utente:
+${styleOrder.map((style,i)=>`${i+1} ${style}`).join("\n")}
+Le prime 40 sono normali; le ultime 10 sono segrete. La prima risposta di OGNI stile deve essere la migliore di quello stile. Rispetta esattamente questo ordine anche nell'array replies.
 
 PERSONALIZZAZIONE DELLE VOCI: l'utente può aver modificato il nome visualizzato e/o l'istruzione di ciascuna voce. Devi rispettare le istruzioni personalizzate qui sotto quando generi quella voce. Mantieni però nei campi JSON "style" i nomi tecnici esatti Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Battuta, Poeta, Erotica, Hot, così l'app può riconoscere correttamente ogni categoria.
 
@@ -130,12 +126,12 @@ RIPETIZIONI: considera anche le risposte già generate e quelle già inviate. No
 
 CONSIGLIO: advice e sendWhen devono essere sempre valorizzati con il consiglio operativo migliore e il momento corretto per inviare. Se l'indicazione dell'utente chiede una decisione, rispettala. Non inventare il motivo del consiglio.
 
-RECOMMENDATIONS: categoryRecommendations deve avere esattamente queste 10 chiavi nell'ordine Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Battuta, Poeta, Erotica, Hot. Ogni chiave ha index:0 e un reason specifico. recommendedNormalIndex deve indicare una delle prime 40; recommendedSecretIndex una delle ultime 10; recommendedIndex la migliore assoluta.
+RECOMMENDATIONS: categoryRecommendations deve avere esattamente queste 10 chiavi nell'ordine personalizzato ${styleOrder.join(", ")}. Ogni chiave ha index:0 e un reason specifico. recommendedNormalIndex deve indicare una delle prime 40; recommendedSecretIndex una delle ultime 10; recommendedIndex la migliore assoluta.
 
 SEGRETE: Erotica e Hot possono essere sensuali e provocanti, ma non grafici e non descrivere esplicitamente atti sessuali.
 
 Rispondi SOLO con JSON valido, senza markdown, esattamente nel formato:
-{"advice":"...","sendWhen":"oggi","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":40,"recommendationReason":"...","categoryRecommendations":{"Dolce":{"index":0,"reason":"..."},"Stuzzica":{"index":0,"reason":"..."},"Ironico":{"index":0,"reason":"..."},"Flirt":{"index":0,"reason":"..."},"Seria":{"index":0,"reason":"..."},"Audace":{"index":0,"reason":"..."},"Battuta":{"index":0,"reason":"..."},"Poeta":{"index":0,"reason":"..."},"Erotica":{"index":0,"reason":"..."},"Hot":{"index":0,"reason":"..."}},"replies":[{"style":"Dolce","text":"..."}]}
+${JSON.stringify({advice:"...",sendWhen:"oggi",recommendedIndex:0,recommendedNormalIndex:0,recommendedSecretIndex:40,recommendationReason:"...",categoryRecommendations:categoryExample,replies:[{style:styleOrder[0],text:"..."}]})}
 
 CONTESTO:
 ${JSON.stringify(context || {})}

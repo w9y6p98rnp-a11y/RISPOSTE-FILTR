@@ -585,7 +585,8 @@ $("generate").onclick=async()=>{
     const aiAdvice=String(data.advice||"").trim();
     const sendWhen=String(data.sendWhen||"").trim();
     const categoryRecommendations=data.categoryRecommendations && typeof data.categoryRecommendations==="object" ? data.categoryRecommendations : {};
-    const styleOrder=["Dolce","Stuzzica","Ironico","Flirt","Seria","Audace","Battuta","Poeta","Erotica","Hot"];
+    const voiceOrder=loadVoiceSettings();
+    const styleOrder=[...voiceOrder.normal.map(v=>v.id),...voiceOrder.secret.map(v=>v.id)];
     const adviceHtml=`<div class="ai-advice-card"><div class="ai-advice-title">💡 Consiglio dell'AI</div><div class="ai-advice-text">${escapeHtml(aiAdvice || "Valuto il momento migliore per scriverle in base alla conversazione.")}</div>${sendWhen ? `<div class="ai-send-when">🕒 Da inviare: ${escapeHtml(sendWhen)}</div>` : ""}</div>`;
     const renderCard=(r,i,categoryRecommendedIndex,categoryReason="")=>{
       const t=typeof r==="string"?r:(r.text||"");
@@ -715,14 +716,26 @@ let pendingVoiceGroup="normal";
 let selectedVoiceGroup="";
 let pendingVoiceSettings=null;
 function cloneVoiceSettings(){return JSON.parse(JSON.stringify(DEFAULT_VOICE_SETTINGS));}
-function loadVoiceSettings(){const s=loadSettings();const saved=s.voiceSettings||{};const base=cloneVoiceSettings();for(const group of ["normal","secret"]){for(const def of base[group]){const custom=Array.isArray(saved[group])?saved[group].find(v=>v&&v.id===def.id):null;if(custom){def.label=String(custom.label||def.label).slice(0,40);def.instruction=String(custom.instruction||def.instruction).slice(0,500);}}}return base;}
+function loadVoiceSettings(){const s=loadSettings();const saved=s.voiceSettings||{};const defaults=cloneVoiceSettings();const out={normal:[],secret:[]};for(const group of ["normal","secret"]){const byId=new Map(defaults[group].map(v=>[v.id,v]));const savedList=Array.isArray(saved[group])?saved[group]:[];for(const custom of savedList){if(!custom||!byId.has(custom.id))continue;const def=byId.get(custom.id);out[group].push({id:def.id,label:String(custom.label||def.label).slice(0,40),instruction:String(custom.instruction||def.instruction).slice(0,500)});byId.delete(custom.id);}for(const def of byId.values())out[group].push({...def});}return out;}
 function getVoiceLabel(id){const all=loadVoiceSettings();const item=[...all.normal,...all.secret].find(v=>v.id===id);return item?.label||id;}
 function getFontOption(id){return FONT_OPTIONS.find(f=>f.id===id)||FONT_OPTIONS[0];}
 function renderVoiceEditor(){
   const defs=pendingVoiceSettings?.[pendingVoiceGroup]||[];
   const title=pendingVoiceGroup==="normal"?"💬 Risposte normali":"🔥 Risposte segrete";
   $("voiceEditorTitle").textContent=title;
-  $("voiceEditorList").innerHTML=defs.map((v,i)=>`<div class="voice-editor-item"><div class="voice-editor-item-head"><span class="voice-editor-number">${i+1}</span><div><b>${esc(v.id)}</b><small>Voce ${i+1}</small></div></div><label>Nome visualizzato<input class="voice-label-input" data-voice-id="${escapeAttr(v.id)}" maxlength="40" value="${escAttr(v.label)}"></label><label>Come deve rispondere l'AI<textarea class="voice-instruction-input" data-voice-id="${escapeAttr(v.id)}" maxlength="500" rows="3">${esc(v.instruction)}</textarea></label></div>`).join("");
+  $("voiceEditorList").innerHTML=defs.map((v,i)=>`<div class="voice-editor-item" data-voice-id="${escapeAttr(v.id)}"><div class="voice-editor-item-head"><span class="voice-editor-number">${i+1}</span><div class="voice-editor-item-title"><b>${esc(v.label)}</b><small>Voce ${i+1}</small></div><div class="voice-order-controls"><button type="button" class="voice-order-btn" data-voice-move="up" data-voice-id="${escapeAttr(v.id)}" ${i===0?'disabled':''} aria-label="Sposta ${escAttr(v.label)} su">↑</button><button type="button" class="voice-order-btn" data-voice-move="down" data-voice-id="${escapeAttr(v.id)}" ${i===defs.length-1?'disabled':''} aria-label="Sposta ${escAttr(v.label)} giù">↓</button></div></div><label>Nome visualizzato<input class="voice-label-input" data-voice-id="${escapeAttr(v.id)}" maxlength="40" value="${escAttr(v.label)}"></label><label>Come deve rispondere l'AI<textarea class="voice-instruction-input" data-voice-id="${escapeAttr(v.id)}" maxlength="500" rows="3">${esc(v.instruction)}</textarea></label></div>`).join("");
+  document.querySelectorAll(".voice-order-btn").forEach(btn=>btn.addEventListener("click",()=>moveVoice(btn.dataset.voiceId,btn.dataset.voiceMove)));
+  document.querySelectorAll(".voice-label-input").forEach(input=>input.addEventListener("input",()=>{const v=pendingVoiceSettings[pendingVoiceGroup]?.find(x=>x.id===input.dataset.voiceId);if(v){v.label=input.value;const title=input.closest('.voice-editor-item')?.querySelector('.voice-editor-item-title b');if(title)title.textContent=input.value||v.id;}}));
+}
+function moveVoice(id,direction){
+  if(!pendingVoiceSettings?.[pendingVoiceGroup])return;
+  const list=pendingVoiceSettings[pendingVoiceGroup];
+  const index=list.findIndex(v=>v.id===id);
+  if(index<0)return;
+  const target=direction==='up'?index-1:index+1;
+  if(target<0||target>=list.length)return;
+  [list[index],list[target]]=[list[target],list[index]];
+  renderVoiceEditor();
 }
 function updateVoiceChoiceUI(){
   const normal=$("editNormalVoices"), secret=$("editSecretVoices"), next=$("continueVoiceChoice");
