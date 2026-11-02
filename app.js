@@ -711,6 +711,7 @@ const DEFAULT_VOICE_SETTINGS={
 };
 let pendingFontId="system";
 let pendingVoiceGroup="normal";
+let selectedVoiceGroup="";
 let pendingVoiceSettings=null;
 function cloneVoiceSettings(){return JSON.parse(JSON.stringify(DEFAULT_VOICE_SETTINGS));}
 function loadVoiceSettings(){const s=loadSettings();const saved=s.voiceSettings||{};const base=cloneVoiceSettings();for(const group of ["normal","secret"]){for(const def of base[group]){const custom=Array.isArray(saved[group])?saved[group].find(v=>v&&v.id===def.id):null;if(custom){def.label=String(custom.label||def.label).slice(0,40);def.instruction=String(custom.instruction||def.instruction).slice(0,500);}}}return base;}
@@ -722,16 +723,43 @@ function renderVoiceEditor(){
   $("voiceEditorTitle").textContent=title;
   $("voiceEditorList").innerHTML=defs.map((v,i)=>`<div class="voice-editor-item"><div class="voice-editor-item-head"><span class="voice-editor-number">${i+1}</span><div><b>${esc(v.id)}</b><small>Voce ${i+1}</small></div></div><label>Nome visualizzato<input class="voice-label-input" data-voice-id="${escapeAttr(v.id)}" maxlength="40" value="${escAttr(v.label)}"></label><label>Come deve rispondere l'AI<textarea class="voice-instruction-input" data-voice-id="${escapeAttr(v.id)}" maxlength="500" rows="3">${esc(v.instruction)}</textarea></label></div>`).join("");
 }
-function openVoiceChoice(){const settings=$("settingsModal");if(settings)settings.classList.add("hidden");const modal=$("voiceChoiceModal");if(modal){modal.classList.remove("hidden");modal.style.zIndex="1000";modal.style.pointerEvents="auto";}}
-function closeVoiceChoice(){$("voiceChoiceModal").classList.add("hidden");}
-function openVoiceEditor(group){pendingVoiceGroup=group;pendingVoiceSettings=loadVoiceSettings();renderVoiceEditor();const choice=$("voiceChoiceModal"),editor=$("voiceEditorModal");if(choice){choice.classList.add("hidden");choice.style.pointerEvents="none";}if(editor){editor.classList.remove("hidden");editor.style.zIndex="1001";editor.style.pointerEvents="auto";}}
-function closeVoiceEditor(){$("voiceEditorModal").classList.add("hidden");pendingVoiceSettings=null;}
+function updateVoiceChoiceUI(){
+  const normal=$("editNormalVoices"), secret=$("editSecretVoices"), next=$("continueVoiceChoice");
+  [normal,secret].forEach(btn=>{
+    if(!btn)return;
+    const active=btn.dataset.voiceGroup===selectedVoiceGroup;
+    btn.classList.toggle("selected",active);
+    btn.setAttribute("aria-pressed",active?"true":"false");
+  });
+  if(next) next.disabled=!selectedVoiceGroup;
+}
+function selectVoiceGroup(group){selectedVoiceGroup=group;updateVoiceChoiceUI();}
+function openVoiceChoice(){
+  const settings=$("settingsModal");
+  if(settings)settings.classList.add("hidden");
+  selectedVoiceGroup="";
+  updateVoiceChoiceUI();
+  const modal=$("voiceChoiceModal");
+  if(modal){modal.classList.remove("hidden");modal.style.zIndex="1000";modal.style.pointerEvents="auto";}
+}
+function closeVoiceChoice(){const modal=$("voiceChoiceModal");if(modal)modal.classList.add("hidden");selectedVoiceGroup="";}
+function continueVoiceChoice(){if(selectedVoiceGroup)openVoiceEditor(selectedVoiceGroup);}
+function openVoiceEditor(group){
+  pendingVoiceGroup=group;
+  pendingVoiceSettings=loadVoiceSettings();
+  renderVoiceEditor();
+  const choice=$("voiceChoiceModal"),editor=$("voiceEditorModal");
+  if(choice){choice.classList.add("hidden");choice.style.pointerEvents="none";}
+  if(editor){editor.classList.remove("hidden");editor.style.zIndex="1001";editor.style.pointerEvents="auto";}
+}
+function closeVoiceEditor(){const editor=$("voiceEditorModal");if(editor)editor.classList.add("hidden");pendingVoiceSettings=null;}
 function resetVoiceEditor(){pendingVoiceSettings=cloneVoiceSettings();renderVoiceEditor();}
 function saveVoiceEditor(){
   if(!pendingVoiceSettings)return;
   document.querySelectorAll(".voice-label-input").forEach(el=>{const v=pendingVoiceSettings[pendingVoiceGroup]?.find(x=>x.id===el.dataset.voiceId);if(v)v.label=el.value.trim()||v.label;});
   document.querySelectorAll(".voice-instruction-input").forEach(el=>{const v=pendingVoiceSettings[pendingVoiceGroup]?.find(x=>x.id===el.dataset.voiceId);if(v)v.instruction=el.value.trim()||v.instruction;});
-  const existing=loadSettings();saveSettings({voiceSettings:pendingVoiceSettings});closeVoiceEditor();
+  saveSettings({voiceSettings:pendingVoiceSettings});
+  closeVoiceEditor();
 }
 function settingsKey(){return `RispostaFlirtSettings_${currentUser?.id||"local"}`;}
 function loadSettings(){try{return {...{theme:"dark",replyZoom:100,font:"system",aboutMe:""},...(JSON.parse(localStorage.getItem(settingsKey())||"{}"))}}catch(e){return {theme:"dark",replyZoom:100,font:"system",aboutMe:""}}}
@@ -742,21 +770,29 @@ function openFontModal(){pendingFontId=loadSettings().font||"system";renderFontL
 function closeFontModal(){$("fontModal").classList.add("hidden")}
 function openSettings(){applySettings();$("settingsModal").classList.remove("hidden")}
 function closeSettings(){$("settingsModal").classList.add("hidden")}
-$("openSettings").onclick=openSettings;$("closeSettings").onclick=closeSettings;$("closeSettingsBottom").onclick=closeSettings;$("settingsModal").addEventListener("click",e=>{if(e.target.id==="settingsModal")closeSettings()});document.querySelectorAll(".theme-option").forEach(b=>b.onclick=()=>saveSettings({theme:b.dataset.theme}));$("replyZoom").addEventListener("input",e=>saveSettings({replyZoom:Number(e.target.value)}));$("openFontSettings").onclick=openFontModal;$("closeFontModal").onclick=closeFontModal;$("cancelFont").onclick=closeFontModal;$("fontModal").addEventListener("click",e=>{if(e.target.id==="fontModal")closeFontModal()});$("saveFont").onclick=()=>{saveSettings({font:pendingFontId});closeFontModal()};$("openVoiceSettings").onclick=openVoiceChoice;$("closeVoiceChoice").onclick=closeVoiceChoice;$("cancelVoiceChoice").onclick=closeVoiceChoice;$("voiceChoiceModal").addEventListener("click",e=>{if(e.target.id==="voiceChoiceModal")closeVoiceChoice()});$("editNormalVoices").onclick=()=>openVoiceEditor("normal");$("editSecretVoices").onclick=()=>openVoiceEditor("secret");$("closeVoiceEditor").onclick=closeVoiceEditor;$("cancelVoiceEditor").onclick=closeVoiceEditor;$("voiceEditorModal").addEventListener("click",e=>{if(e.target.id==="voiceEditorModal")closeVoiceEditor()});$("resetVoiceSettings").onclick=resetVoiceEditor;$("saveVoiceSettings").onclick=saveVoiceEditor;// Gestione robusta dei pulsanti Modifica voci su dispositivi touch.
-document.addEventListener("pointerdown", function(e){
-  const normal=e.target.closest && e.target.closest("#editNormalVoices");
-  const secret=e.target.closest && e.target.closest("#editSecretVoices");
-  if(normal){ e.preventDefault(); e.stopPropagation(); openVoiceEditor("normal"); return; }
-  if(secret){ e.preventDefault(); e.stopPropagation(); openVoiceEditor("secret"); return; }
-}, true);
-
-document.addEventListener("click", function(e){
-  const normal=e.target.closest && e.target.closest("#editNormalVoices");
-  const secret=e.target.closest && e.target.closest("#editSecretVoices");
-  if(normal){ e.preventDefault(); e.stopPropagation(); openVoiceEditor("normal"); }
-  else if(secret){ e.preventDefault(); e.stopPropagation(); openVoiceEditor("secret"); }
-}, true);
-
+$("openSettings").onclick=openSettings;
+$("closeSettings").onclick=closeSettings;
+$("closeSettingsBottom").onclick=closeSettings;
+$("settingsModal").addEventListener("click",e=>{if(e.target.id==="settingsModal")closeSettings()});
+document.querySelectorAll(".theme-option").forEach(b=>b.onclick=()=>saveSettings({theme:b.dataset.theme}));
+$("replyZoom").addEventListener("input",e=>saveSettings({replyZoom:Number(e.target.value)}));
+$("openFontSettings").onclick=openFontModal;
+$("closeFontModal").onclick=closeFontModal;
+$("cancelFont").onclick=closeFontModal;
+$("fontModal").addEventListener("click",e=>{if(e.target.id==="fontModal")closeFontModal()});
+$("saveFont").onclick=()=>{saveSettings({font:pendingFontId});closeFontModal()};
+$("openVoiceSettings").onclick=openVoiceChoice;
+$("closeVoiceChoice").onclick=closeVoiceChoice;
+$("cancelVoiceChoice").onclick=closeVoiceChoice;
+$("editNormalVoices").onclick=()=>selectVoiceGroup("normal");
+$("editSecretVoices").onclick=()=>selectVoiceGroup("secret");
+$("continueVoiceChoice").onclick=continueVoiceChoice;
+$("voiceChoiceModal").addEventListener("click",e=>{if(e.target.id==="voiceChoiceModal")closeVoiceChoice()});
+$("closeVoiceEditor").onclick=closeVoiceEditor;
+$("cancelVoiceEditor").onclick=closeVoiceEditor;
+$("voiceEditorModal").addEventListener("click",e=>{if(e.target.id==="voiceEditorModal")closeVoiceEditor()});
+$("resetVoiceSettings").onclick=resetVoiceEditor;
+$("saveVoiceSettings").onclick=saveVoiceEditor;
 applySettings();
 
 // -------------------------

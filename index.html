@@ -224,12 +224,12 @@
 
 <div id="voiceChoiceModal" class="modal hidden">
   <div class="modal-card voice-choice-card">
-    <div class="settings-head"><div><h2>🎙️ Modifica voci</h2><p class="hint">Scegli quali risposte vuoi personalizzare.</p></div><button type="button" id="closeVoiceChoice" class="memory-close">×</button></div>
+    <div class="settings-head"><div><h2>🎙️ Modifica voci</h2><p class="hint">Scegli cosa vuoi personalizzare e poi premi Avanti.</p></div><button type="button" id="closeVoiceChoice" class="memory-close">×</button></div>
     <div class="voice-choice-list">
-      <button type="button" class="voice-choice" id="editNormalVoices" onclick="openVoiceEditor('normal')"><span>💬</span><div><b>Risposte normali</b><small>Modifica Dolce, Flirt, Seria, Battuta e le altre voci normali.</small></div><strong>›</strong></button>
-      <button type="button" class="voice-choice" id="editSecretVoices" onclick="openVoiceEditor('secret')"><span>🔥</span><div><b>Risposte segrete</b><small>Modifica Erotica e Hot come preferisci.</small></div><strong>›</strong></button>
+      <button type="button" class="voice-choice" id="editNormalVoices" data-voice-group="normal" aria-pressed="false"><span class="voice-choice-radio"></span><span class="voice-choice-icon">💬</span><div><b>Risposte normali</b><small>Modifica Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Battuta e Poeta.</small></div></button>
+      <button type="button" class="voice-choice" id="editSecretVoices" data-voice-group="secret" aria-pressed="false"><span class="voice-choice-radio"></span><span class="voice-choice-icon">🔥</span><div><b>Risposte segrete</b><small>Modifica Erotica e Hot come preferisci.</small></div></button>
     </div>
-    <div class="modal-actions"><button type="button" id="cancelVoiceChoice" class="secondary">Annulla</button></div>
+    <div class="modal-actions voice-choice-actions"><button type="button" id="cancelVoiceChoice" class="secondary">Annulla</button><button type="button" id="continueVoiceChoice" class="primary" disabled>Avanti&nbsp;→</button></div>
   </div>
 </div>
 
@@ -266,6 +266,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20261102-voci1"></script>
+<script src="app.js?v=20261102-voci2"></script>
 </body>
 </html>
