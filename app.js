@@ -466,6 +466,7 @@ function bindResultButtons(){
     document.documentElement.scrollTop=0; document.body.scrollTop=0;
     setTimeout(()=>b.textContent="Copia",1200);
   });
+  document.querySelectorAll("#loadSecretReplies").forEach(b=>b.onclick=()=>loadSecretRepliesLazy());
   document.querySelectorAll(".category-more-toggle").forEach(b=>b.onclick=()=>{
     const target=$(b.dataset.target);
     if(!target) return;
@@ -485,6 +486,9 @@ function bindResultButtons(){
       target.classList.remove("hidden");
       b.classList.add("selected");
       setTimeout(()=>target.scrollIntoView({behavior:"smooth",block:"start"}),50);
+      // Le risposte segrete partono automaticamente appena si apre la sezione.
+      // Nessun secondo tap su "Genera": mostriamo subito lo stato di caricamento.
+      if(target.id === "secretRepliesPanel") setTimeout(()=>loadSecretRepliesLazy(),90);
     }
   });
   document.querySelectorAll(".reply-panel-close").forEach(b=>b.onclick=()=>{
@@ -500,6 +504,9 @@ async function loadSecretRepliesLazy(){
   const a=window.__rfLastAnalysis;
   if(!btn || !content || !a || btn.dataset.loading==="1") return;
   btn.dataset.loading="1"; btn.disabled=true; btn.textContent="Genero le risposte segrete...";
+  // Feedback visivo immediato: la generazione parte da sola e la rotellina
+  // resta visibile per tutta la durata della richiesta AI.
+  content.innerHTML=`<div class="secret-loading-card"><div class="secret-spinner" aria-hidden="true"></div><div class="secret-loading-title">Genero le risposte segrete...</div><div class="secret-loading-text">Sto preparando Erotica e Hot. Non devi premere altro.</div></div>`;
   try{
     if(navigator.onLine===false) throw new Error("Nessuna connessione internet.");
     const controller=new AbortController();
