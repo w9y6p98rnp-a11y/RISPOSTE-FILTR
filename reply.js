@@ -263,18 +263,23 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 55000) {
   const img = imagePart(image);
   if (img) parts.push({ inlineData: img });
 
+  // Gemini 3.8 Flash non accetta thinkingLevel: 'minimal'.
+  // Per 3.5/3.6 manteniamo la modalità rapida; per 3.8 lasciamo
+  // che il modello usi il proprio livello predefinito supportato.
+  const generationConfig = {
+    maxOutputTokens: 3000,
+    responseMimeType: 'application/json'
+  };
+  if (model !== 'gemini-3.8-flash') {
+    generationConfig.thinkingConfig = { thinkingLevel: 'minimal' };
+  }
+
   const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ role: 'user', parts }],
-      generationConfig: {
-        maxOutputTokens: 3000,
-        responseMimeType: 'application/json',
-        thinkingConfig: {
-          thinkingLevel: 'minimal'
-        }
-      }
+      generationConfig
     })
   }, timeoutMs);
 
