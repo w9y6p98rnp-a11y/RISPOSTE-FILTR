@@ -87,6 +87,12 @@ async function selectGirl(id){
   selectedId=id;
   localStorage.setItem(`selectedGirl_${currentUser?.id||"local"}`,id);
   const g=girls.find(x=>x.id===id)||await getGirl(id);
+  // L'ordine della sidebar segue l'ultima ragazza aperta: quella appena selezionata passa in cima,
+  // mentre tutte le altre mantengono il loro ordine relativo.
+  g.updatedAt=Date.now();
+  await put("girls",g);
+  girls=await getAll("girls");
+  girls.sort((a,b)=>b.updatedAt-a.updatedAt);
   $("empty").classList.add("hidden");
   $("chat").classList.remove("hidden");
   $("girlTitle").textContent=g.name;
