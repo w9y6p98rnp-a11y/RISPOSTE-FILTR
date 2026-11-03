@@ -123,6 +123,8 @@ L'INDICAZIONE DELL'UTENTE NON È UN MESSAGGIO DI LEI: è una nota/informazione c
 
 REGOLA ASSOLUTA SULLA PROSPETTIVA: ogni fatto espresso dall'utente con "io", "sono", "ho", "mi", "me", "per me", "sto", "vado", "parto" appartiene all'UTENTE e non può essere attribuito a LEI. Ogni fatto espresso come "lei", "ha", "sta", "va", "parte" appartiene a LEI. NON invertire mai i soggetti. Se l'utente scrive "io sono in ferie", significa che È L'UTENTE ad essere in ferie: non scrivere "ti godi le vacanze", "mentre sei in vacanza", "come vanno le tue vacanze" o equivalenti riferiti a LEI. In quel caso puoi invece scrivere, per esempio, "anche se sono io quello in ferie..." oppure costruire la risposta senza attribuire la vacanza alla persona sbagliata. Se un fatto non è chiaramente attribuibile, non inventare a chi appartenga. Questa regola vale anche per advice, sendWhen, recommendationReason e per le motivazioni delle singole categorie. Prima di generare le risposte, costruisci mentalmente un piccolo elenco dei fatti: FATTI DI IO = utente; FATTI DI LEI = ragazza; poi usa quell'elenco senza scambiarli.
 
+RICOSTRUZIONE DEI RUOLI E DEI POSSESSIVI: prima di generare qualsiasi risposta, identifica chiaramente chi parla in ogni bolla. Nell'ultima bolla di LEI, i riferimenti "tu", "te", "ti", "tuo", "tua", "tuoi", "tue" indicano l'UTENTE; i riferimenti "io", "me", "mi", "mio", "mia", "miei", "mie" indicano LEI. Nelle bolle di IO vale l'opposto. Esempio fondamentale: se LEI scrive "la tua estetista", l'estetista è quella dell'UTENTE; se LEI scrive "la mia estetista", è quella di LEI. Non invertire questi riferimenti e non decidere il proprietario in base a supposizioni o al tono della frase. Se una risposta parla di una persona, oggetto, lavoro, familiare o attività citata con un possessivo, conserva esattamente il proprietario indicato dal parlante. Prima di scrivere, costruisci mentalmente una tabella: IO = utente; LEI = ragazza; "tuo/tua" detto da LEI = IO; "mio/mia" detto da LEI = LEI.
+
 GENERA ESATTAMENTE ${totalReplies} RISPOSTE, con 5 risposte per ogni stile tranne Hot che deve avere ESATTAMENTE 10 risposte. Nell'ordine personalizzato scelto dall'utente. MODALITÀ: ${sectionName}:
 ${styleOrder.map((style,i)=>`${i+1} ${style}`).join("\n")}
 Genera SOLO gli stili elencati sopra. La prima risposta di OGNI stile deve essere la migliore di quello stile. Rispetta esattamente questo ordine anche nell'array replies.
@@ -202,6 +204,7 @@ CONTROLLO FINALE OBBLIGATORIO PRIMA DEL JSON:
 - Se compare un altro fatto personale introdotto da "io", "ho", "sono", "sto", "vado", "parto" o simili, mantienilo riferito all'UTENTE.
 - Non correggere o reinterpretare la prospettiva dell'utente in base a supposizioni.
 - Ricontrolla ogni risposta, advice e reason per assicurarti che IO e LEI non siano stati invertiti.
+- Ricontrolla anche i possessivi: se LEI dice "la tua X", X appartiene all'UTENTE; se dice "la mia X", X appartiene a LEI.
 - Ricontrolla che ogni risposta sia realmente collegata all'ultimo messaggio di LEI e non sia una frase generica da flirt riciclata.
 - Se LEI è arrabbiata o infastidita, verifica che nessuna risposta la provochi inutilmente o trasformi la situazione in flirt/sesso senza una base reale.
 - Verifica che ogni stile sia diverso nel tono ma coerente con la stessa situazione concreta.
