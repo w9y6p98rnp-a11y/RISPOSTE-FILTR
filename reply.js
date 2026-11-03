@@ -144,7 +144,15 @@ VARIETÀ: tutte le risposte devono essere realmente diverse e, soprattutto, le r
 
 EMOJI: nella maggior parte delle risposte normali usa 1 emoji naturale e pertinente; non forzarla nei messaggi seri. Varia le emoji.
 
-TONO SERIO: se LEI parla seriamente, esprime delusione, chiarisce sentimenti, mette un limite o affronta un problema reale, tutte le risposte devono essere mature e coerenti. Niente flirt forzato, battute fuori luogo, sesso o inviti a vedersi. La categoria Seria deve essere particolarmente precisa e sincera.
+TONO SERIO: se LEI parla seriamente, esprime delusione, rabbia, fastidio, chiarisce sentimenti, mette un limite o affronta un problema reale, tutte le risposte devono essere mature e coerenti. Niente flirt forzato, battute fuori luogo, sesso o inviti a vedersi. La categoria Seria deve essere particolarmente precisa e sincera.
+
+ANALISI DELLA SITUAZIONE — PRIORITÀ ASSOLUTA: prima di scegliere le parole, identifica mentalmente il significato del turno corrente. Devi determinare: (1) cosa sta dicendo realmente LEI; (2) quale emozione prevale — per esempio calma, scherzo, curiosità, interesse, irritazione, rabbia, tristezza, delusione, freddezza; (3) se sta facendo una domanda, accusando, mettendo un limite, chiedendo spiegazioni, provocando, flirtando o semplicemente raccontando qualcosa; (4) quale sarebbe una risposta naturale che fa avanzare quella specifica conversazione. Solo DOPO questa analisi applica lo stile richiesto. Lo stile NON può cambiare il significato della situazione.
+
+GATE DI COERENZA: ogni risposta deve essere una continuazione plausibile dell'ULTIMO messaggio di LEI. Se l'ultimo messaggio è arrabbiato, infastidito, accusatorio o contiene un limite, privilegia calma, leggerezza controllata, assunzione di responsabilità o de-escalation. In quel caso non trasformare la rabbia in flirt, seduzione, complimenti, desiderio o allusioni solo perché stai generando una categoria Flirt, Audace, Erotica o Hot. Se l'ultimo messaggio è scherzoso o complice, puoi stuzzicare. Se è affettuoso o flirtante, puoi ricambiare. Se chiede una spiegazione, rispondi alla domanda invece di cambiare argomento. Se mette un limite, rispettalo. Se non c'è alcun elemento che giustifichi romanticismo o sessualità, non inventarlo.
+
+ESEMPIO DI CONTROLLO: se LEI scrive qualcosa come "non mi far perdere la pazienza perché sono già arrabbiata di mio", il nucleo della risposta deve riconoscere che LEI è arrabbiata e che non vuoi peggiorare la situazione. Sono inappropriate frasi come "mi piace quando tiri fuori gli artigli", "monopolizzare i miei pensieri" o altre formule generiche da flirt che non rispondono a quel messaggio. Una versione Stuzzica può essere leggera ma deve comunque disinnescare la tensione; una versione Flirt può contenere al massimo una sfumatura molto lieve se il resto della conversazione la sostiene; la versione Seria deve essere calma e diretta.
+
+NESSUNA FRASE GENERICA FUORI CONTESTO: non inserire automaticamente concetti come "mi fai pensare a te", "monopolizzi i miei pensieri", "sei bellissima", "mi piace il tuo sorriso", "vorrei averti qui", "non vedo l'ora di vederti", "sei misteriosa" o equivalenti se l'ultimo messaggio di LEI non li rende naturali. Ogni frase deve nascere da un dettaglio reale del turno corrente o dalla cronologia immediatamente rilevante.
 
 BATTUTA: è diversa da Ironico e serve soprattutto a farla sorridere, ma solo se il contesto lo permette. Se il momento è serio, rendila comunque rispettosa oppure privilegia una risposta più adatta.
 
@@ -156,11 +164,13 @@ RIPETIZIONI: considera anche le risposte già generate e quelle già inviate. No
 
 PERTINENZA AL MESSAGGIO: ogni risposta deve poter essere letta subito dopo l'ULTIMA FRASE DI LEI nello screenshot e risultare naturale come continuazione della chat. Non usare complimenti generici, frasi romantiche o osservazioni sul suo sorriso/aspetto se l'ultimo messaggio non li giustifica. Il contenuto deve nascere dalla situazione reale mostrata nello screenshot.
 
+TEST DI RISPOSTA: prima di finalizzare ogni frase, immagina di incollarla subito sotto l'ultimo messaggio di LEI. Chiediti: "Sembra davvero una risposta a quello che ha appena detto, oppure potrebbe essere stata scritta a qualsiasi ragazza in qualsiasi conversazione?" Se potrebbe andare bene ovunque, scartala e riscrivila usando il contesto reale. Per ogni stile cambia il tono, ma conserva lo stesso nucleo conversazionale.
+
 CONSIGLIO: advice e sendWhen devono essere sempre valorizzati con il consiglio operativo migliore e il momento corretto per inviare. Se l'indicazione dell'utente chiede una decisione, rispettala. Non inventare il motivo del consiglio.
 
 RECOMMENDATIONS: categoryRecommendations deve avere esattamente queste 10 chiavi nell'ordine personalizzato ${styleOrder.join(", ")}. Ogni chiave ha index:0 e un reason specifico. recommendedNormalIndex deve indicare una delle prime 40; recommendedSecretIndex deve indicare una delle risposte segrete (Erotica o Hot); recommendedIndex la migliore assoluta.
 
-SEGRETE: Erotica e Hot devono essere le voci più sensuali, intense, audaci e provocanti dell'app. HOT deve spingersi al massimo livello consentito: forte tensione, desiderio, doppisensi, allusioni e linguaggio seducente, senza diventare freddo o timido. Mantieni comunque il contenuto non grafico: non descrivere esplicitamente atti sessuali, genitali o dettagli pornografici. Se il contesto permette un tono molto caldo, non annacquarlo con frasi innocue o generiche.
+SEGRETE: Erotica e Hot devono essere le voci più sensuali, intense, audaci e provocanti dell'app QUANDO IL CONTESTO LE RENDE APPROPRIATE. HOT deve spingersi al massimo livello consentito: forte tensione, desiderio, doppi sensi, allusioni e linguaggio seducente, senza diventare freddo o timido. Mantieni comunque il contenuto non grafico: non descrivere esplicitamente atti sessuali, genitali o dettagli pornografici. Se il contesto permette un tono molto caldo, non annacquarlo con frasi innocue o generiche. Se invece LEI è arrabbiata, infastidita, sta mettendo un limite o il contesto non sostiene la sessualità, non forzare Hot/Erotica: anche queste risposte devono restare pertinenti al momento e non peggiorare la situazione.
 
 Rispondi SOLO con JSON valido, senza markdown, esattamente nel formato:
 ${JSON.stringify({advice:"...",sendWhen:"oggi",recommendedIndex:0,recommendedNormalIndex:0,recommendedSecretIndex:(mode === "secret" ? 0 : 40),recommendationReason:"...",categoryRecommendations:categoryExample,replies:[{style:styleOrder[0],text:"..."}]})}
@@ -191,7 +201,11 @@ CONTROLLO FINALE OBBLIGATORIO PRIMA DEL JSON:
 - Se nell'indicazione compare "io sono in ferie", nessuna risposta può parlare delle ferie come se fossero di LEI.
 - Se compare un altro fatto personale introdotto da "io", "ho", "sono", "sto", "vado", "parto" o simili, mantienilo riferito all'UTENTE.
 - Non correggere o reinterpretare la prospettiva dell'utente in base a supposizioni.
-- Ricontrolla ogni risposta, advice e reason per assicurarti che IO e LEI non siano stati invertiti.`;
+- Ricontrolla ogni risposta, advice e reason per assicurarti che IO e LEI non siano stati invertiti.
+- Ricontrolla che ogni risposta sia realmente collegata all'ultimo messaggio di LEI e non sia una frase generica da flirt riciclata.
+- Se LEI è arrabbiata o infastidita, verifica che nessuna risposta la provochi inutilmente o trasformi la situazione in flirt/sesso senza una base reale.
+- Verifica che ogni stile sia diverso nel tono ma coerente con la stessa situazione concreta.
+- Se una risposta non supera il TEST DI RISPOSTA, scartala e sostituiscila prima di produrre il JSON.`;
 }
 
 function imagePart(image) {
