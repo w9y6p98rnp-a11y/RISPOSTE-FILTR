@@ -100,7 +100,22 @@ function promptFor(context, message, aiHint = "", audioTranscript = "", previous
   const countForStyle = style => style === "Hot" ? 10 : 5;
   const totalReplies = styleOrder.reduce((sum, style) => sum + countForStyle(style), 0);
   const sectionName = mode === "secret" ? "SOLO RISPOSTE SEGRETE" : "SOLO RISPOSTE NORMALI";
+  const settingsById = new Map();
+  for (const group of [context?.voiceSettings?.normal, context?.voiceSettings?.secret]) {
+    if (Array.isArray(group)) for (const v of group) if (v?.id) settingsById.set(String(v.id), v);
+  }
+  const lengthRules = styleOrder.map(style => {
+    const instruction = String(settingsById.get(style)?.instruction || "").toLowerCase();
+    const wantsLong = /(più\s+lung|piu\s+lung|lunghe|lunghezza|articolat|dettagliat|più\s+ampie|piu\s+ampie)/i.test(instruction);
+    const wantsShort = /(più\s+brev|piu\s+brev|corte|concise|sintetiche)/i.test(instruction);
+    if (wantsLong) return `${style}: LUNGHEZZA OBBLIGATORIA, circa 30-50 parole per risposta (non meno di 25 salvo che il contesto renda impossibile).`;
+    if (wantsShort) return `${style}: LUNGHEZZA BREVE OBBLIGATORIA, circa 8-18 parole per risposta.`;
+    if (style === "Hot" || style === "Erotica") return `${style}: circa 18-32 parole per risposta, con contenuto sostanzioso ma naturale.`;
+    return `${style}: circa 18-32 parole per risposta; evita risposte di una sola frase telegrafica quando il contesto consente di sviluppare meglio l'idea.`;
+  }).join("\n");
   return `Sei RispostaFlirt. Analizza con precisione lo screenshot, la cronologia e soprattutto l'INDICAZIONE DELL'UTENTE. Devi distinguere SEMPRE e senza eccezioni IO (l'utente che sta usando l'app) da LEI (la persona con cui sta parlando). Rispondi ESCLUSIVAMENTE all'ultimo messaggio realmente ricevuto da LEI.
+
+DATA E ORA ATTUALI DEL DISPOSITIVO: ${context?.currentTime?.weekday || ''}, ${context?.currentTime?.date || ''}, ore ${context?.currentTime?.time || ''} (${context?.currentTime?.timeZone || 'fuso locale'}). USA QUESTO COME RIFERIMENTO TEMPORALE PER INTERPRETARE E GENERARE LE RISPOSTE. Se una risposta contiene riferimenti a oggi, domani, ieri, stamattina, stasera o giorni della settimana, devono essere coerenti con questa data e ora. NON scrivere per esempio "iniziare il lunedì" se oggi non è lunedì, salvo che tu stia parlando esplicitamente di un altro giorno. Se il contesto non richiede un riferimento temporale, non inserirlo artificialmente.
 
 PRIORITÀ DELLO SCREENSHOT E DEL TURNO CORRENTE: se è presente uno screenshot, trattalo come la fonte primaria per capire il turno corrente. Leggi la conversazione visibile e identifica l'ULTIMA BOLLA SCRITTA DA LEI. Quella è la frase a cui devi rispondere. Le bolle precedenti servono solo come contesto. Non rispondere a un messaggio vecchio, a una frase precedente o a un dettaglio secondario dello screenshot. Prima di generare, ricostruisci mentalmente: 1) ultimo messaggio di LEI da rispondere; 2) ultimo messaggio di IO che lo precede; 3) eventuali fatti personali rilevanti. Se lo screenshot e una vecchia cronologia salvata sembrano riferirsi a turni diversi, per il turno corrente prevale lo screenshot.
 
@@ -121,7 +136,9 @@ PRIORITÀ DELLE ISTRUZIONI PERSONALIZZATE: le istruzioni scritte dall'utente per
 
 OUTPUT E VELOCITÀ: mantieni il JSON compatto. I reason delle categorie devono essere brevi (una frase), advice e sendWhen devono essere sintetici. Non aggiungere spiegazioni fuori dal JSON.
 
-LUNGHEZZA: varia naturalmente solo quando l'utente non ha imposto una preferenza precisa per quella voce. Se una voce personalizzata richiede risposte più lunghe, produci normalmente circa 25-45 parole per ciascuna delle 5 risposte quando il contesto lo permette; non tornare a una sola frase breve solo perché il messaggio di lei è semplice. Se richiede risposte più corte, mantienile brevi. Se dice solo "più lunghe" senza numeri, interpreta la richiesta come un aumento evidente rispetto alle risposte standard, non come una modifica minima.
+LUNGHEZZA: la lunghezza NON dipende dal telefono, dal browser o dal sistema operativo. Applica ESATTAMENTE le regole per voce qui sotto a ogni dispositivo. Le risposte standard devono essere mediamente articolate e non telegrafiche. Se una voce personalizzata richiede risposte più lunghe, rispettala concretamente in TUTTE le risposte di quella voce. Se richiede risposte più corte, accorciale. Non compensare una richiesta di risposte lunghe con frasi brevi.
+REGOLE DI LUNGHEZZA PER VOCE:
+${lengthRules}
 
 VARIETÀ: tutte le risposte devono essere realmente diverse e, soprattutto, le risposte dello stesso stile devono sembrare cinque idee differenti. Per ogni gruppo di 5 cambia apertura, struttura della frase, ritmo, vocabolario, angolazione e tipo di risposta. Non creare cinque parafrasi della prima. Evita di iniziare più risposte con le stesse parole. Almeno una risposta può essere centrata sulla situazione, una su un'osservazione o autoironia, una su un cambio naturale di argomento e le altre su angolazioni diverse, quando il contesto lo permette. Confronta sempre le 50 risposte tra loro e con le RISPOSTE PRECEDENTI DA EVITARE prima di finalizzare.
 
@@ -170,6 +187,7 @@ INDICAZIONE DELL'UTENTE:
 ${aiHint || 'Nessuna.'}
 
 CONTROLLO FINALE OBBLIGATORIO PRIMA DEL JSON:
+- Verifica sempre il giorno della settimana e l'ora rispetto alla DATA E ORA ATTUALI DEL DISPOSITIVO sopra indicata. Non confondere lunedì, martedì, ecc. e non usare riferimenti temporali incoerenti con oggi.
 - Se nell'indicazione compare "io sono in ferie", nessuna risposta può parlare delle ferie come se fossero di LEI.
 - Se compare un altro fatto personale introdotto da "io", "ho", "sono", "sto", "vado", "parto" o simili, mantienilo riferito all'UTENTE.
 - Non correggere o reinterpretare la prospettiva dell'utente in base a supposizioni.
@@ -290,7 +308,7 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { message = '', aiHint = '', image = null, audio = null, audioTranscript: providedAudioTranscript = '', mode = 'normal', girlId = '' } = body;
+    const { message = '', aiHint = '', image = null, audio = null, audioTranscript: providedAudioTranscript = '', currentTime = null, mode = 'normal', girlId = '' } = body;
     if (!image && !audio) return json(400, { error: 'Aggiungi uno screenshot oppure una registrazione vocale.' });
     if (!env.DB || !context.user?.id || !girlId) return json(401, { error: 'Sessione o ragazza non valide.' });
 
@@ -326,7 +344,14 @@ export async function onRequestPost(context) {
       memory: girl.memory || '',
       conversation,
       previousReplies: (previous.results || []).reverse().map(x => x.text).filter(Boolean),
-      previousGeneratedReplies
+      previousGeneratedReplies,
+      currentTime: (currentTime && typeof currentTime === 'object') ? {
+        weekday: String(currentTime.weekday || ''),
+        date: String(currentTime.date || ''),
+        time: String(currentTime.time || ''),
+        timeZone: String(currentTime.timeZone || ''),
+        iso: String(currentTime.iso || '')
+      } : null
     };
 
     let audioTranscript = '';

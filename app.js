@@ -527,6 +527,16 @@ function bindResultButtons(){
   });
 }
 
+
+function getCurrentTimeContext(){
+  const now=new Date();
+  const weekday=new Intl.DateTimeFormat('it-IT',{weekday:'long'}).format(now);
+  const date=new Intl.DateTimeFormat('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'}).format(now);
+  const time=new Intl.DateTimeFormat('it-IT',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(now);
+  const timeZone=Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Rome';
+  return {weekday,date,time,timeZone,iso:now.toISOString()};
+}
+
 async function loadSecretRepliesLazy(){
   const btn=document.getElementById("loadSecretReplies");
   const content=document.getElementById("secretRepliesContent");
@@ -545,7 +555,7 @@ async function loadSecretRepliesLazy(){
     let response;
     try{
       response=await fetch("/api/reply",{method:"POST",headers:{"Content-Type":"application/json"},signal:controller.signal,body:JSON.stringify({
-        girlId:a.girlId,message:a.message,aiHint:a.aiHint,image:a.image,audio:a.audio,audioTranscript:a.audioTranscript||"",mode:"secret"
+        girlId:a.girlId,message:a.message,aiHint:a.aiHint,image:a.image,audio:a.audio,audioTranscript:a.audioTranscript||"",currentTime:getCurrentTimeContext(),mode:"secret"
       })});
     }finally{clearTimeout(timer)}
     if(!response.ok){ const detail=await response.text().catch(()=>""); throw new Error(detail||"Server AI non disponibile."); }
@@ -639,6 +649,7 @@ $("generate").onclick=async()=>{
           aiHint,
           image,
           audio,
+          currentTime:getCurrentTimeContext(),
           mode:"normal"
         })
       });
