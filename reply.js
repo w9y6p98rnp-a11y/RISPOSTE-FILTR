@@ -296,32 +296,61 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 55000) {
   return extractJson(raw);
 }
 
-async function callOpenRouter(apiKey, prompt, image, timeoutMs = 55000) {
+async function callOpenRouter(apiKey, prompt, image, timeoutMs = 16000) {
   const content = [{ type: 'text', text: prompt }];
   if (image) content.push({ type: 'image_url', image_url: { url: image } });
 
-  const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://rispostaflirt.netlify.app',
-      'X-Title': 'RispostaFlirt'
-    },
-    body: JSON.stringify({
-      model: 'openrouter/free',
-      messages: [{ role: 'user', content }],
-      temperature: 0.85,
-      max_tokens: 2600,
-      response_format: { type: 'json_object' }
-    })
-  }, timeoutMs);
+  const requestBody = JSON.stringify({
+    model: 'openrouter/free',
+    messages: [{ role: 'user', content }],
+    temperature: 0.85,
+    max_tokens: 2600,
+    response_format: { type: 'json_object' }
+  });
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error('OpenRouter: servizio non disponibile');
+  // OpenRouter può rispondere HTTP 200 senza testo o con content in formato array.
+  // Effettuiamo un solo nuovo tentativo, senza avviare provider in parallelo.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://rispostaflirt.netlify.app',
+        'X-Title': 'RispostaFlirt'
+      },
+      body: requestBody
+    }, timeoutMs);
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const status = response.status;
+      const message = data?.error?.message || data?.error?.metadata?.raw || `HTTP ${status}`;
+      const retryable = status === 429 || status >= 500;
+      if (attempt === 1 && retryable) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        continue;
+      }
+      throw new Error(`OpenRouter (${status}): ${String(message).slice(0, 300)}`);
+    }
+
+    const messageContent = data?.choices?.[0]?.message?.content;
+    const raw = Array.isArray(messageContent)
+      ? messageContent.map(part => typeof part === 'string' ? part : (part?.text || '')).join('').trim()
+      : (typeof messageContent === 'string' ? messageContent.trim() : '');
+
+    if (!raw) {
+      if (attempt === 1) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        continue;
+      }
+      throw new Error('OpenRouter: il servizio ha restituito una risposta vuota anche al secondo tentativo.');
+    }
+
+    return extractJson(raw);
   }
-  return extractJson(data?.choices?.[0]?.message?.content || '');
+
+  throw new Error('OpenRouter: impossibile ottenere una risposta valida.');
 }
 
 export async function onRequestPost(context) {
@@ -395,8 +424,9 @@ export async function onRequestPost(context) {
     const errors = [];
 
     // Manteniamo i provider in sequenza per non consumare più quote con una sola richiesta.
-    // I timeout originali sono mantenuti: 14 secondi per Gemini e 16 per OpenRouter.
-    // Le letture D1 indipendenti sono invece eseguite in parallelo.
+    // Gemini mantiene timeout brevi; OpenRouter dispone di un secondo tentativo solo
+    // per risposta vuota o errore temporaneo, senza avviare richieste in parallelo.
+    // Le letture D1 indipendenti sono eseguite in parallelo.
     const attempts = [];
 
     if (env.GEMINI_API_KEY) {
@@ -437,11 +467,11 @@ export async function onRequestPost(context) {
       }
     }
 
-    const retryable = errors.some(e => /429|RESOURCE_EXHAUSTED|quota|rate limit|temporarily|unavailable|503/i.test(String(e)));
+    const retryable = errors.some(e => /429|RESOURCE_EXHAUSTED|quota|rate limit|temporarily|unavailable|503|500|502|504|risposta vuota/i.test(String(e)));
     return new Response(JSON.stringify({
       error: retryable
-        ? 'Il servizio AI gratuito è momentaneamente saturo o ha raggiunto un limite. Riprova tra poco.'
-        : 'Nessun servizio AI gratuito disponibile in questo momento.',
+        ? 'I servizi AI sono momentaneamente occupati o hanno restituito una risposta incompleta. Attendi qualche secondo e riprova.'
+        : 'Nessun servizio AI disponibile. Controlla le chiavi API e riprova.',
       details: errors
     }), { status: 503, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {

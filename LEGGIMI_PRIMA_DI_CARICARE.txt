@@ -3,13 +3,13 @@ PACCHETTO COMPLETO RISPOSTAFLIRT PER GITHUB
 La cartella contiene tutti i file del progetto completo.
 
 FILE DA PUBBLICARE:
-- Pubblica il contenuto della cartella principale nel repository GitHub, mantenendo la cartella migrations.
+- Pubblica tutti i file di questa cartella direttamente nella root del repository GitHub. Non ci sono sottocartelle.
 - reply.js nella cartella principale è il file backend attivo incluso nel progetto completo.
 - worker.js importa ./reply.js e ./auth.js: non spostare questi file.
 
-EXTRA_OTTIMIZZAZIONE_PRECEDENTE:
-- Contiene i due artefatti di ottimizzazione consegnati in precedenza (reply_fast_precedente.js e il relativo ZIP).
-- Sono conservati come copia di riferimento; NON caricare questi extra al posto di reply.js.
+FILE DI RIFERIMENTO DELL'OTTIMIZZAZIONE PRECEDENTE:
+- reply_fast_precedente.js e pacchetto_ottimizzazione_precedente.zip sono inclusi nella stessa cartella come copie di riferimento.
+- Il backend attivo resta reply.js. NON rinominare reply_fast_precedente.js al posto di reply.js.
 - Il file reply_fast_precedente.js usa timeout di 30 secondi per i tentativi AI, mentre reply.js del progetto completo mantiene i timeout più brevi già presenti e le letture D1 in parallelo.
 
 PRIMA DEL DEPLOY:
