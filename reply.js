@@ -264,7 +264,7 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 55000) {
   return extractJson(raw);
 }
 
-async function callOpenRouter(apiKey, prompt, image, timeoutMs = 16000) {
+async function callOpenRouter(apiKey, prompt, image, timeoutMs = 22000) {
   const content = [{ type: 'text', text: prompt }];
   if (image) content.push({ type: 'image_url', image_url: { url: image } });
 
@@ -308,14 +308,31 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 16000) {
       : (typeof messageContent === 'string' ? messageContent.trim() : '');
 
     if (!raw) {
+      const choice = data?.choices?.[0] || {};
+      const finishReason = choice?.finish_reason || 'non indicato';
+      const returnedModel = data?.model || 'non indicato';
+      const refusal = choice?.message?.refusal;
+      const diagnostic = [
+        `modello=${String(returnedModel).slice(0, 100)}`,
+        `finish_reason=${String(finishReason).slice(0, 60)}`,
+        refusal ? `refusal=${String(refusal).slice(0, 180)}` : ''
+      ].filter(Boolean).join(', ');
       if (attempt === 1) {
-        await new Promise(resolve => setTimeout(resolve, 150));
+        await new Promise(resolve => setTimeout(resolve, 700));
         continue;
       }
-      throw new Error('OpenRouter: il servizio ha restituito una risposta vuota anche al secondo tentativo.');
+      throw new Error(`OpenRouter: risposta HTTP ${response.status} senza testo utilizzabile (${diagnostic}).`);
     }
 
-    return extractJson(raw);
+    try {
+      return extractJson(raw);
+    } catch (err) {
+      if (attempt === 1) {
+        await new Promise(resolve => setTimeout(resolve, 700));
+        continue;
+      }
+      throw new Error(`OpenRouter: il modello ha restituito testo ma non un JSON valido (${String(err?.message || err).slice(0, 180)}).`);
+    }
   }
 
   throw new Error('OpenRouter: impossibile ottenere una risposta valida.');
@@ -385,29 +402,21 @@ export async function onRequestPost(context) {
     // fallback finali. I provider restano sequenziali per non consumare quote doppie.
     // Le letture D1 indipendenti sono già eseguite in parallelo.
     const attempts = [];
-
     if (env.GEMINI_API_KEY) {
-      attempts.push(async () => {
-        try {
-          const model = 'gemini-3.5-flash-lite';
-          const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 10000);
-          return { result, provider: 'Gemini', model };
-        } catch (err) {
-          throw new Error(err?.name === 'AbortError' ? 'Gemini gemini-3.5-flash-lite: timeout' : err.message);
-        }
+      attempts.push({
+        provider: 'Gemini',
+        model: 'gemini-3.5-flash-lite',
+        run: () => callGemini(env.GEMINI_API_KEY, 'gemini-3.5-flash-lite', prompt, image, 9000)
       });
     } else {
       errors.push('GEMINI_API_KEY non configurata');
     }
 
     if (env.OPENROUTER_API_KEY) {
-      attempts.push(async () => {
-        try {
-          const result = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 12000);
-          return { result, provider: 'OpenRouter', model: 'openrouter/free' };
-        } catch (err) {
-          throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
-        }
+      attempts.push({
+        provider: 'OpenRouter',
+        model: 'openrouter/free',
+        run: () => callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 22000)
       });
     } else {
       errors.push('OPENROUTER_API_KEY non configurata');
@@ -415,23 +424,33 @@ export async function onRequestPost(context) {
 
     if (env.GEMINI_API_KEY) {
       for (const model of ['gemini-3.6-flash', 'gemini-3.8-flash']) {
-        attempts.push(async () => {
-          try {
-            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 8000);
-            return { result, provider: 'Gemini', model };
-          } catch (err) {
-            throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
-          }
+        attempts.push({
+          provider: 'Gemini',
+          model,
+          run: () => callGemini(env.GEMINI_API_KEY, model, prompt, image, 7000)
         });
       }
     }
 
+    // Se Gemini segnala quota giornaliera esaurita, non sprechiamo altri
+    // tentativi sugli altri modelli Gemini: passiamo direttamente oltre.
+    let geminiQuotaExhausted = false;
     for (const attempt of attempts) {
+      if (attempt.provider === 'Gemini' && attempt.model !== 'gemini-3.5-flash-lite' && geminiQuotaExhausted) {
+        errors.push(`Gemini ${attempt.model}: saltato perché la quota Gemini risulta già esaurita.`);
+        continue;
+      }
       try {
-        const winner = await attempt();
-        return new Response(JSON.stringify({ ...winner.result, provider: winner.provider, model: winner.model }), { status: 200, headers: { "Content-Type": "application/json" } });
+        const result = await attempt.run();
+        return new Response(JSON.stringify({ ...result, provider: attempt.provider, model: attempt.model }), { status: 200, headers: { "Content-Type": "application/json" } });
       } catch (err) {
-        errors.push(err?.message || String(err));
+        const message = err?.name === 'AbortError'
+          ? `${attempt.provider} ${attempt.model}: timeout`
+          : `${attempt.provider} ${attempt.model}: ${err?.message || String(err)}`;
+        errors.push(message);
+        if (attempt.provider === 'Gemini' && /RESOURCE_EXHAUSTED|quota exceeded|exceeded your current quota|free.?tier.*quota|retry in \d+/i.test(message)) {
+          geminiQuotaExhausted = true;
+        }
       }
     }
 
