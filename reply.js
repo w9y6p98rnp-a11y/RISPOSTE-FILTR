@@ -88,7 +88,7 @@ function extractPreviousGeneratedReplies(html) {
   return [...new Set(out)];
 }
 
-function promptFor(context, message, aiHint = "", previousGeneratedReplies = [], mode = "normal") {
+function promptFor(context, message, aiHint = "", audioTranscript = "", previousGeneratedReplies = [], mode = "normal") {
   const defaultOrder = ["Dolce","Stuzzica","Ironico","Flirt","Seria","Audace","Battuta","Poeta","Erotica","Hot"];
   const normalOrder = Array.isArray(context?.voiceSettings?.normal) && context.voiceSettings.normal.length ? context.voiceSettings.normal.map(v => String(v.id || "")).filter(Boolean) : defaultOrder.slice(0,8);
   const secretOrder = Array.isArray(context?.voiceSettings?.secret) && context.voiceSettings.secret.length ? context.voiceSettings.secret.map(v => String(v.id || "")).filter(Boolean) : defaultOrder.slice(8);
@@ -192,6 +192,9 @@ ${prev.length ? prev.map((x,i)=>`${i+1}. ${x}`).join('\n') : 'Nessuna.'}
 MESSAGGIO TESTUALE:
 ${message || ''}
 
+TRASCRIZIONE VOCALE:
+${audioTranscript || 'Nessuna.'}
+
 INDICAZIONE DELL'UTENTE:
 ${aiHint || 'Nessuna.'}
 
@@ -215,6 +218,35 @@ function imagePart(image) {
   return { mimeType: match[1], data: match[2] };
 }
 
+function audioPart(audio) {
+  if (!audio || typeof audio !== 'string') return null;
+  const match = audio.match(/^data:([^;]+);base64,(.+)$/s);
+  if (!match) return null;
+  return { mimeType: match[1], data: match[2] };
+}
+
+async function transcribeAudio(apiKey, audio, timeoutMs = 16000) {
+  const part = audioPart(audio);
+  if (!part) throw new Error('Registrazione vocale non valida.');
+  const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-transcribe:generateContent?key=${encodeURIComponent(apiKey)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [
+        { text: 'Trascrivi fedelmente questa registrazione vocale in italiano. Non riassumere, non inventare parole e mantieni il significato originale. Restituisci solo la trascrizione.' },
+        { inlineData: part }
+      ] }],
+      generationConfig: {
+        audioTranscriptionConfig: { languageCodes: [] }
+      }
+    })
+  }, timeoutMs);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error('Trascrizione audio non disponibile.');
+  const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim() || '';
+  if (!text) throw new Error('Non è stato possibile trascrivere la registrazione.');
+  return text;
+}
 
 async function fetchWithTimeout(url, options, ms = 18000) {
   const controller = new AbortController();
@@ -264,78 +296,32 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 55000) {
   return extractJson(raw);
 }
 
-async function callOpenRouter(apiKey, prompt, image, timeoutMs = 22000) {
+async function callOpenRouter(apiKey, prompt, image, timeoutMs = 55000) {
   const content = [{ type: 'text', text: prompt }];
   if (image) content.push({ type: 'image_url', image_url: { url: image } });
 
-  const requestBody = JSON.stringify({
-    model: 'openrouter/free',
-    messages: [{ role: 'user', content }],
-    temperature: 0.85,
-    max_tokens: 2600,
-    response_format: { type: 'json_object' }
-  });
+  const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://rispostaflirt.netlify.app',
+      'X-Title': 'RispostaFlirt'
+    },
+    body: JSON.stringify({
+      model: 'openrouter/free',
+      messages: [{ role: 'user', content }],
+      temperature: 0.85,
+      max_tokens: 2600,
+      response_format: { type: 'json_object' }
+    })
+  }, timeoutMs);
 
-  // OpenRouter può rispondere HTTP 200 senza testo o con content in formato array.
-  // Effettuiamo un solo nuovo tentativo, senza avviare provider in parallelo.
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://rispostaflirt.netlify.app',
-        'X-Title': 'RispostaFlirt'
-      },
-      body: requestBody
-    }, timeoutMs);
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const status = response.status;
-      const message = data?.error?.message || data?.error?.metadata?.raw || `HTTP ${status}`;
-      const retryable = status === 429 || status >= 500;
-      if (attempt === 1 && retryable) {
-        await new Promise(resolve => setTimeout(resolve, 150));
-        continue;
-      }
-      throw new Error(`OpenRouter (${status}): ${String(message).slice(0, 300)}`);
-    }
-
-    const messageContent = data?.choices?.[0]?.message?.content;
-    const raw = Array.isArray(messageContent)
-      ? messageContent.map(part => typeof part === 'string' ? part : (part?.text || '')).join('').trim()
-      : (typeof messageContent === 'string' ? messageContent.trim() : '');
-
-    if (!raw) {
-      const choice = data?.choices?.[0] || {};
-      const finishReason = choice?.finish_reason || 'non indicato';
-      const returnedModel = data?.model || 'non indicato';
-      const refusal = choice?.message?.refusal;
-      const diagnostic = [
-        `modello=${String(returnedModel).slice(0, 100)}`,
-        `finish_reason=${String(finishReason).slice(0, 60)}`,
-        refusal ? `refusal=${String(refusal).slice(0, 180)}` : ''
-      ].filter(Boolean).join(', ');
-      if (attempt === 1) {
-        await new Promise(resolve => setTimeout(resolve, 700));
-        continue;
-      }
-      throw new Error(`OpenRouter: risposta HTTP ${response.status} senza testo utilizzabile (${diagnostic}).`);
-    }
-
-    try {
-      return extractJson(raw);
-    } catch (err) {
-      if (attempt === 1) {
-        await new Promise(resolve => setTimeout(resolve, 700));
-        continue;
-      }
-      throw new Error(`OpenRouter: il modello ha restituito testo ma non un JSON valido (${String(err?.message || err).slice(0, 180)}).`);
-    }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error('OpenRouter: servizio non disponibile');
   }
-
-  throw new Error('OpenRouter: impossibile ottenere una risposta valida.');
+  return extractJson(data?.choices?.[0]?.message?.content || '');
 }
 
 export async function onRequestPost(context) {
@@ -344,8 +330,8 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { message = '', aiHint = '', image = null, currentTime = null, mode = 'normal', girlId = '' } = body;
-    if (!image) return json(400, { error: 'Aggiungi uno screenshot.' });
+    const { message = '', aiHint = '', image = null, audio = null, audioTranscript: providedAudioTranscript = '', currentTime = null, mode = 'normal', girlId = '' } = body;
+    if (!image && !audio) return json(400, { error: 'Aggiungi uno screenshot oppure una registrazione vocale.' });
     if (!env.DB || !context.user?.id || !girlId) return json(401, { error: 'Sessione o ragazza non valide.' });
 
     // Il contesto usato dall'AI viene letto dal database del proprietario della sessione.
@@ -356,23 +342,19 @@ export async function onRequestPost(context) {
     ).bind(String(girlId), context.user.id).first();
     if (!girl) return json(404, { error: 'Conversazione non trovata.' });
 
-    // Le quattro letture indipendenti vengono eseguite in parallelo:
-    // stesso contesto e stessi filtri, meno attesa prima della generazione AI.
-    const [history, previous, previousState, settingsRow] = await Promise.all([
-      env.DB.prepare(
-        'SELECT role,text,created_at AS createdAt FROM messages WHERE user_id=? AND girl_id=? ORDER BY created_at DESC LIMIT 10'
-      ).bind(context.user.id, String(girlId)).all(),
-      env.DB.prepare(
-        "SELECT text FROM messages WHERE user_id=? AND girl_id=? AND role='me' ORDER BY created_at DESC LIMIT 8"
-      ).bind(context.user.id, String(girlId)).all(),
-      env.DB.prepare(
-        'SELECT results_html AS resultsHtml FROM girl_states WHERE user_id=? AND girl_id=? LIMIT 1'
-      ).bind(context.user.id, String(girlId)).first(),
-      env.DB.prepare(
-        'SELECT value FROM settings WHERE user_id=? AND key=? LIMIT 1'
-      ).bind(context.user.id, 'app').first()
-    ]);
+    const history = await env.DB.prepare(
+      'SELECT role,text,created_at AS createdAt FROM messages WHERE user_id=? AND girl_id=? ORDER BY created_at DESC LIMIT 10'
+    ).bind(context.user.id, String(girlId)).all();
     const conversation = (history.results || []).reverse();
+    const previous = await env.DB.prepare(
+      "SELECT text FROM messages WHERE user_id=? AND girl_id=? AND role='me' ORDER BY created_at DESC LIMIT 8"
+    ).bind(context.user.id, String(girlId)).all();
+    const previousState = await env.DB.prepare(
+      'SELECT results_html AS resultsHtml FROM girl_states WHERE user_id=? AND girl_id=? LIMIT 1'
+    ).bind(context.user.id, String(girlId)).first();
+    const settingsRow = await env.DB.prepare(
+      'SELECT value FROM settings WHERE user_id=? AND key=? LIMIT 1'
+    ).bind(context.user.id, 'app').first();
     let accountSettings = {};
     try { accountSettings = settingsRow?.value ? JSON.parse(settingsRow.value) : {}; } catch (_) { accountSettings = {}; }
     const previousGeneratedReplies = extractPreviousGeneratedReplies(previousState?.resultsHtml || '').slice(-12);
@@ -394,71 +376,68 @@ export async function onRequestPost(context) {
       } : null
     };
 
-    const prompt = promptFor(serverContext, message, aiHint, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
+    let audioTranscript = '';
+    if (audio) {
+      if (!env.GEMINI_API_KEY) return json(503, { error: 'La trascrizione vocale richiede il servizio Gemini configurato.' });
+      try {
+        audioTranscript = await transcribeAudio(env.GEMINI_API_KEY, audio, 16000);
+      } catch (err) {
+        return json(502, { error: err?.message || 'Non riesco a trascrivere la registrazione vocale.' });
+      }
+    }
+
+    if (providedAudioTranscript) audioTranscript = String(providedAudioTranscript).slice(0, 12000);
+    const prompt = promptFor(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
     const errors = [];
 
-    // Strategia rapida: un primo tentativo Gemini, poi OpenRouter senza aspettare
-    // tutti i modelli Gemini sovraccarichi. Gli altri modelli Gemini restano come
-    // fallback finali. I provider restano sequenziali per non consumare quote doppie.
-    // Le letture D1 indipendenti sono già eseguite in parallelo.
+    // NON avviare tutti i provider in parallelo: ogni tentativo può consumare quota.
+    // Proviamo un solo servizio alla volta e passiamo al successivo solo se il precedente
+    // è esaurito/non disponibile. In questo modo una richiesta normale usa una sola quota.
     const attempts = [];
+
     if (env.GEMINI_API_KEY) {
-      attempts.push({
-        provider: 'Gemini',
-        model: 'gemini-3.5-flash-lite',
-        run: () => callGemini(env.GEMINI_API_KEY, 'gemini-3.5-flash-lite', prompt, image, 9000)
-      });
+      // Ordine: modello economico/free prima, poi fallback più robusti.
+      for (const model of ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash']) {
+        attempts.push(async () => {
+          try {
+            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 55000);
+            return { result, provider: 'Gemini', model };
+          } catch (err) {
+            throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
+          }
+        });
+      }
     } else {
       errors.push('GEMINI_API_KEY non configurata');
     }
 
     if (env.OPENROUTER_API_KEY) {
-      attempts.push({
-        provider: 'OpenRouter',
-        model: 'openrouter/free',
-        run: () => callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 22000)
+      attempts.push(async () => {
+        try {
+          const result = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 55000);
+          return { result, provider: 'OpenRouter', model: 'openrouter/free' };
+        } catch (err) {
+          throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
+        }
       });
     } else {
       errors.push('OPENROUTER_API_KEY non configurata');
     }
 
-    if (env.GEMINI_API_KEY) {
-      for (const model of ['gemini-3.6-flash', 'gemini-3.8-flash']) {
-        attempts.push({
-          provider: 'Gemini',
-          model,
-          run: () => callGemini(env.GEMINI_API_KEY, model, prompt, image, 7000)
-        });
-      }
-    }
-
-    // Se Gemini segnala quota giornaliera esaurita, non sprechiamo altri
-    // tentativi sugli altri modelli Gemini: passiamo direttamente oltre.
-    let geminiQuotaExhausted = false;
     for (const attempt of attempts) {
-      if (attempt.provider === 'Gemini' && attempt.model !== 'gemini-3.5-flash-lite' && geminiQuotaExhausted) {
-        errors.push(`Gemini ${attempt.model}: saltato perché la quota Gemini risulta già esaurita.`);
-        continue;
-      }
       try {
-        const result = await attempt.run();
-        return new Response(JSON.stringify({ ...result, provider: attempt.provider, model: attempt.model }), { status: 200, headers: { "Content-Type": "application/json" } });
+        const winner = await attempt();
+        return new Response(JSON.stringify({ ...winner.result, audioTranscript, provider: winner.provider, model: winner.model }), { status: 200, headers: { "Content-Type": "application/json" } });
       } catch (err) {
-        const message = err?.name === 'AbortError'
-          ? `${attempt.provider} ${attempt.model}: timeout`
-          : `${attempt.provider} ${attempt.model}: ${err?.message || String(err)}`;
-        errors.push(message);
-        if (attempt.provider === 'Gemini' && /RESOURCE_EXHAUSTED|quota exceeded|exceeded your current quota|free.?tier.*quota|retry in \d+/i.test(message)) {
-          geminiQuotaExhausted = true;
-        }
+        errors.push(err?.message || String(err));
       }
     }
 
-    const retryable = errors.some(e => /429|RESOURCE_EXHAUSTED|quota|rate limit|temporarily|unavailable|503|500|502|504|risposta vuota/i.test(String(e)));
+    const retryable = errors.some(e => /429|RESOURCE_EXHAUSTED|quota|rate limit|temporarily|unavailable|503/i.test(String(e)));
     return new Response(JSON.stringify({
       error: retryable
-        ? 'I servizi AI sono momentaneamente occupati o hanno restituito una risposta incompleta. Attendi qualche secondo e riprova.'
-        : 'Nessun servizio AI disponibile. Controlla le chiavi API e riprova.',
+        ? 'Il servizio AI gratuito è momentaneamente saturo o ha raggiunto un limite. Riprova tra poco.'
+        : 'Nessun servizio AI gratuito disponibile in questo momento.',
       details: errors
     }), { status: 503, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
