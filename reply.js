@@ -342,19 +342,23 @@ export async function onRequestPost(context) {
     ).bind(String(girlId), context.user.id).first();
     if (!girl) return json(404, { error: 'Conversazione non trovata.' });
 
-    const history = await env.DB.prepare(
-      'SELECT role,text,created_at AS createdAt FROM messages WHERE user_id=? AND girl_id=? ORDER BY created_at DESC LIMIT 10'
-    ).bind(context.user.id, String(girlId)).all();
+    // Le quattro letture indipendenti vengono eseguite in parallelo:
+    // stesso contesto e stessi filtri, meno attesa prima della generazione AI.
+    const [history, previous, previousState, settingsRow] = await Promise.all([
+      env.DB.prepare(
+        'SELECT role,text,created_at AS createdAt FROM messages WHERE user_id=? AND girl_id=? ORDER BY created_at DESC LIMIT 10'
+      ).bind(context.user.id, String(girlId)).all(),
+      env.DB.prepare(
+        "SELECT text FROM messages WHERE user_id=? AND girl_id=? AND role='me' ORDER BY created_at DESC LIMIT 8"
+      ).bind(context.user.id, String(girlId)).all(),
+      env.DB.prepare(
+        'SELECT results_html AS resultsHtml FROM girl_states WHERE user_id=? AND girl_id=? LIMIT 1'
+      ).bind(context.user.id, String(girlId)).first(),
+      env.DB.prepare(
+        'SELECT value FROM settings WHERE user_id=? AND key=? LIMIT 1'
+      ).bind(context.user.id, 'app').first()
+    ]);
     const conversation = (history.results || []).reverse();
-    const previous = await env.DB.prepare(
-      "SELECT text FROM messages WHERE user_id=? AND girl_id=? AND role='me' ORDER BY created_at DESC LIMIT 8"
-    ).bind(context.user.id, String(girlId)).all();
-    const previousState = await env.DB.prepare(
-      'SELECT results_html AS resultsHtml FROM girl_states WHERE user_id=? AND girl_id=? LIMIT 1'
-    ).bind(context.user.id, String(girlId)).first();
-    const settingsRow = await env.DB.prepare(
-      'SELECT value FROM settings WHERE user_id=? AND key=? LIMIT 1'
-    ).bind(context.user.id, 'app').first();
     let accountSettings = {};
     try { accountSettings = settingsRow?.value ? JSON.parse(settingsRow.value) : {}; } catch (_) { accountSettings = {}; }
     const previousGeneratedReplies = extractPreviousGeneratedReplies(previousState?.resultsHtml || '').slice(-12);
@@ -390,9 +394,9 @@ export async function onRequestPost(context) {
     const prompt = promptFor(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
     const errors = [];
 
-    // NON avviare tutti i provider in parallelo: ogni tentativo può consumare quota.
-    // Proviamo un solo servizio alla volta e passiamo al successivo solo se il precedente
-    // è esaurito/non disponibile. In questo modo una richiesta normale usa una sola quota.
+    // Manteniamo i provider in sequenza per non consumare più quote con una sola richiesta.
+    // I timeout originali sono mantenuti: 14 secondi per Gemini e 16 per OpenRouter.
+    // Le letture D1 indipendenti sono invece eseguite in parallelo.
     const attempts = [];
 
     if (env.GEMINI_API_KEY) {
@@ -400,7 +404,7 @@ export async function onRequestPost(context) {
       for (const model of ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash']) {
         attempts.push(async () => {
           try {
-            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 55000);
+            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 14000);
             return { result, provider: 'Gemini', model };
           } catch (err) {
             throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
@@ -414,7 +418,7 @@ export async function onRequestPost(context) {
     if (env.OPENROUTER_API_KEY) {
       attempts.push(async () => {
         try {
-          const result = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 55000);
+          const result = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 16000);
           return { result, provider: 'OpenRouter', model: 'openrouter/free' };
         } catch (err) {
           throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
