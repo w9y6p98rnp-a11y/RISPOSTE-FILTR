@@ -296,61 +296,32 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 55000) {
   return extractJson(raw);
 }
 
-async function callOpenRouter(apiKey, prompt, image, timeoutMs = 16000) {
+async function callOpenRouter(apiKey, prompt, image, timeoutMs = 55000) {
   const content = [{ type: 'text', text: prompt }];
   if (image) content.push({ type: 'image_url', image_url: { url: image } });
 
-  const requestBody = JSON.stringify({
-    model: 'openrouter/free',
-    messages: [{ role: 'user', content }],
-    temperature: 0.85,
-    max_tokens: 2600,
-    response_format: { type: 'json_object' }
-  });
+  const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://rispostaflirt.netlify.app',
+      'X-Title': 'RispostaFlirt'
+    },
+    body: JSON.stringify({
+      model: 'openrouter/free',
+      messages: [{ role: 'user', content }],
+      temperature: 0.85,
+      max_tokens: 2600,
+      response_format: { type: 'json_object' }
+    })
+  }, timeoutMs);
 
-  // OpenRouter può rispondere HTTP 200 senza testo o con content in formato array.
-  // Effettuiamo un solo nuovo tentativo, senza avviare provider in parallelo.
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://rispostaflirt.netlify.app',
-        'X-Title': 'RispostaFlirt'
-      },
-      body: requestBody
-    }, timeoutMs);
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const status = response.status;
-      const message = data?.error?.message || data?.error?.metadata?.raw || `HTTP ${status}`;
-      const retryable = status === 429 || status >= 500;
-      if (attempt === 1 && retryable) {
-        await new Promise(resolve => setTimeout(resolve, 150));
-        continue;
-      }
-      throw new Error(`OpenRouter (${status}): ${String(message).slice(0, 300)}`);
-    }
-
-    const messageContent = data?.choices?.[0]?.message?.content;
-    const raw = Array.isArray(messageContent)
-      ? messageContent.map(part => typeof part === 'string' ? part : (part?.text || '')).join('').trim()
-      : (typeof messageContent === 'string' ? messageContent.trim() : '');
-
-    if (!raw) {
-      if (attempt === 1) {
-        await new Promise(resolve => setTimeout(resolve, 150));
-        continue;
-      }
-      throw new Error('OpenRouter: il servizio ha restituito una risposta vuota anche al secondo tentativo.');
-    }
-
-    return extractJson(raw);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error('OpenRouter: servizio non disponibile');
   }
-
-  throw new Error('OpenRouter: impossibile ottenere una risposta valida.');
+  return extractJson(data?.choices?.[0]?.message?.content || '');
 }
 
 export async function onRequestPost(context) {
@@ -371,23 +342,19 @@ export async function onRequestPost(context) {
     ).bind(String(girlId), context.user.id).first();
     if (!girl) return json(404, { error: 'Conversazione non trovata.' });
 
-    // Le quattro letture indipendenti vengono eseguite in parallelo:
-    // stesso contesto e stessi filtri, meno attesa prima della generazione AI.
-    const [history, previous, previousState, settingsRow] = await Promise.all([
-      env.DB.prepare(
-        'SELECT role,text,created_at AS createdAt FROM messages WHERE user_id=? AND girl_id=? ORDER BY created_at DESC LIMIT 10'
-      ).bind(context.user.id, String(girlId)).all(),
-      env.DB.prepare(
-        "SELECT text FROM messages WHERE user_id=? AND girl_id=? AND role='me' ORDER BY created_at DESC LIMIT 8"
-      ).bind(context.user.id, String(girlId)).all(),
-      env.DB.prepare(
-        'SELECT results_html AS resultsHtml FROM girl_states WHERE user_id=? AND girl_id=? LIMIT 1'
-      ).bind(context.user.id, String(girlId)).first(),
-      env.DB.prepare(
-        'SELECT value FROM settings WHERE user_id=? AND key=? LIMIT 1'
-      ).bind(context.user.id, 'app').first()
-    ]);
+    const history = await env.DB.prepare(
+      'SELECT role,text,created_at AS createdAt FROM messages WHERE user_id=? AND girl_id=? ORDER BY created_at DESC LIMIT 10'
+    ).bind(context.user.id, String(girlId)).all();
     const conversation = (history.results || []).reverse();
+    const previous = await env.DB.prepare(
+      "SELECT text FROM messages WHERE user_id=? AND girl_id=? AND role='me' ORDER BY created_at DESC LIMIT 8"
+    ).bind(context.user.id, String(girlId)).all();
+    const previousState = await env.DB.prepare(
+      'SELECT results_html AS resultsHtml FROM girl_states WHERE user_id=? AND girl_id=? LIMIT 1'
+    ).bind(context.user.id, String(girlId)).first();
+    const settingsRow = await env.DB.prepare(
+      'SELECT value FROM settings WHERE user_id=? AND key=? LIMIT 1'
+    ).bind(context.user.id, 'app').first();
     let accountSettings = {};
     try { accountSettings = settingsRow?.value ? JSON.parse(settingsRow.value) : {}; } catch (_) { accountSettings = {}; }
     const previousGeneratedReplies = extractPreviousGeneratedReplies(previousState?.resultsHtml || '').slice(-12);
@@ -423,22 +390,23 @@ export async function onRequestPost(context) {
     const prompt = promptFor(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
     const errors = [];
 
-    // Strategia rapida: un primo tentativo Gemini, poi OpenRouter senza aspettare
-    // tutti i modelli Gemini sovraccarichi. Gli altri modelli Gemini restano come
-    // fallback finali. I provider restano sequenziali per non consumare quote doppie.
-    // Le letture D1 indipendenti sono già eseguite in parallelo.
+    // NON avviare tutti i provider in parallelo: ogni tentativo può consumare quota.
+    // Proviamo un solo servizio alla volta e passiamo al successivo solo se il precedente
+    // è esaurito/non disponibile. In questo modo una richiesta normale usa una sola quota.
     const attempts = [];
 
     if (env.GEMINI_API_KEY) {
-      attempts.push(async () => {
-        try {
-          const model = 'gemini-3.5-flash-lite';
-          const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 10000);
-          return { result, provider: 'Gemini', model };
-        } catch (err) {
-          throw new Error(err?.name === 'AbortError' ? 'Gemini gemini-3.5-flash-lite: timeout' : err.message);
-        }
-      });
+      // Ordine: modello economico/free prima, poi fallback più robusti.
+      for (const model of ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash']) {
+        attempts.push(async () => {
+          try {
+            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 55000);
+            return { result, provider: 'Gemini', model };
+          } catch (err) {
+            throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
+          }
+        });
+      }
     } else {
       errors.push('GEMINI_API_KEY non configurata');
     }
@@ -446,7 +414,7 @@ export async function onRequestPost(context) {
     if (env.OPENROUTER_API_KEY) {
       attempts.push(async () => {
         try {
-          const result = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 12000);
+          const result = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 55000);
           return { result, provider: 'OpenRouter', model: 'openrouter/free' };
         } catch (err) {
           throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
@@ -454,19 +422,6 @@ export async function onRequestPost(context) {
       });
     } else {
       errors.push('OPENROUTER_API_KEY non configurata');
-    }
-
-    if (env.GEMINI_API_KEY) {
-      for (const model of ['gemini-3.6-flash', 'gemini-3.8-flash']) {
-        attempts.push(async () => {
-          try {
-            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 8000);
-            return { result, provider: 'Gemini', model };
-          } catch (err) {
-            throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
-          }
-        });
-      }
     }
 
     for (const attempt of attempts) {
@@ -478,11 +433,11 @@ export async function onRequestPost(context) {
       }
     }
 
-    const retryable = errors.some(e => /429|RESOURCE_EXHAUSTED|quota|rate limit|temporarily|unavailable|503|500|502|504|risposta vuota/i.test(String(e)));
+    const retryable = errors.some(e => /429|RESOURCE_EXHAUSTED|quota|rate limit|temporarily|unavailable|503/i.test(String(e)));
     return new Response(JSON.stringify({
       error: retryable
-        ? 'I servizi AI sono momentaneamente occupati o hanno restituito una risposta incompleta. Attendi qualche secondo e riprova.'
-        : 'Nessun servizio AI disponibile. Controlla le chiavi API e riprova.',
+        ? 'Il servizio AI gratuito è momentaneamente saturo o ha raggiunto un limite. Riprova tra poco.'
+        : 'Nessun servizio AI gratuito disponibile in questo momento.',
       details: errors
     }), { status: 503, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {

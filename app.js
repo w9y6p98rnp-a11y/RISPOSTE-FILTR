@@ -557,7 +557,7 @@ async function loadSecretRepliesLazy(){
   try{
     if(navigator.onLine===false) throw new Error("Nessuna connessione internet.");
     const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),70000);
+    const timer=setTimeout(()=>controller.abort(),45000);
     let response;
     try{
       response=await fetch("/api/reply",{method:"POST",headers:{"Content-Type":"application/json"},signal:controller.signal,body:JSON.stringify({
@@ -613,35 +613,27 @@ $("generate").onclick=async()=>{
   $("generate").disabled=true;
   $("generate").textContent="Analizzo...";
   try{
-    // Evita una lettura IndexedDB aggiuntiva: il backend riceve girlId e recupera
-    // il contesto persistente dal server. Il valore context non veniva usato.
+    const context=await buildContext();
     let image=null;
     let audio=null;
     state.message="";
     state.lastAnalysisMessage=text;
     state.aiHint=aiHint;
     if(selectedImageFile){
-      // showSelectedMedia ha già compresso e salvato lo screenshot al momento
-      // della selezione. Riutilizzalo invece di ripetere il lavoro sul telefono.
-      image=state.imageData || await compressImageForAI(selectedImageFile);
-      if(!state.imageData){
-        state.imageData=image;
-        state.imageFile=selectedImageFile;
-        state.imageName="Screenshot: "+selectedImageFile.name;
-        await persistGirlState(selectedId);
-      }
+      image=await compressImageForAI(selectedImageFile);
+      state.imageData=image;
+      state.imageFile=selectedImageFile;
+      state.imageName="Screenshot: "+selectedImageFile.name;
+      await persistGirlState(selectedId);
     }else if(state.imageData){
       image=state.imageData;
     }
     if(selectedAudioFile){
-      // Anche l'audio viene già convertito in data URL alla selezione.
-      audio=state.audioData || await fileToDataUrl(selectedAudioFile);
-      if(!state.audioData){
-        state.audioData=audio;
-        state.audioFile=selectedAudioFile;
-        state.audioName=selectedAudioFile.name;
-        await persistGirlState(selectedId);
-      }
+      audio=await fileToDataUrl(selectedAudioFile);
+      state.audioData=audio;
+      state.audioFile=selectedAudioFile;
+      state.audioName=selectedAudioFile.name;
+      await persistGirlState(selectedId);
     }else if(state.audioData){
       audio=state.audioData;
     }
@@ -650,7 +642,7 @@ $("generate").onclick=async()=>{
       throw new Error("Nessuna connessione internet.");
     }
     const controller=new AbortController();
-    const clientTimer=setTimeout(()=>controller.abort(),70000);
+    const clientTimer=setTimeout(()=>controller.abort(),62000);
     let response;
     try{
       response=await fetch("/api/reply",{
@@ -1084,3 +1076,4 @@ $("logoutBtn")?.addEventListener("click",async()=>{
 (async function boot(){
   await initAuth();
 })();
+
