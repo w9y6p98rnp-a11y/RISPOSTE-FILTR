@@ -25,10 +25,10 @@ binding = "DB"
 database_name = "rispostaflirt-auth"
 database_id = "IL_TUO_DATABASE_ID"
 
-4) Applica il file SQL 0001_auth_and_user_data.sql dalla root del progetto:
-   npx wrangler d1 execute rispostaflirt-auth --remote --file=0001_auth_and_user_data.sql
+4) Dopo il primo deploy, applica la migrazione SQL:
+   npx wrangler d1 migrations apply rispostaflirt-auth --remote
 
-   Esegui la migrazione una sola volta sul database nuovo.
+   Oppure usa il comando equivalente disponibile nel tuo ambiente Cloudflare.
 
 5) Google:
    Crea un OAuth Client di tipo Web application in Google Cloud.

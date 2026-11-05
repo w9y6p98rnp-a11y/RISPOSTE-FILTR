@@ -3,16 +3,20 @@ PACCHETTO COMPLETO RISPOSTAFLIRT PER GITHUB
 La cartella contiene tutti i file del progetto completo.
 
 FILE DA PUBBLICARE:
-- Pubblica tutti i file di questa cartella direttamente nella root del repository GitHub. Non ci sono sottocartelle.
+- Pubblica il contenuto della cartella principale nel repository GitHub, con tutti i file direttamente nella root del repository.
 - reply.js nella cartella principale è il file backend attivo incluso nel progetto completo.
 - worker.js importa ./reply.js e ./auth.js: non spostare questi file.
 
-FILE DI RIFERIMENTO DELL'OTTIMIZZAZIONE PRECEDENTE:
-- reply_fast_precedente.js e pacchetto_ottimizzazione_precedente.zip sono inclusi nella stessa cartella come copie di riferimento.
-- Il backend attivo resta reply.js. NON rinominare reply_fast_precedente.js al posto di reply.js.
+EXTRA_OTTIMIZZAZIONE_PRECEDENTE:
+- Contiene i due artefatti di ottimizzazione consegnati in precedenza (reply_fast_precedente.js e il relativo ZIP).
+- Sono conservati come copia di riferimento; NON caricare questi extra al posto di reply.js.
 - Il file reply_fast_precedente.js usa timeout di 30 secondi per i tentativi AI, mentre reply.js del progetto completo mantiene i timeout più brevi già presenti e le letture D1 in parallelo.
 
 PRIMA DEL DEPLOY:
 - Controlla wrangler.toml e inserisci il database_id corretto del tuo database D1 se è ancora un segnaposto.
 - Verifica che i segreti Cloudflare richiesti siano già configurati (vedi README_MULTIUTENTE_SETUP.txt).
 - Non sovrascrivere le variabili/segreti del progetto con valori di esempio.
+
+AGGIORNAMENTO VELOCITA': questa versione aggiorna app.js e reply.js per anticipare il fallback OpenRouter e coordinare i timeout. Mantieni tutti gli altri file invariati.
+
+STRUTTURA: tutti i file sono nella stessa cartella, senza sottocartelle. Il file SQL 0001_auth_and_user_data.sql e' nella root: applicalo con il comando indicato in README_MULTIUTENTE_SETUP.txt.

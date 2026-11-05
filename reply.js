@@ -328,7 +328,7 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 16000) {
       const message = data?.error?.message || data?.error?.metadata?.raw || `HTTP ${status}`;
       const retryable = status === 429 || status >= 500;
       if (attempt === 1 && retryable) {
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 150));
         continue;
       }
       throw new Error(`OpenRouter (${status}): ${String(message).slice(0, 300)}`);
@@ -341,7 +341,7 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 16000) {
 
     if (!raw) {
       if (attempt === 1) {
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 150));
         continue;
       }
       throw new Error('OpenRouter: il servizio ha restituito una risposta vuota anche al secondo tentativo.');
@@ -423,24 +423,22 @@ export async function onRequestPost(context) {
     const prompt = promptFor(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
     const errors = [];
 
-    // Manteniamo i provider in sequenza per non consumare più quote con una sola richiesta.
-    // Gemini mantiene timeout brevi; OpenRouter dispone di un secondo tentativo solo
-    // per risposta vuota o errore temporaneo, senza avviare richieste in parallelo.
-    // Le letture D1 indipendenti sono eseguite in parallelo.
+    // Strategia rapida: un primo tentativo Gemini, poi OpenRouter senza aspettare
+    // tutti i modelli Gemini sovraccarichi. Gli altri modelli Gemini restano come
+    // fallback finali. I provider restano sequenziali per non consumare quote doppie.
+    // Le letture D1 indipendenti sono già eseguite in parallelo.
     const attempts = [];
 
     if (env.GEMINI_API_KEY) {
-      // Ordine: modello economico/free prima, poi fallback più robusti.
-      for (const model of ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash']) {
-        attempts.push(async () => {
-          try {
-            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 14000);
-            return { result, provider: 'Gemini', model };
-          } catch (err) {
-            throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
-          }
-        });
-      }
+      attempts.push(async () => {
+        try {
+          const model = 'gemini-3.5-flash-lite';
+          const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 10000);
+          return { result, provider: 'Gemini', model };
+        } catch (err) {
+          throw new Error(err?.name === 'AbortError' ? 'Gemini gemini-3.5-flash-lite: timeout' : err.message);
+        }
+      });
     } else {
       errors.push('GEMINI_API_KEY non configurata');
     }
@@ -448,7 +446,7 @@ export async function onRequestPost(context) {
     if (env.OPENROUTER_API_KEY) {
       attempts.push(async () => {
         try {
-          const result = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 16000);
+          const result = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 12000);
           return { result, provider: 'OpenRouter', model: 'openrouter/free' };
         } catch (err) {
           throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
@@ -456,6 +454,19 @@ export async function onRequestPost(context) {
       });
     } else {
       errors.push('OPENROUTER_API_KEY non configurata');
+    }
+
+    if (env.GEMINI_API_KEY) {
+      for (const model of ['gemini-3.6-flash', 'gemini-3.8-flash']) {
+        attempts.push(async () => {
+          try {
+            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 8000);
+            return { result, provider: 'Gemini', model };
+          } catch (err) {
+            throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
+          }
+        });
+      }
     }
 
     for (const attempt of attempts) {

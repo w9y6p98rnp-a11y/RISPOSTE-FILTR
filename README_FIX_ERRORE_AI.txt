@@ -1,19 +1,22 @@
-FIX ERRORE AI - RISPOSTAFLIRT
+RISPOSTAFLIRT - OTTIMIZZAZIONE GENERAZIONE E RETE
 
-Questa versione mantiene le funzioni e i file del progetto completo.
+Modifiche incluse:
+- Primo tentativo Gemini 3.5 Flash Lite: massimo 10 secondi.
+- Se non risponde, passaggio anticipato a OpenRouter: massimo 12 secondi per tentativo.
+- OpenRouter mantiene un solo nuovo tentativo per errori temporanei o risposta vuota.
+- Se OpenRouter non riesce, restano Gemini 3.6 Flash e 3.8 Flash come fallback finali: massimo 8 secondi ciascuno.
+- I provider AI restano sequenziali: nessuna chiamata AI parallela e nessun consumo simultaneo di quote.
+- Le letture D1 indipendenti restano in parallelo.
+- Timeout browser a 70 secondi sia per generazione normale sia segreta.
+- Prompt, numero di risposte, categorie, grafica, autenticazione e dati restano invariati.
 
-Modifica in reply.js:
-- I provider AI restano in sequenza: non vengono avviati in parallelo.
-- Se OpenRouter risponde HTTP 200 ma senza testo, viene eseguito un solo nuovo tentativo automatico.
-- Se OpenRouter restituisce un errore temporaneo (HTTP 429 o 5xx), viene eseguito un solo nuovo tentativo.
-- Vengono gestite anche le risposte OpenRouter il cui contenuto testuale arriva come array.
-- In caso di errore definitivo viene mostrato un messaggio più chiaro.
+NOTA SUL WI-FI:
+"Nessun servizio AI gratuito disponibile" significa che nessun provider ha restituito una risposta utilizzabile. Le chiamate a Gemini/OpenRouter partono dal Worker Cloudflare. La differenza Wi-Fi/4G può dipendere anche dal percorso browser -> Cloudflare (DNS, IPv6, filtri di rete) o da cache/sessione. Questa modifica migliora il fallback e i tempi, ma non può garantire disponibilità continua dei provider gratuiti.
 
-INSTALLAZIONE GITHUB:
-1. Scaricare ed estrarre lo ZIP.
-2. Caricare/sostituire nella root del repository tutti i file della cartella del progetto.
-3. Conservare la cartella migrations.
-4. Verificare wrangler.toml e impostare il database_id corretto per il proprio database D1.
-5. Non pubblicare chiavi API o segreti nel repository: configurarli come Cloudflare Worker Secrets.
+Dopo il caricamento:
+1. Sostituisci app.js e reply.js con quelli inclusi.
+2. Lascia invariati gli altri file e i segreti Cloudflare.
+3. Attendi il deploy.
+4. Chiudi e riapri la PWA su iPhone.
 
-Il retry automatico non può risolvere un'interruzione generale dei provider o una chiave API mancante/non valida. In quel caso il messaggio finale indica di controllare la configurazione o riprovare più tardi.
+Controlla che database_id in wrangler.toml contenga il tuo ID D1 reale. Non sostituire i segreti API.
