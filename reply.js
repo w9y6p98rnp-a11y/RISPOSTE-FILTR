@@ -431,7 +431,6 @@ export async function onRequestPost(context) {
     }
 
     if (providedAudioTranscript) audioTranscript = String(providedAudioTranscript).slice(0, 12000);
-    const errors = [];
     const secretMode = mode === 'secret';
     const voiceKey = secretMode ? 'secret' : 'normal';
     const defaultStyles = secretMode ? ['Erotica', 'Hot'] : ['Dolce', 'Stuzzica', 'Ironico', 'Flirt', 'Seria', 'Audace', 'Battuta', 'Poeta'];
@@ -439,28 +438,18 @@ export async function onRequestPost(context) {
       ? serverContext.voiceSettings[voiceKey].map(v => String(v?.id || '')).filter(Boolean)
       : [];
     const allStyles = configuredStyles.length ? configuredStyles : defaultStyles;
-    // Non chiediamo al modello tutte le 40 risposte in un'unica generazione:
-    // Un solo stile per richiesta: cinque risposte per volta riducono molto
-    // il rischio che i modelli gratuiti tronchino il JSON (finish_reason=length).
-    const styleBatches = allStyles.map(style => [style]);
 
-    const combined = {
-      replies: [],
-      recommendedIndex: 0,
-      recommendedNormalIndex: 0,
-      recommendedSecretIndex: 40,
-      recommendationReason: '',
-      advice: '',
-      sendWhen: '',
-      categoryRecommendations: {}
-    };
-    // La quota Gemini è specifica per modello: l'esaurimento di 3.6 non
-    // deve impedire di provare 3.8, che può avere una quota distinta.
+    // Due richieste parallele, ciascuna con al massimo quattro stili.
+    // Questo mantiene l'output entro un limite gestibile senza attendere
+    // otto richieste consecutive come nella V5.
+    const styleBatches = [];
+    for (let i = 0; i < allStyles.length; i += 4) {
+      styleBatches.push(allStyles.slice(i, i + 4));
+    }
+
     const geminiQuotaExhaustedModels = new Set();
-    let winningProviders = [];
 
-    for (let batchIndex = 0; batchIndex < styleBatches.length; batchIndex++) {
-      const batchStyles = styleBatches[batchIndex];
+    async function generateBatch(batchStyles, batchIndex) {
       const originalSettings = serverContext?.voiceSettings || {};
       const batchVoiceSettings = {
         ...originalSettings,
@@ -481,7 +470,7 @@ export async function onRequestPost(context) {
         attempts.push({
           provider: 'Gemini',
           model: 'gemini-3.5-flash-lite',
-          run: () => callGemini(env.GEMINI_API_KEY, 'gemini-3.5-flash-lite', prompt, image, 18000)
+          run: () => callGemini(env.GEMINI_API_KEY, 'gemini-3.5-flash-lite', prompt, image, 15000)
         });
       }
 
@@ -489,7 +478,7 @@ export async function onRequestPost(context) {
         attempts.push({
           provider: 'OpenRouter',
           model: 'openrouter/free',
-          run: () => callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 22000)
+          run: () => callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 18000)
         });
       }
 
@@ -499,34 +488,64 @@ export async function onRequestPost(context) {
             provider: 'Gemini',
             model,
             fallback: true,
-            run: () => callGemini(env.GEMINI_API_KEY, model, prompt, image, 18000)
+            run: () => callGemini(env.GEMINI_API_KEY, model, prompt, image, 15000)
           });
         }
       }
 
-      let batchResult = null;
+      const errors = [];
       for (const attempt of attempts) {
         if (attempt.provider === 'Gemini' && geminiQuotaExhaustedModels.has(attempt.model)) continue;
         try {
-          batchResult = await attempt.run();
-          winningProviders.push(`${attempt.provider}/${attempt.model}`);
-          break;
+          const result = await attempt.run();
+          return {
+            batchIndex,
+            result,
+            provider: `${attempt.provider}/${attempt.model}`,
+            errors
+          };
         } catch (err) {
           const detail = err?.name === 'AbortError'
             ? `${attempt.provider} ${attempt.model}: timeout`
             : (err?.message || String(err));
           errors.push(`Blocco ${batchIndex + 1}: ${detail}`);
-          if (attempt.provider === 'Gemini' && isGeminiQuotaError(err)) geminiQuotaExhaustedModels.add(attempt.model);
+          if (attempt.provider === 'Gemini' && isGeminiQuotaError(err)) {
+            geminiQuotaExhaustedModels.add(attempt.model);
+          }
         }
       }
+      return { batchIndex, result: null, provider: '', errors };
+    }
 
-      if (!batchResult) {
-        return new Response(JSON.stringify({
-          error: 'Non è stato possibile completare tutte le categorie. I servizi AI gratuiti sono saturi o hanno restituito una risposta incompleta.',
-          details: errors
-        }), { status: 503, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
-      }
+    // Esegui i due blocchi in parallelo e mantieni l'ordine originale
+    // delle categorie quando si uniscono i risultati.
+    const batchResults = await Promise.all(
+      styleBatches.map((styles, index) => generateBatch(styles, index))
+    );
+    const errors = batchResults.flatMap(item => item.errors);
+    const failedBatch = batchResults.find(item => !item.result);
+    if (failedBatch) {
+      return new Response(JSON.stringify({
+        error: 'Non è stato possibile completare tutte le categorie. I servizi AI gratuiti sono saturi o hanno restituito una risposta incompleta.',
+        details: errors
+      }), { status: 503, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    }
 
+    const combined = {
+      replies: [],
+      recommendedIndex: 0,
+      recommendedNormalIndex: 0,
+      recommendedSecretIndex: 40,
+      recommendationReason: '',
+      advice: '',
+      sendWhen: '',
+      categoryRecommendations: {}
+    };
+    const winningProviders = [];
+
+    for (let batchIndex = 0; batchIndex < batchResults.length; batchIndex++) {
+      const batchResult = batchResults[batchIndex].result;
+      winningProviders.push(batchResults[batchIndex].provider);
       const offset = combined.replies.length;
       combined.replies.push(...(Array.isArray(batchResult.replies) ? batchResult.replies : []));
       Object.assign(combined.categoryRecommendations, batchResult.categoryRecommendations || {});

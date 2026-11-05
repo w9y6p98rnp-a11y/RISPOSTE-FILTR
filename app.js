@@ -650,7 +650,7 @@ $("generate").onclick=async()=>{
       throw new Error("Nessuna connessione internet.");
     }
     const controller=new AbortController();
-    const clientTimer=setTimeout(()=>controller.abort(),62000);
+    const clientTimer=setTimeout(()=>controller.abort(),90000);
     let response;
     try{
       response=await fetch("/api/reply",{
