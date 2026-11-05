@@ -1,5 +1,5 @@
 let DB_NAME="RispostaFlirtDB", DB_VERSION=2;
-let db, girls=[], selectedId=null, currentRole="her", deferredInstall=null, selectedImageFile=null, selectedAudioFile=null;
+let db, girls=[], selectedId=null, currentRole="her", deferredInstall=null, selectedImageFile=null;
 let currentUser=null, serverSyncEnabled=false, serverSyncTimer=null, serverSyncPaused=false;
 // Stato temporaneo separato per ogni ragazza: screenshot, testo e risultati non vengono condivisi tra chat.
 const girlStates = new Map();
@@ -18,16 +18,15 @@ function fmt(t){return new Date(t).toLocaleString("it-IT",{day:"2-digit",month:"
 
 async function renderGirls(){girls=await getAll("girls");girls.sort((a,b)=>b.updatedAt-a.updatedAt);$("girlList").innerHTML=girls.map(g=>`<button class="girl ${g.id===selectedId?"active":""}" data-id="${g.id}"><span class="avatar">${esc((g.name||"?")[0].toUpperCase())}</span><span class="girl-meta"><span class="girl-name">${esc(g.name)}</span></span></button>`).join("");document.querySelectorAll(".girl").forEach(b=>b.onclick=()=>selectGirl(b.dataset.id))}
 function getGirlState(id){
-  if(!girlStates.has(id)) girlStates.set(id,{message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""});
+  if(!girlStates.has(id)) girlStates.set(id,{message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",resultsHtml:"",role:"her",aiHint:""});
   return girlStates.get(id);
 }
 async function loadGirlState(id){
-  const base={message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""};
+  const base={message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",resultsHtml:"",role:"her",aiHint:""};
   try{
     const saved=await new Promise((res,rej)=>{const r=tx("girlStates").get(id);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
     const st={...base,...(saved||{})};
     st.imageFile=null;
-    st.audioFile=null;
     girlStates.set(id,st);
     return st;
   }catch(err){
@@ -38,7 +37,7 @@ async function loadGirlState(id){
 async function persistGirlState(id){
   if(!id)return;
   const st=getGirlState(id);
-  await put("girlStates",{girlId:id,message:st.message||"",lastAnalysisMessage:st.lastAnalysisMessage||"",imageData:st.imageData||null,imageName:st.imageName||"",audioData:st.audioData||null,audioName:st.audioName||"",audioTranscript:st.audioTranscript||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",aiHint:st.aiHint||"",updatedAt:Date.now()});
+  await put("girlStates",{girlId:id,message:st.message||"",lastAnalysisMessage:st.lastAnalysisMessage||"",imageData:st.imageData||null,imageName:st.imageName||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",aiHint:st.aiHint||"",updatedAt:Date.now()});
 }
 async function clearGirlState(id){
   girlStates.delete(id);
@@ -56,7 +55,6 @@ async function saveCurrentGirlState(){
 function restoreGirlState(id){
   const st=getGirlState(id);
   selectedImageFile=st.imageFile||null;
-  selectedAudioFile=st.audioFile||null;
   currentRole=st.role||"her";
   if($("msgInput")) $("msgInput").value=st.message||"";
   if($("aiHint")) $("aiHint").value=st.aiHint||"";
@@ -72,8 +70,6 @@ function restoreGirlState(id){
       message: st.lastAnalysisMessage || st.message || "",
       aiHint: st.aiHint || "",
       image: st.imageData || null,
-      audio: st.audioData || null,
-      audioTranscript: st.audioTranscript || ""
     };
   }else if(window.__rfLastAnalysis?.girlId === id){
     window.__rfLastAnalysis = null;
@@ -112,15 +108,11 @@ async function renderMessages(){
   const st=selectedId?getGirlState(selectedId):null;
   const saved=ms.map(m=>{
     const image=m.imageData?`<img class="chat-image" src="${escapeAttr(m.imageData)}" alt="Screenshot della conversazione">`:"";
-    const audio=m.audioData?`<audio class="chat-audio" controls preload="metadata" src="${escapeAttr(m.audioData)}"></audio>`:"";
-    const transcript=m.audioTranscript?`<div class="audio-transcript"><b>📝 Trascrizione</b><div>${esc(m.audioTranscript)}</div></div>`:"";
     const text=m.text?`<div class="bubble-text">${esc(m.text)}</div>`:"";
-    const hasMedia=m.imageData||m.audioData;
-    return `<div class="bubble ${m.role}${hasMedia?" has-image":""}">${image}${audio}${text}${transcript}<small>${m.role==="her"?"Lei":"Io"} · ${fmt(m.createdAt)}</small></div>`;
+    return `<div class="bubble ${m.role}${m.imageData?" has-image":""}">${image}${text}<small>${m.role==="her"?"Lei":"Io"} · ${fmt(m.createdAt)}</small></div>`;
   }).join("");
   const pendingImage=st?.imageData?`<div class="bubble her pending-bubble has-image"><img class="chat-image" src="${escapeAttr(st.imageData)}" alt="Screenshot da inviare"><div class="pending-label">Screenshot pronto per l'invio</div></div>`:"";
-  const pendingAudio=st?.audioData?`<div class="bubble her pending-bubble has-image"><audio class="chat-audio" controls preload="metadata" src="${escapeAttr(st.audioData)}"></audio><div class="pending-label">🎙️ ${escapeHtml(st.audioName||"Registrazione vocale pronta")}</div>${st.audioTranscript?`<div class="audio-transcript"><b>📝 Trascrizione</b><div>${esc(st.audioTranscript)}</div></div>`:""}</div>`:"";
-  const pending=pendingImage+pendingAudio;
+  const pending=pendingImage;
   $("messages").innerHTML=(saved||pending)?saved+pending:`<div class="hint">Nessun messaggio salvato ancora.</div>`;
   $("messages").scrollTop=$("messages").scrollHeight;
 }
@@ -154,11 +146,11 @@ if($("saveMsg")) $("saveMsg").onclick=async()=>{
   if(!selectedId)return;
   const text=$("msgInput")?.value.trim()||"";
   const st=getGirlState(selectedId);
-  if(!text && !st.imageData && !st.audioData){alert("Inserisci una risposta oppure aggiungi uno screenshot. Se il vocale è un file audio, selezionalo insieme allo screenshot.");return;}
+  if(!text && !st.imageData){alert("Inserisci una risposta oppure aggiungi uno screenshot.");return;}
   const now=Date.now();
-  // Screenshot e registrazione rappresentano il messaggio ricevuto da lei; la risposta scritta viene subito sotto.
-  if(st.imageData || st.audioData){
-    await add("messages",{girlId:selectedId,role:"her",text:"",imageData:st.imageData||null,audioData:st.audioData||null,audioName:st.audioName||"",audioTranscript:st.audioTranscript||"",createdAt:now});
+  // Lo screenshot rappresenta il messaggio ricevuto da lei; la risposta scritta viene subito sotto.
+  if(st.imageData){
+    await add("messages",{girlId:selectedId,role:"her",text:"",imageData:st.imageData,createdAt:now});
   }
   if(text) await add("messages",{girlId:selectedId,role:"me",text,createdAt:now+1});
   const g=await getGirl(selectedId);g.updatedAt=Date.now();await put("girls",g);
@@ -169,13 +161,8 @@ if($("saveMsg")) $("saveMsg").onclick=async()=>{
   st.imageFile=null;
   st.imageData=null;
   st.imageName="Nessuno screenshot inserito";
-  st.audioFile=null;
-  st.audioData=null;
-  st.audioName="";
-  st.audioTranscript="";
   st.resultsHtml="";
   selectedImageFile=null;
-  selectedAudioFile=null;
   if($("screenshotInput")) $("screenshotInput").value="";
   if($("cameraInput")) $("cameraInput").value="";
   if($("screenshotInput")) $("screenshotInput").value="";
@@ -280,54 +267,29 @@ $("confirmDelete").onclick=async()=>{
   }
 };
 async function showSelectedMedia(e){
- const files=[...(e.target.files||[])];
- const imageFile=files.find(f=>f.type?.startsWith("image/"))||null;
- const audioFile=files.find(f=>f.type?.startsWith("audio/"))||null;
- if(!imageFile && !audioFile){
-   e.target.value="";
-   alert("Seleziona uno screenshot oppure il file audio del vocale.");
-   return;
- }
- if(audioFile && audioFile.size>12*1024*1024){
-   alert("La registrazione è troppo grande. Per questa versione usa un audio fino a 12 MB.");
-   e.target.value="";
-   return;
- }
- selectedImageFile=imageFile;
- selectedAudioFile=audioFile;
- if(selectedId){
-   const st=getGirlState(selectedId);
-   st.imageFile=imageFile;
-   st.imageData=imageFile?await compressImageForAI(imageFile):null;
-   st.imageName=imageFile ? "Screenshot: "+imageFile.name : "Nessuno screenshot inserito";
-   st.audioFile=audioFile;
-   st.audioData=audioFile?await fileToDataUrl(audioFile):null;
-   st.audioName=audioFile ? audioFile.name : "";
-   st.audioTranscript="";
-   st.resultsHtml="";
-   // Ogni nuovo screenshot apre una nuova analisi: l'indicazione precedente non va riutilizzata.
-   st.aiHint="";
-   if($("aiHint")) $("aiHint").value="";
-   await persistGirlState(selectedId);
- }
- if(imageFile && audioFile){
-   $("imageName").textContent=`Screenshot + 🎙️ vocale rilevato: ${imageFile.name}`;
- }else if(imageFile){
-   $("imageName").textContent=`Screenshot: ${imageFile.name}`;
- }else{
-   $("imageName").textContent=`🎙️ Vocale rilevato: ${audioFile.name}`;
- }
- $("results").innerHTML="";
- await renderMessages();
+  const files=[...(e.target.files||[])];
+  const imageFile=files.find(f=>f.type?.startsWith("image/"))||null;
+  if(!imageFile){
+    e.target.value="";
+    alert("Seleziona uno screenshot in formato immagine.");
+    return;
+  }
+  selectedImageFile=imageFile;
+  if(selectedId){
+    const st=getGirlState(selectedId);
+    st.imageFile=imageFile;
+    st.imageData=await compressImageForAI(imageFile);
+    st.imageName="Screenshot: "+imageFile.name;
+    st.resultsHtml="";
+    st.aiHint="";
+    if($("aiHint")) $("aiHint").value="";
+    await persistGirlState(selectedId);
+  }
+  $("imageName").textContent=`Screenshot: ${imageFile.name}`;
+  $("results").innerHTML="";
+  await renderMessages();
 }
-async function fileToDataUrl(file){
-  return await new Promise((resolve,reject)=>{
-    const reader=new FileReader();
-    reader.onload=()=>resolve(String(reader.result||""));
-    reader.onerror=()=>reject(reader.error||new Error("Impossibile leggere la registrazione."));
-    reader.readAsDataURL(file);
-  });
-}
+
 $("screenshotInput")?.addEventListener("change",showSelectedMedia);
 $("chooseScreenshot")?.addEventListener("click",()=> $("screenshotInput").click());
 
@@ -478,7 +440,7 @@ function getLastAnalysisContext(){
   if(a?.girlId===selectedId) return a;
   const st=selectedId?getGirlState(selectedId):null;
   if(!st || !st.resultsHtml) return null;
-  const recovered={girlId:selectedId,message:st.lastAnalysisMessage||st.message||"",aiHint:st.aiHint||"",image:st.imageData||null,audio:st.audioData||null,audioTranscript:st.audioTranscript||""};
+  const recovered={girlId:selectedId,message:st.lastAnalysisMessage||st.message||"",aiHint:st.aiHint||"",image:st.imageData||null};
   window.__rfLastAnalysis=recovered;
   return recovered;
 }
@@ -557,11 +519,11 @@ async function loadSecretRepliesLazy(){
   try{
     if(navigator.onLine===false) throw new Error("Nessuna connessione internet.");
     const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),45000);
+    const timer=setTimeout(()=>controller.abort(),70000);
     let response;
     try{
       response=await fetch("/api/reply",{method:"POST",headers:{"Content-Type":"application/json"},signal:controller.signal,body:JSON.stringify({
-        girlId:a.girlId,message:a.message,aiHint:a.aiHint,image:a.image,audio:a.audio,audioTranscript:a.audioTranscript||"",currentTime:getCurrentTimeContext(),mode:"secret"
+        girlId:a.girlId,message:a.message,aiHint:a.aiHint,image:a.image,currentTime:getCurrentTimeContext(),mode:"secret"
       })});
     }finally{clearTimeout(timer)}
     if(!response.ok){ const detail=await response.text().catch(()=>""); throw new Error(detail||"Server AI non disponibile."); }
@@ -605,44 +567,38 @@ $("generate").onclick=async()=>{
   const aiHint=$("aiHint")?.value.trim()||"";
   const state=getGirlState(selectedId);
   const hasImage=Boolean(selectedImageFile || state.imageData);
-  const hasAudio=Boolean(selectedAudioFile || state.audioData);
-  if(!hasImage && !hasAudio){
-    alert("Aggiungi uno screenshot prima di analizzare. Se nello scambio c’è un vocale, seleziona anche il file audio insieme allo screenshot.");
+  if(!hasImage){
+    alert("Aggiungi uno screenshot prima di analizzare.");
     return;
   }
   $("generate").disabled=true;
   $("generate").textContent="Analizzo...";
   try{
-    const context=await buildContext();
+    // Evita una lettura IndexedDB aggiuntiva: il backend riceve girlId e recupera
+    // il contesto persistente dal server. Il valore context non veniva usato.
     let image=null;
-    let audio=null;
     state.message="";
     state.lastAnalysisMessage=text;
     state.aiHint=aiHint;
     if(selectedImageFile){
-      image=await compressImageForAI(selectedImageFile);
-      state.imageData=image;
-      state.imageFile=selectedImageFile;
-      state.imageName="Screenshot: "+selectedImageFile.name;
-      await persistGirlState(selectedId);
+      // showSelectedMedia ha già compresso e salvato lo screenshot al momento
+      // della selezione. Riutilizzalo invece di ripetere il lavoro sul telefono.
+      image=state.imageData || await compressImageForAI(selectedImageFile);
+      if(!state.imageData){
+        state.imageData=image;
+        state.imageFile=selectedImageFile;
+        state.imageName="Screenshot: "+selectedImageFile.name;
+        await persistGirlState(selectedId);
+      }
     }else if(state.imageData){
       image=state.imageData;
-    }
-    if(selectedAudioFile){
-      audio=await fileToDataUrl(selectedAudioFile);
-      state.audioData=audio;
-      state.audioFile=selectedAudioFile;
-      state.audioName=selectedAudioFile.name;
-      await persistGirlState(selectedId);
-    }else if(state.audioData){
-      audio=state.audioData;
     }
     // Se il dispositivo è offline, mostra un messaggio chiaro invece del generico "Load failed".
     if (navigator.onLine === false) {
       throw new Error("Nessuna connessione internet.");
     }
     const controller=new AbortController();
-    const clientTimer=setTimeout(()=>controller.abort(),62000);
+    const clientTimer=setTimeout(()=>controller.abort(),70000);
     let response;
     try{
       response=await fetch("/api/reply",{
@@ -654,7 +610,6 @@ $("generate").onclick=async()=>{
           message:text,
           aiHint,
           image,
-          audio,
           currentTime:getCurrentTimeContext(),
           mode:"normal"
         })
@@ -665,10 +620,6 @@ $("generate").onclick=async()=>{
       throw new Error(detail || "Server AI non disponibile.");
     }
     const data=await response.json();
-    const audioTranscript=String(data.audioTranscript||"").trim();
-    if(audioTranscript){
-      state.audioTranscript=audioTranscript;
-    }
     const replies=Array.isArray(data.replies)?data.replies:[];
     if(!replies.length) throw new Error("Nessuna risposta restituita dall'AI.");
     const recommendedIndex=Number.isInteger(data.recommendedIndex)&&data.recommendedIndex>=0&&data.recommendedIndex<replies.length?data.recommendedIndex:0;
@@ -720,8 +671,7 @@ $("generate").onclick=async()=>{
     };
     const normalCards=styleOrder.slice(0,8).map(style=>renderCategory(style,normalIndexes,false)).join("");
     const secretCards=styleOrder.slice(8).map(style=>renderCategory(style,secretIndexes,true)).join("");
-    const transcriptHtml=audioTranscript?`<div class="audio-transcript-card"><div class="audio-transcript-title">🎙️ Trascrizione della registrazione</div><div class="audio-transcript-text">${escapeHtml(audioTranscript)}</div></div>`:"";
-    const columns=`${transcriptHtml}${adviceHtml}<div class="reply-choice-grid">
+    const columns=`${adviceHtml}<div class="reply-choice-grid">
       <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>5 per stile: Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Battuta, Poeta</small></span><span class="reply-choice-arrow">›</span></button>
       <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>5 Erotiche + 10 Hot • vengono generate quando le apri</small></span><span class="reply-choice-arrow">›</span></button>
     </div>
@@ -731,7 +681,7 @@ $("generate").onclick=async()=>{
     applySettings();
     state.resultsHtml=$("results").innerHTML;
     await persistGirlState(selectedId);
-    window.__rfLastAnalysis = { girlId: selectedId, message: text, aiHint, image, audio, audioTranscript };
+    window.__rfLastAnalysis = { girlId: selectedId, message: text, aiHint, image };
     bindResultButtons();
     // Dopo l'analisi apri automaticamente solo la prima casella: Risposte normali.
     const normalChoice=document.querySelector('.reply-choice[data-target="normalRepliesPanel"]');
@@ -1076,4 +1026,3 @@ $("logoutBtn")?.addEventListener("click",async()=>{
 (async function boot(){
   await initAuth();
 })();
-

@@ -20,3 +20,6 @@ PRIMA DEL DEPLOY:
 AGGIORNAMENTO VELOCITA': questa versione aggiorna app.js e reply.js per anticipare il fallback OpenRouter e coordinare i timeout. Mantieni tutti gli altri file invariati.
 
 STRUTTURA: tutti i file sono nella stessa cartella, senza sottocartelle. Il file SQL 0001_auth_and_user_data.sql e' nella root: applicalo con il comando indicato in README_MULTIUTENTE_SETUP.txt.
+
+
+MESSAGGI VOCALI: la funzione di caricamento e trascrizione audio è stata rimossa. L'app analizza screenshot immagine. Le personalizzazioni degli stili/voce delle risposte restano attive.
