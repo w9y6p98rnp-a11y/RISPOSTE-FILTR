@@ -318,7 +318,7 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 11000) {
           model: 'openrouter/free',
           messages: [{ role: 'user', content }],
           temperature: 0.85,
-          max_tokens: 2600,
+          max_tokens: 4500,
           response_format: { type: 'json_object' }
         })
       }, timeoutMs);
@@ -440,9 +440,9 @@ export async function onRequestPost(context) {
       : [];
     const allStyles = configuredStyles.length ? configuredStyles : defaultStyles;
     // Non chiediamo al modello tutte le 40 risposte in un'unica generazione:
-    // due blocchi da quattro stili evitano il troncamento JSON (finish_reason=length).
-    const styleBatches = [];
-    for (let i = 0; i < allStyles.length; i += 4) styleBatches.push(allStyles.slice(i, i + 4));
+    // Un solo stile per richiesta: cinque risposte per volta riducono molto
+    // il rischio che i modelli gratuiti tronchino il JSON (finish_reason=length).
+    const styleBatches = allStyles.map(style => [style]);
 
     const combined = {
       replies: [],
@@ -454,7 +454,9 @@ export async function onRequestPost(context) {
       sendWhen: '',
       categoryRecommendations: {}
     };
-    let geminiQuotaExhausted = false;
+    // La quota Gemini è specifica per modello: l'esaurimento di 3.6 non
+    // deve impedire di provare 3.8, che può avere una quota distinta.
+    const geminiQuotaExhaustedModels = new Set();
     let winningProviders = [];
 
     for (let batchIndex = 0; batchIndex < styleBatches.length; batchIndex++) {
@@ -475,7 +477,7 @@ export async function onRequestPost(context) {
       );
 
       const attempts = [];
-      if (env.GEMINI_API_KEY && !geminiQuotaExhausted) {
+      if (env.GEMINI_API_KEY && !geminiQuotaExhaustedModels.has('gemini-3.5-flash-lite')) {
         attempts.push({
           provider: 'Gemini',
           model: 'gemini-3.5-flash-lite',
@@ -491,7 +493,7 @@ export async function onRequestPost(context) {
         });
       }
 
-      if (env.GEMINI_API_KEY && !geminiQuotaExhausted) {
+      if (env.GEMINI_API_KEY) {
         for (const model of ['gemini-3.6-flash', 'gemini-3.8-flash']) {
           attempts.push({
             provider: 'Gemini',
@@ -504,7 +506,7 @@ export async function onRequestPost(context) {
 
       let batchResult = null;
       for (const attempt of attempts) {
-        if (attempt.provider === 'Gemini' && attempt.fallback && geminiQuotaExhausted) continue;
+        if (attempt.provider === 'Gemini' && geminiQuotaExhaustedModels.has(attempt.model)) continue;
         try {
           batchResult = await attempt.run();
           winningProviders.push(`${attempt.provider}/${attempt.model}`);
@@ -514,7 +516,7 @@ export async function onRequestPost(context) {
             ? `${attempt.provider} ${attempt.model}: timeout`
             : (err?.message || String(err));
           errors.push(`Blocco ${batchIndex + 1}: ${detail}`);
-          if (attempt.provider === 'Gemini' && isGeminiQuotaError(err)) geminiQuotaExhausted = true;
+          if (attempt.provider === 'Gemini' && isGeminiQuotaError(err)) geminiQuotaExhaustedModels.add(attempt.model);
         }
       }
 
