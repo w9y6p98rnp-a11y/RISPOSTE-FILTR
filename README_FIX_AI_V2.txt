@@ -21,10 +21,11 @@ NON SONO STATE RIMOSSE
 CARICAMENTO
 1. Estrai lo ZIP.
 2. Carica il contenuto della cartella RispostaFlirt_FIX_AI_V2 nel repository/progetto Cloudflare già collegato.
-3. Prima di distribuire, controlla il file wrangler.toml: il campo database_id deve contenere il TUO ID D1 reale, non il testo segnaposto.
-4. Non sovrascrivere o modificare i Secrets Cloudflare già configurati:
+3. Il wrangler.toml è già allineato al Worker esistente `risposte-filtr` e al database D1 indicato nel log Cloudflare (`9372e6cb-0118-412f-b7f2-9c37e7911b94`). Non sostituire questi valori con segnaposto.
+4. Il file .assetsignore evita che file server, configurazioni e migrazioni vengano pubblicati come asset statici.
+5. Non sovrascrivere o modificare i Secrets Cloudflare già configurati:
    GEMINI_API_KEY, OPENROUTER_API_KEY e gli eventuali segreti per login/email.
-5. Dopo il deploy, ricarica completamente la PWA e prova prima uno screenshot semplice.
+6. Dopo il deploy, ricarica completamente la PWA e prova prima uno screenshot semplice.
 
 IMPORTANTE
 Questo aggiornamento non può garantire disponibilità permanente dei modelli gratuiti. OpenRouter Free e Gemini possono applicare limiti o avere momenti di saturazione. Se entrambi i servizi sono indisponibili, l'app mostrerà i dettagli dei tentativi.

@@ -1,4 +1,4 @@
-name = "rispostaflirt"
+name = "risposte-filtr"
 main = "worker.js"
 compatibility_date = "2026-10-31"
 
@@ -6,10 +6,9 @@ compatibility_date = "2026-10-31"
 directory = "."
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-exclude = ["worker.js", "reply.js", "auth.js", "wrangler.toml", "README_CLOUDFLARE_WORKER.txt"]
 
 # Inserisci il database_id reale del tuo database D1 prima del deploy.
 [[d1_databases]]
 binding = "DB"
 database_name = "rispostaflirt-auth"
-database_id = "INCOLLA_QUI_IL_DATABASE_ID"
+database_id = "9372e6cb-0118-412f-b7f2-9c37e7911b94"
