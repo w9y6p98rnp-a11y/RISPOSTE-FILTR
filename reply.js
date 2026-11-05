@@ -170,7 +170,7 @@ TEST DI RISPOSTA: prima di finalizzare ogni frase, immagina di incollarla subito
 
 CONSIGLIO: advice e sendWhen devono essere sempre valorizzati con il consiglio operativo migliore e il momento corretto per inviare. Se l'indicazione dell'utente chiede una decisione, rispettala. Non inventare il motivo del consiglio.
 
-RECOMMENDATIONS: categoryRecommendations deve avere esattamente queste 10 chiavi nell'ordine personalizzato ${styleOrder.join(", ")}. Ogni chiave ha index:0 e un reason specifico. recommendedNormalIndex deve indicare una delle prime 40; recommendedSecretIndex deve indicare una delle risposte segrete (Erotica o Hot); recommendedIndex la migliore assoluta.
+RECOMMENDATIONS: categoryRecommendations deve contenere esattamente le chiavi degli stili richiesti in questo blocco, nell'ordine ${styleOrder.join(", ")}. Ogni chiave ha index:0 e un reason specifico. recommendedIndex deve indicare la migliore risposta tra quelle generate in questo blocco. recommendedNormalIndex e recommendedSecretIndex devono essere coerenti con la modalità richiesta.
 
 SEGRETE: Erotica e Hot devono essere le voci più sensuali, intense, audaci e provocanti dell'app QUANDO IL CONTESTO LE RENDE APPROPRIATE. HOT deve spingersi al massimo livello consentito: forte tensione, desiderio, doppi sensi, allusioni e linguaggio seducente, senza diventare freddo o timido. Mantieni comunque il contenuto non grafico: non descrivere esplicitamente atti sessuali, genitali o dettagli pornografici. Se il contesto permette un tono molto caldo, non annacquarlo con frasi innocue o generiche. Se invece LEI è arrabbiata, infastidita, sta mettendo un limite o il contesto non sostiene la sessualità, non forzare Hot/Erotica: anche queste risposte devono restare pertinenti al momento e non peggiorare la situazione.
 
@@ -431,77 +431,127 @@ export async function onRequestPost(context) {
     }
 
     if (providedAudioTranscript) audioTranscript = String(providedAudioTranscript).slice(0, 12000);
-    const prompt = promptFor(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
     const errors = [];
+    const secretMode = mode === 'secret';
+    const voiceKey = secretMode ? 'secret' : 'normal';
+    const defaultStyles = secretMode ? ['Erotica', 'Hot'] : ['Dolce', 'Stuzzica', 'Ironico', 'Flirt', 'Seria', 'Audace', 'Battuta', 'Poeta'];
+    const configuredStyles = Array.isArray(serverContext?.voiceSettings?.[voiceKey])
+      ? serverContext.voiceSettings[voiceKey].map(v => String(v?.id || '')).filter(Boolean)
+      : [];
+    const allStyles = configuredStyles.length ? configuredStyles : defaultStyles;
+    // Non chiediamo al modello tutte le 40 risposte in un'unica generazione:
+    // due blocchi da quattro stili evitano il troncamento JSON (finish_reason=length).
+    const styleBatches = [];
+    for (let i = 0; i < allStyles.length; i += 4) styleBatches.push(allStyles.slice(i, i + 4));
 
-    // Sequenza rapida: Gemini 3.5, poi OpenRouter, infine i fallback Gemini.
-    // I timeout brevi evitano che i tentativi in serie superino l'attesa del client.
-    // Se Gemini segnala quota giornaliera esaurita, saltiamo gli altri modelli Gemini.
-    const attempts = [];
+    const combined = {
+      replies: [],
+      recommendedIndex: 0,
+      recommendedNormalIndex: 0,
+      recommendedSecretIndex: 40,
+      recommendationReason: '',
+      advice: '',
+      sendWhen: '',
+      categoryRecommendations: {}
+    };
+    let geminiQuotaExhausted = false;
+    let winningProviders = [];
 
-    if (env.GEMINI_API_KEY) {
-      attempts.push({
-        provider: 'Gemini',
-        model: 'gemini-3.5-flash-lite',
-        run: () => callGemini(env.GEMINI_API_KEY, 'gemini-3.5-flash-lite', prompt, image, 8000)
-      });
-    } else {
-      errors.push('GEMINI_API_KEY non configurata');
-    }
+    for (let batchIndex = 0; batchIndex < styleBatches.length; batchIndex++) {
+      const batchStyles = styleBatches[batchIndex];
+      const originalSettings = serverContext?.voiceSettings || {};
+      const batchVoiceSettings = {
+        ...originalSettings,
+        [voiceKey]: batchStyles.map(style =>
+          (Array.isArray(originalSettings[voiceKey])
+            ? originalSettings[voiceKey].find(v => String(v?.id || '') === style)
+            : null) || { id: style }
+        )
+      };
+      const batchContext = { ...serverContext, voiceSettings: batchVoiceSettings };
+      const prompt = promptFor(
+        batchContext, message, aiHint, audioTranscript,
+        previousGeneratedReplies, secretMode ? 'secret' : 'normal'
+      );
 
-    if (env.OPENROUTER_API_KEY) {
-      attempts.push({
-        provider: 'OpenRouter',
-        model: 'openrouter/free',
-        run: () => callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 11000)
-      });
-    } else {
-      errors.push('OPENROUTER_API_KEY non configurata');
-    }
-
-    if (env.GEMINI_API_KEY) {
-      for (const model of ['gemini-3.6-flash', 'gemini-3.8-flash']) {
+      const attempts = [];
+      if (env.GEMINI_API_KEY && !geminiQuotaExhausted) {
         attempts.push({
           provider: 'Gemini',
-          model,
-          fallback: true,
-          run: () => callGemini(env.GEMINI_API_KEY, model, prompt, image, 6500)
+          model: 'gemini-3.5-flash-lite',
+          run: () => callGemini(env.GEMINI_API_KEY, 'gemini-3.5-flash-lite', prompt, image, 18000)
         });
       }
-    }
 
-    let geminiQuotaExhausted = false;
-    for (const attempt of attempts) {
-      if (attempt.provider === 'Gemini' && attempt.fallback && geminiQuotaExhausted) {
-        errors.push(`Gemini ${attempt.model}: saltato perché la quota Gemini risulta esaurita.`);
-        continue;
+      if (env.OPENROUTER_API_KEY) {
+        attempts.push({
+          provider: 'OpenRouter',
+          model: 'openrouter/free',
+          run: () => callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 22000)
+        });
       }
-      try {
-        const result = await attempt.run();
-        return new Response(JSON.stringify({
-          ...result,
-          audioTranscript,
-          provider: attempt.provider,
-          model: attempt.model
-        }), { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
-      } catch (err) {
-        const message = err?.name === 'AbortError'
-          ? `${attempt.provider} ${attempt.model}: timeout`
-          : (err?.message || String(err));
-        errors.push(message);
-        if (attempt.provider === 'Gemini' && isGeminiQuotaError(err)) {
-          geminiQuotaExhausted = true;
+
+      if (env.GEMINI_API_KEY && !geminiQuotaExhausted) {
+        for (const model of ['gemini-3.6-flash', 'gemini-3.8-flash']) {
+          attempts.push({
+            provider: 'Gemini',
+            model,
+            fallback: true,
+            run: () => callGemini(env.GEMINI_API_KEY, model, prompt, image, 18000)
+          });
         }
       }
+
+      let batchResult = null;
+      for (const attempt of attempts) {
+        if (attempt.provider === 'Gemini' && attempt.fallback && geminiQuotaExhausted) continue;
+        try {
+          batchResult = await attempt.run();
+          winningProviders.push(`${attempt.provider}/${attempt.model}`);
+          break;
+        } catch (err) {
+          const detail = err?.name === 'AbortError'
+            ? `${attempt.provider} ${attempt.model}: timeout`
+            : (err?.message || String(err));
+          errors.push(`Blocco ${batchIndex + 1}: ${detail}`);
+          if (attempt.provider === 'Gemini' && isGeminiQuotaError(err)) geminiQuotaExhausted = true;
+        }
+      }
+
+      if (!batchResult) {
+        return new Response(JSON.stringify({
+          error: 'Non è stato possibile completare tutte le categorie. I servizi AI gratuiti sono saturi o hanno restituito una risposta incompleta.',
+          details: errors
+        }), { status: 503, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+      }
+
+      const offset = combined.replies.length;
+      combined.replies.push(...(Array.isArray(batchResult.replies) ? batchResult.replies : []));
+      Object.assign(combined.categoryRecommendations, batchResult.categoryRecommendations || {});
+
+      // Consiglio generale e indici: conserviamo quello calcolato dal primo blocco.
+      if (batchIndex === 0) {
+        combined.recommendedIndex = offset + (Number.isInteger(batchResult.recommendedIndex) ? batchResult.recommendedIndex : 0);
+        combined.recommendationReason = batchResult.recommendationReason || '';
+        combined.advice = batchResult.advice || '';
+        combined.sendWhen = batchResult.sendWhen || '';
+      }
     }
 
-    const retryable = errors.some(e => /429|RESOURCE_EXHAUSTED|quota|rate limit|temporarily|unavailable|503/i.test(String(e)));
+    if (secretMode) {
+      combined.recommendedSecretIndex = 40 + combined.recommendedIndex;
+      combined.recommendedNormalIndex = 0;
+    } else {
+      combined.recommendedNormalIndex = combined.recommendedIndex;
+      combined.recommendedSecretIndex = 40;
+    }
+
     return new Response(JSON.stringify({
-      error: retryable
-        ? 'Il servizio AI gratuito è momentaneamente saturo o ha raggiunto un limite. Riprova tra poco.'
-        : 'Nessun servizio AI gratuito disponibile in questo momento.',
-      details: errors
-    }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+      ...combined,
+      audioTranscript,
+      provider: [...new Set(winningProviders)].join(' + '),
+      model: 'batch-generation'
+    }), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
   } catch (error) {
     return new Response(JSON.stringify({ error: error?.message || 'Errore del server AI.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
