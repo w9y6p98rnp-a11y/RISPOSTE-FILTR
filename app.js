@@ -534,6 +534,23 @@ function bindResultButtons(){
 }
 
 
+function formatAIProviderLabel(provider){
+  const raw=String(provider||"").trim();
+  if(!raw) return "Provider non indicato";
+  return raw.split(/\s*\+\s*/).map(item=>{
+    const parts=item.split("/");
+    const name=(parts[0]||"").trim();
+    const model=parts.slice(1).join("/").trim();
+    if(name.toLowerCase()==="ollitert") return model ? `Gemma · ${model} (OlliteRT)` : "Gemma (OlliteRT)";
+    if(name.toLowerCase()==="gemini") return model ? `Gemini · ${model}` : "Gemini";
+    if(name.toLowerCase()==="openrouter") return model ? `OpenRouter · ${model}` : "OpenRouter";
+    return item;
+  }).join(" + ");
+}
+function providerInfoHtml(provider){
+  return `<div class="ai-provider-info">🧠 Motore AI utilizzato: <b>${escapeHtml(formatAIProviderLabel(provider))}</b></div>`;
+}
+
 function getCurrentTimeContext(){
   const now=new Date();
   const weekday=new Intl.DateTimeFormat('it-IT',{weekday:'long'}).format(now);
@@ -566,6 +583,7 @@ async function loadSecretRepliesLazy(){
     }finally{clearTimeout(timer)}
     if(!response.ok){ const detail=await response.text().catch(()=>""); throw new Error(detail||"Server AI non disponibile."); }
     const data=await response.json();
+    const providerHtml=providerInfoHtml(data.provider);
     const replies=Array.isArray(data.replies)?data.replies:[];
     if(!replies.length) throw new Error("Nessuna risposta segreta restituita dall'AI.");
     const voiceOrder=loadVoiceSettings();
@@ -589,7 +607,7 @@ async function loadSecretRepliesLazy(){
       const moreBlock=moreCount?`<div id="${groupId}_more" class="reply-category-more hidden">${otherCards}</div><button type="button" class="category-more-toggle" data-target="${groupId}_more" data-count="${moreCount}">⌄ Mostra le altre ${moreCount} risposte</button>`:"";
       return `<div id="${groupId}" class="reply-category-group secret-category-group"><div class="reply-category-title">${escapeHtml(getVoiceLabel(style))} <span class="reply-category-count">${cat.length} risposte</span></div>${recommendedCard}${moreBlock}</div>`;
     }).join("");
-    content.innerHTML=groups||"<div class='secret-lazy-text'>Nessuna risposta segreta disponibile.</div>";
+    content.innerHTML=providerHtml+(groups||"<div class='secret-lazy-text'>Nessuna risposta segreta disponibile.</div>");
     bindResultButtons();
     const state=getGirlState(a.girlId);
     if(state){ state.resultsHtml=document.getElementById("results")?.innerHTML||state.resultsHtml; await persistGirlState(a.girlId); }
@@ -673,6 +691,7 @@ $("generate").onclick=async()=>{
       throw new Error(detail || "Server AI non disponibile.");
     }
     const data=await response.json();
+    const providerHtml=providerInfoHtml(data.provider);
     const audioTranscript=String(data.audioTranscript||"").trim();
     if(audioTranscript){
       state.audioTranscript=audioTranscript;
@@ -729,7 +748,7 @@ $("generate").onclick=async()=>{
     const normalCards=styleOrder.slice(0,8).map(style=>renderCategory(style,normalIndexes,false)).join("");
     const secretCards=styleOrder.slice(8).map(style=>renderCategory(style,secretIndexes,true)).join("");
     const transcriptHtml=audioTranscript?`<div class="audio-transcript-card"><div class="audio-transcript-title">🎙️ Trascrizione della registrazione</div><div class="audio-transcript-text">${escapeHtml(audioTranscript)}</div></div>`:"";
-    const columns=`${transcriptHtml}${adviceHtml}<div class="reply-choice-grid">
+    const columns=`${providerHtml}${transcriptHtml}${adviceHtml}<div class="reply-choice-grid">
       <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>5 per stile: Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Battuta, Poeta</small></span><span class="reply-choice-arrow">›</span></button>
       <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>5 Erotiche + 10 Hot • vengono generate quando le apri</small></span><span class="reply-choice-arrow">›</span></button>
     </div>
