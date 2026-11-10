@@ -363,6 +363,47 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 11000) {
   throw new Error('OpenRouter: nessuna risposta testuale dopo due tentativi.');
 }
 
+
+async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs = 330000) {
+  const content = [{ type: 'text', text: prompt }];
+  if (image) content.push({ type: 'image_url', image_url: { url: image } });
+
+  const endpoint = `${String(baseUrl || '').replace(/\/+$/, '')}/chat/completions`;
+  const authorization = /^Bearer\s+/i.test(String(apiToken || ''))
+    ? String(apiToken).trim()
+    : `Bearer ${String(apiToken || '').trim()}`;
+  const response = await fetchWithTimeout(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': authorization,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content }],
+      temperature: 0.85,
+      max_tokens: 4500
+    })
+  }, timeoutMs);
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = data?.error?.message || data?.error?.detail || `HTTP ${response.status}`;
+    throw new Error(`OlliteRT (${response.status}): ${String(detail).slice(0, 240)}`);
+  }
+
+  const messageContent = data?.choices?.[0]?.message?.content;
+  const raw = Array.isArray(messageContent)
+    ? messageContent.map(part => typeof part === 'string' ? part : (part?.text || '')).join('').trim()
+    : (typeof messageContent === 'string' ? messageContent.trim() : '');
+
+  if (!raw) {
+    const finishReason = data?.choices?.[0]?.finish_reason || 'non indicato';
+    throw new Error(`OlliteRT: risposta senza testo (finish_reason ${finishReason}).`);
+  }
+  return extractJson(raw);
+}
+
 function isGeminiQuotaError(error) {
   const message = String(error?.message || error || '');
   return /RESOURCE_EXHAUSTED|quota exceeded|exceeded your current quota|generate_content_free_tier_requests|retry in \d+/i.test(message);
@@ -466,6 +507,23 @@ export async function onRequestPost(context) {
       );
 
       const attempts = [];
+      // Gemma locale su OlliteRT è il provider principale; Gemini e OpenRouter
+      // restano disponibili come fallback se il telefono/tunnel non risponde.
+      if (env.OLLITERT_BASE_URL && env.OLLITERT_MODEL && env.OLLITERT_TOKEN) {
+        attempts.push({
+          provider: 'OlliteRT',
+          model: env.OLLITERT_MODEL,
+          run: () => callOlliteRT(
+            env.OLLITERT_BASE_URL,
+            env.OLLITERT_TOKEN,
+            env.OLLITERT_MODEL,
+            prompt,
+            image,
+            330000
+          )
+        });
+      }
+
       if (env.GEMINI_API_KEY && !geminiQuotaExhaustedModels.has('gemini-3.5-flash-lite')) {
         attempts.push({
           provider: 'Gemini',
