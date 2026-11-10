@@ -507,6 +507,16 @@ export async function onRequestPost(context) {
       );
 
       const attempts = [];
+      // Diagnostica sicura: non registrare token, prompt, screenshot o dati personali.
+      const olliteConfig = {
+        baseUrlPresent: Boolean(env.OLLITERT_BASE_URL),
+        modelPresent: Boolean(env.OLLITERT_MODEL),
+        tokenPresent: Boolean(env.OLLITERT_TOKEN),
+        baseUrlLooksValid: /^https:\/\//i.test(String(env.OLLITERT_BASE_URL || '')),
+        model: env.OLLITERT_MODEL ? String(env.OLLITERT_MODEL).slice(0, 80) : null
+      };
+      console.info('[AI-DIAG] Configurazione OlliteRT', JSON.stringify(olliteConfig));
+
       // Gemma locale su OlliteRT è il provider principale; Gemini e OpenRouter
       // restano disponibili come fallback se il telefono/tunnel non risponde.
       if (env.OLLITERT_BASE_URL && env.OLLITERT_MODEL && env.OLLITERT_TOKEN) {
@@ -555,7 +565,13 @@ export async function onRequestPost(context) {
       for (const attempt of attempts) {
         if (attempt.provider === 'Gemini' && geminiQuotaExhaustedModels.has(attempt.model)) continue;
         try {
+          if (attempt.provider === 'OlliteRT') {
+            console.info('[AI-DIAG] Avvio richiesta OlliteRT', JSON.stringify({ model: attempt.model, batch: batchIndex + 1 }));
+          }
           const result = await attempt.run();
+          if (attempt.provider === 'OlliteRT') {
+            console.info('[AI-DIAG] OlliteRT OK', JSON.stringify({ model: attempt.model, batch: batchIndex + 1 }));
+          }
           return {
             batchIndex,
             result,
@@ -567,6 +583,14 @@ export async function onRequestPost(context) {
             ? `${attempt.provider} ${attempt.model}: timeout`
             : (err?.message || String(err));
           errors.push(`Blocco ${batchIndex + 1}: ${detail}`);
+          if (attempt.provider === 'OlliteRT') {
+            console.error('[AI-DIAG] OlliteRT FALLITO', JSON.stringify({
+              model: attempt.model,
+              batch: batchIndex + 1,
+              error: String(detail).slice(0, 300),
+              fallbackNext: attempts.some((candidate, index) => index > attempts.indexOf(attempt))
+            }));
+          }
           if (attempt.provider === 'Gemini' && isGeminiQuotaError(err)) {
             geminiQuotaExhaustedModels.add(attempt.model);
           }
