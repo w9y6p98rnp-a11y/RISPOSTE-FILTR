@@ -211,6 +211,68 @@ CONTROLLO FINALE OBBLIGATORIO PRIMA DEL JSON:
 - Se una risposta non supera il TEST DI RISPOSTA, scartala e sostituiscila prima di produrre il JSON.`;
 }
 
+// Prompt compatto dedicato a Gemma locale: mantiene le regole essenziali e
+// limita i dati di contesto inviati al telefono. Il prompt completo resta
+// invariato per Gemini/OpenRouter come fallback.
+function promptForOlliteRT(context, message, aiHint = '', audioTranscript = '', previousGeneratedReplies = [], mode = 'normal') {
+  const defaults = mode === 'secret' ? ['Erotica', 'Hot'] : ['Dolce', 'Stuzzica', 'Ironico', 'Flirt', 'Seria', 'Audace', 'Battuta', 'Poeta'];
+  const settings = context?.voiceSettings || {};
+  const configured = Array.isArray(settings[mode]) ? settings[mode] : [];
+  const styles = configured.length ? configured.map(v => String(v?.id || '')).filter(Boolean) : defaults;
+  const count = style => style === 'Hot' ? 10 : 5;
+  const total = styles.reduce((n, style) => n + count(style), 0);
+  const categoryExample = Object.fromEntries(styles.map(style => [style, { index: 0, reason: '...' }]));
+  const custom = configured.map(v => ({
+    style: String(v?.id || ''),
+    instruction: String(v?.instruction || '').slice(0, 350)
+  })).filter(v => v.style && v.instruction);
+  const clip = (value, max) => String(value || '').slice(0, max);
+  const conversation = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-6).map(m => ({
+    role: m?.role === 'me' ? 'IO' : 'LEI',
+    text: clip(m?.text, 350)
+  }));
+  const previousReplies = (Array.isArray(context?.previousReplies) ? context.previousReplies : []).slice(-4).map(x => clip(x, 140));
+  const previousGenerated = [...new Set((Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : []).map(x => clip(x, 130)).filter(Boolean))].slice(-4);
+  const compactContext = {
+    ragazza: clip(context?.girl?.name, 80),
+    noteRagazza: clip(context?.girl?.note, 450),
+    memoriaRagazza: clip(context?.memory || context?.girl?.memory, 900),
+    profiloUtente: clip(context?.aboutMe, 350),
+    dataOra: context?.currentTime ? {
+      giorno: clip(context.currentTime.weekday, 20),
+      data: clip(context.currentTime.date, 20),
+      ora: clip(context.currentTime.time, 12),
+      fuso: clip(context.currentTime.timeZone, 40)
+    } : null,
+    conversazioneRecente: conversation,
+    messaggiUtentePrecedenti: previousReplies,
+    risposteGiaGenerateDaEvitare: previousGenerated
+  };
+  const modeLabel = mode === 'secret' ? 'SEGRETE' : 'NORMALI';
+  const styleInstructions = custom.length ? JSON.stringify(custom) : 'Nessuna.';
+  return `Sei RispostaFlirt. Scrivi in italiano naturale. Devi rispondere SOLO all'ULTIMO messaggio di LEI nello screenshot allegato. Lo screenshot, se presente, prevale sulla cronologia salvata. Il campo INDICAZIONE è una nota dell'utente, non è un messaggio di LEI.
+
+RUOLI: IO = utente; LEI = ragazza. Nei messaggi di LEI, “tu/te/ti/tuo” indicano IO e “io/me/mi/mio” indicano LEI. Nei messaggi di IO vale l'opposto. Non scambiare mai fatti o possessivi. Se non è chiaro chi possiede un fatto, non inventarlo.
+
+CONTESTO: ${JSON.stringify(compactContext)}
+
+MESSAGGIO/SCREENSHOT: analizza lo screenshot per identificare l'ultima bolla di LEI. Testo aggiuntivo: ${clip(message, 1800)}
+INDICAZIONE UTENTE: ${clip(aiHint, 900) || 'Nessuna.'}
+TRASCRIZIONE VOCALE: ${clip(audioTranscript, 1200) || 'Nessuna.'}
+
+MEMORIA E ISTRUZIONI PERSONALIZZATE: rispetta note e memoria della ragazza, profilo utente e istruzioni delle voci. Istruzioni voci: ${styleInstructions}
+
+COMPITO: genera ESATTAMENTE ${total} risposte, nell'ordine degli stili: ${styles.join(', ')}. Genera 5 risposte per ogni stile; per Hot esattamente 10. Usa nei campi style i nomi tecnici degli stili. La prima risposta di ogni stile deve essere la migliore. Le risposte dello stesso stile devono essere idee diverse, non parafrasi.
+
+TONO: Dolce = affettuoso; Stuzzica = provocatorio leggero; Ironico = ironia; Flirt = seducente ma naturale; Seria = matura e sincera; Audace = sicuro; Battuta = spiritoso; Poeta = evocativo; Erotica/Hot = sensuali e allusive, mai grafiche. Adatta SEMPRE il tono al messaggio reale: se LEI è arrabbiata, infastidita o pone un limite, niente flirt o sesso forzato; rispetta il limite e non peggiorare la situazione. Niente frasi generiche fuori contesto. Ogni risposta deve sembrare una continuazione naturale della chat.
+
+LUNGHEZZA: risposte naturali e mediamente articolate; segui le istruzioni personalizzate della singola voce. Mantieni 1 emoji pertinente nella maggior parte delle risposte normali, senza forzarla nei messaggi seri. Evita ripetizioni con i messaggi e le risposte precedenti.
+
+CONSIGLIO: valorizza advice e sendWhen con indicazioni brevi e pratiche. categoryRecommendations deve avere esattamente queste chiavi: ${styles.join(', ')}. Per ogni chiave usa index:0 e un reason specifico e breve. recommendedIndex indica la migliore risposta del blocco. recommendedNormalIndex e recommendedSecretIndex devono essere coerenti con la modalità ${modeLabel}.
+
+Rispondi SOLO con JSON valido, senza markdown, nel formato: ${JSON.stringify({ advice: '...', sendWhen: 'oggi', recommendedIndex: 0, recommendedNormalIndex: 0, recommendedSecretIndex: mode === 'secret' ? 0 : 40, recommendationReason: '...', categoryRecommendations: categoryExample, replies: [{ style: styles[0] || 'Dolce', text: '...' }] })}`;
+}
+
 function imagePart(image) {
   if (!image || typeof image !== 'string') return null;
   const match = image.match(/^data:([^;]+);base64,(.+)$/s);
@@ -501,9 +563,14 @@ export async function onRequestPost(context) {
         )
       };
       const batchContext = { ...serverContext, voiceSettings: batchVoiceSettings };
+      const modeForPrompt = secretMode ? 'secret' : 'normal';
       const prompt = promptFor(
         batchContext, message, aiHint, audioTranscript,
-        previousGeneratedReplies, secretMode ? 'secret' : 'normal'
+        previousGeneratedReplies, modeForPrompt
+      );
+      const ollitePrompt = promptForOlliteRT(
+        batchContext, message, aiHint, audioTranscript,
+        previousGeneratedReplies, modeForPrompt
       );
 
       const attempts = [];
@@ -527,7 +594,7 @@ export async function onRequestPost(context) {
             env.OLLITERT_BASE_URL,
             env.OLLITERT_TOKEN,
             env.OLLITERT_MODEL,
-            prompt,
+            ollitePrompt,
             image,
             330000
           )
