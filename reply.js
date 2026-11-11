@@ -479,6 +479,20 @@ export async function onRequestPost(context) {
   const request = context.request;
   const env = context.env;
 
+  // L'URL registrato da Termux ha precedenza sulla variabile statica.
+  // Il fallback mantiene compatibilità con la configurazione precedente.
+  let olliteBaseUrl = String(env.OLLITERT_BASE_URL || '');
+  try {
+    if (env.DB) {
+      const tunnelRow = await env.DB.prepare(
+        "SELECT base_url AS baseUrl FROM tunnel_config WHERE id='ollitert' LIMIT 1"
+      ).first();
+      if (tunnelRow?.baseUrl) olliteBaseUrl = String(tunnelRow.baseUrl);
+    }
+  } catch (error) {
+    console.warn('[AI-DIAG] Lettura URL tunnel da D1 non riuscita; uso variabile statica.', error?.message || String(error));
+  }
+
   try {
     const body = await request.json().catch(() => ({}));
     const { message = '', aiHint = '', image = null, audio = null, audioTranscript: providedAudioTranscript = '', currentTime = null, mode = 'normal', girlId = '' } = body;
@@ -583,22 +597,22 @@ export async function onRequestPost(context) {
       const attempts = [];
       // Diagnostica sicura: non registrare token, prompt, screenshot o dati personali.
       const olliteConfig = {
-        baseUrlPresent: Boolean(env.OLLITERT_BASE_URL),
+        baseUrlPresent: Boolean(olliteBaseUrl),
         modelPresent: Boolean(env.OLLITERT_MODEL),
         tokenPresent: Boolean(env.OLLITERT_TOKEN),
-        baseUrlLooksValid: /^https:\/\//i.test(String(env.OLLITERT_BASE_URL || '')),
+        baseUrlLooksValid: /^https:\/\//i.test(olliteBaseUrl),
         model: env.OLLITERT_MODEL ? String(env.OLLITERT_MODEL).slice(0, 80) : null
       };
       console.info('[AI-DIAG] Configurazione OlliteRT', JSON.stringify(olliteConfig));
 
       // Gemma locale su OlliteRT è il provider principale; Gemini e OpenRouter
       // restano disponibili come fallback se il telefono/tunnel non risponde.
-      if (!olliteCircuitOpen && env.OLLITERT_BASE_URL && env.OLLITERT_MODEL && env.OLLITERT_TOKEN) {
+      if (!olliteCircuitOpen && olliteBaseUrl && env.OLLITERT_MODEL && env.OLLITERT_TOKEN) {
         attempts.push({
           provider: 'OlliteRT',
           model: env.OLLITERT_MODEL,
           run: () => callOlliteRT(
-            env.OLLITERT_BASE_URL,
+            olliteBaseUrl,
             env.OLLITERT_TOKEN,
             env.OLLITERT_MODEL,
             ollitePrompt,
