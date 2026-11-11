@@ -23,7 +23,7 @@ export default {
       let tunnelUrl;
       try {
         const parsed = new URL(String(body.url || ''));
-        if (parsed.protocol !== 'https:' || !/^[a-z0-9-]+\\.trycloudflare\\.com$/i.test(parsed.hostname) || parsed.pathname !== '/' || parsed.search || parsed.hash) {
+        if (parsed.protocol !== 'https:' || !/^[a-z0-9-]+\.trycloudflare\.com$/i.test(parsed.hostname) || parsed.pathname !== '/' || parsed.search || parsed.hash) {
           throw new Error('URL non valido');
         }
         tunnelUrl = `${parsed.origin}/v1`;
