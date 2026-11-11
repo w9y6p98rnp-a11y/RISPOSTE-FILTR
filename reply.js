@@ -310,13 +310,17 @@ async function transcribeAudio(apiKey, audio, timeoutMs = 16000) {
   return text;
 }
 
-async function fetchWithTimeout(url, options, ms = 18000) {
+async function fetchWithTimeout(url, options, ms = 18000, parentSignal = null) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
+  const abortFromParent = () => controller.abort(parentSignal?.reason);
+  if (parentSignal?.aborted) abortFromParent();
+  else parentSignal?.addEventListener('abort', abortFromParent, { once: true });
+  const timer = setTimeout(() => controller.abort(new Error('Timeout richiesta AI')), ms);
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
     clearTimeout(timer);
+    parentSignal?.removeEventListener('abort', abortFromParent);
   }
 }
 
@@ -426,7 +430,7 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 11000) {
 }
 
 
-async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs = 330000) {
+async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs = 90000, parentSignal = null) {
   const content = [{ type: 'text', text: prompt }];
   if (image) content.push({ type: 'image_url', image_url: { url: image } });
 
@@ -446,7 +450,7 @@ async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs =
       temperature: 0.85,
       max_tokens: 4500
     })
-  }, timeoutMs);
+  }, timeoutMs, parentSignal);
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -551,6 +555,9 @@ export async function onRequestPost(context) {
     }
 
     const geminiQuotaExhaustedModels = new Set();
+    // Dopo un timeout 524/abort del tunnel non inviamo altre richieste locali: OlliteRT
+    // potrebbe continuare a elaborare la richiesta precedente anche dopo la chiusura HTTP.
+    let olliteCircuitOpen = false;
 
     async function generateBatch(batchStyles, batchIndex) {
       const originalSettings = serverContext?.voiceSettings || {};
@@ -586,7 +593,7 @@ export async function onRequestPost(context) {
 
       // Gemma locale su OlliteRT è il provider principale; Gemini e OpenRouter
       // restano disponibili come fallback se il telefono/tunnel non risponde.
-      if (env.OLLITERT_BASE_URL && env.OLLITERT_MODEL && env.OLLITERT_TOKEN) {
+      if (!olliteCircuitOpen && env.OLLITERT_BASE_URL && env.OLLITERT_MODEL && env.OLLITERT_TOKEN) {
         attempts.push({
           provider: 'OlliteRT',
           model: env.OLLITERT_MODEL,
@@ -596,7 +603,8 @@ export async function onRequestPost(context) {
             env.OLLITERT_MODEL,
             ollitePrompt,
             image,
-            330000
+            90000,
+            request.signal
           )
         });
       }
@@ -646,15 +654,21 @@ export async function onRequestPost(context) {
             errors
           };
         } catch (err) {
+          if (request.signal?.aborted) {
+            return { batchIndex, result: null, provider: '', errors: ['Richiesta interrotta dal client.'] };
+          }
           const detail = err?.name === 'AbortError'
             ? `${attempt.provider} ${attempt.model}: timeout`
             : (err?.message || String(err));
           errors.push(`Blocco ${batchIndex + 1}: ${detail}`);
           if (attempt.provider === 'OlliteRT') {
+            const olliteTimedOut = /HTTP 524|HTTP 522|HTTP 504|timeout|aborted|aborterror/i.test(String(detail));
+            if (olliteTimedOut) olliteCircuitOpen = true;
             console.error('[AI-DIAG] OlliteRT FALLITO', JSON.stringify({
               model: attempt.model,
               batch: batchIndex + 1,
               error: String(detail).slice(0, 300),
+              circuitOpen: olliteCircuitOpen,
               fallbackNext: attempts.some((candidate, index) => index > attempts.indexOf(attempt))
             }));
           }
@@ -666,11 +680,17 @@ export async function onRequestPost(context) {
       return { batchIndex, result: null, provider: '', errors };
     }
 
-    // Esegui i due blocchi in parallelo e mantieni l'ordine originale
-    // delle categorie quando si uniscono i risultati.
-    const batchResults = await Promise.all(
-      styleBatches.map((styles, index) => generateBatch(styles, index))
-    );
+    // Esegui un blocco alla volta: il telefono ha risorse limitate e due
+    // generazioni Gemma simultanee possono saturare CPU/RAM e causare HTTP 524.
+    // Se il tunnel va in timeout, il circuito OlliteRT resta aperto per i blocchi
+    // successivi: usiamo i fallback senza accodare altro lavoro sul telefono.
+    const batchResults = [];
+    for (let index = 0; index < styleBatches.length; index++) {
+      if (request.signal?.aborted) {
+        return json(499, { error: 'Richiesta interrotta dal client.' });
+      }
+      batchResults.push(await generateBatch(styleBatches[index], index));
+    }
     const errors = batchResults.flatMap(item => item.errors);
     const failedBatch = batchResults.find(item => !item.result);
     if (failedBatch) {
