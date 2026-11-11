@@ -5,9 +5,6 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    const authResponse = await onAuthRequest(request, env, ctx);
-    if (authResponse) return authResponse;
-
     // Aggiornamento protetto dell'URL Quick Tunnel comunicato da Termux.
     if (request.method === 'POST' && url.pathname === '/api/tunnel/register') {
       if (!env.TUNNEL_UPDATE_TOKEN || !env.DB) {
@@ -43,6 +40,10 @@ export default {
         status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
       });
     }
+
+    // Gli altri endpoint continuano a passare dal controllo di sessione.
+    const authResponse = await onAuthRequest(request, env, ctx);
+    if (authResponse) return authResponse;
 
     if (request.method === 'POST' && url.pathname === '/api/reply') {
       const user = await getSession(request, env);
