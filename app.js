@@ -574,7 +574,7 @@ async function loadSecretRepliesLazy(){
   try{
     if(navigator.onLine===false) throw new Error("Nessuna connessione internet.");
     const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),360000);
+    const timer=setTimeout(()=>controller.abort(),660000);
     let response;
     try{
       response=await fetch("/api/reply",{method:"POST",headers:{"Content-Type":"application/json"},signal:controller.signal,body:JSON.stringify({
@@ -668,7 +668,7 @@ $("generate").onclick=async()=>{
       throw new Error("Nessuna connessione internet.");
     }
     const controller=new AbortController();
-    const clientTimer=setTimeout(()=>controller.abort(),360000);
+    const clientTimer=setTimeout(()=>controller.abort(),660000);
     let response;
     try{
       response=await fetch("/api/reply",{

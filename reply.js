@@ -560,9 +560,8 @@ export async function onRequestPost(context) {
       : [];
     const allStyles = configuredStyles.length ? configuredStyles : defaultStyles;
 
-    // Due richieste parallele, ciascuna con al massimo quattro stili.
-    // Questo mantiene l'output entro un limite gestibile senza attendere
-    // otto richieste consecutive come nella V5.
+    // I blocchi vengono elaborati in sequenza, con al massimo quattro stili ciascuno.
+    // La sequenza evita di sovraccaricare il realme durante la generazione locale.
     const styleBatches = [];
     for (let i = 0; i < allStyles.length; i += 4) {
       styleBatches.push(allStyles.slice(i, i + 4));
@@ -617,7 +616,7 @@ export async function onRequestPost(context) {
             env.OLLITERT_MODEL,
             ollitePrompt,
             image,
-            90000,
+            300000,
             request.signal
           )
         });
@@ -694,8 +693,8 @@ export async function onRequestPost(context) {
       return { batchIndex, result: null, provider: '', errors };
     }
 
-    // Esegui un blocco alla volta: il telefono ha risorse limitate e due
-    // generazioni Gemma simultanee possono saturare CPU/RAM e causare HTTP 524.
+    // Esegui un blocco alla volta: il telefono ha risorse limitate e le generazioni
+    // Gemma simultanee possono saturare CPU/RAM e causare timeout.
     // Se il tunnel va in timeout, il circuito OlliteRT resta aperto per i blocchi
     // successivi: usiamo i fallback senza accodare altro lavoro sul telefono.
     const batchResults = [];
