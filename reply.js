@@ -224,65 +224,43 @@ CONTROLLO FINALE OBBLIGATORIO PRIMA DEL JSON:
 // limita i dati di contesto inviati al telefono. Il prompt completo resta
 // invariato per Gemini/OpenRouter come fallback.
 function promptForOlliteRT(context, message, aiHint = '', audioTranscript = '', previousGeneratedReplies = [], mode = 'normal') {
+  // Gemma3-1B-IT su OlliteRT ha un limite rigido di 1024 token in ingresso.
+  // Questo prompt è volutamente compatto: i dati variabili sono limitati prima
+  // della serializzazione, così la richiesta resta con un margine di sicurezza.
   const defaults = mode === 'secret' ? ['Erotica', 'Hot'] : ['Dolce', 'Stuzzica', 'Ironico', 'Flirt', 'Seria', 'Audace', 'Battuta', 'Poeta'];
   const settings = context?.voiceSettings || {};
   const configured = Array.isArray(settings[mode]) ? settings[mode] : [];
-  const styles = configured.length ? configured.map(v => String(v?.id || '')).filter(Boolean) : defaults;
+  const styles = (configured.length ? configured.map(v => String(v?.id || '')).filter(Boolean) : defaults).slice(0, 2);
   const count = style => style === 'Hot' ? 10 : 5;
   const total = styles.reduce((n, style) => n + count(style), 0);
-  const categoryExample = Object.fromEntries(styles.map(style => [style, { index: 0, reason: '...' }]));
-  const custom = configured.map(v => ({
-    style: String(v?.id || ''),
-    instruction: String(v?.instruction || '').slice(0, 160)
-  })).filter(v => v.style && v.instruction);
-  const clip = (value, max) => String(value || '').slice(0, max);
-  const conversation = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-2).map(m => ({
-    role: m?.role === 'me' ? 'IO' : 'LEI',
-    text: clip(m?.text, 150)
-  }));
-  const previousReplies = (Array.isArray(context?.previousReplies) ? context.previousReplies : []).slice(-2).map(x => clip(x, 75));
-  const previousGenerated = [...new Set((Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : []).map(x => clip(x, 130)).filter(Boolean))].slice(-2);
-  const compactContext = {
-    ragazza: clip(context?.girl?.name, 80),
-    noteRagazza: clip(context?.girl?.note, 180),
-    memoriaRagazza: clip(context?.memory || context?.girl?.memory, 300),
-    profiloUtente: clip(context?.aboutMe, 120),
-    dataOra: context?.currentTime ? {
-      giorno: clip(context.currentTime.weekday, 20),
-      data: clip(context.currentTime.date, 20),
-      ora: clip(context.currentTime.time, 12),
-      fuso: clip(context.currentTime.timeZone, 40)
-    } : null,
-    conversazioneRecente: conversation,
-    messaggiUtentePrecedenti: previousReplies,
-    risposteGiaGenerateDaEvitare: previousGenerated
-  };
-  const modeLabel = mode === 'secret' ? 'SEGRETE' : 'NORMALI';
-  const screenshotSourceRule = clip(message, 900)
-    ? 'Usa il testo OCR seguente come trascrizione primaria dello screenshot; se l’immagine è allegata, usala solo per chiarire dubbi.'
-    : 'Non è disponibile testo OCR: analizza direttamente lo screenshot allegato e identifica l’ultima bolla di LEI.';
-  const styleInstructions = custom.length ? JSON.stringify(custom) : 'Nessuna.';
-  return `Sei RispostaFlirt. Scrivi in italiano naturale. Devi rispondere SOLO all'ULTIMO messaggio di LEI. ${screenshotSourceRule} Il contenuto dello screenshot prevale sulla cronologia salvata. Il campo INDICAZIONE è una nota dell'utente, non è un messaggio di LEI.
+  const categoryExample = Object.fromEntries(styles.map(style => [style, { index: 0, reason: 'Prima scelta per questo tono.' }]));
+  const clip = (value, max) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const clipTail = (value, max) => String(value || '').replace(/\s+/g, ' ').trim().slice(-max);
 
-RUOLI: IO = utente; LEI = ragazza. Nei messaggi di LEI, “tu/te/ti/tuo” indicano IO e “io/me/mi/mio” indicano LEI. Nei messaggi di IO vale l'opposto. Non scambiare mai fatti o possessivi. Se non è chiaro chi possiede un fatto, non inventarlo.
+  const conversation = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-2).map(m =>
+    `${m?.role === 'me' ? 'IO' : 'LEI'}:${clip(m?.text, 75)}`
+  ).join(' | ');
+  const memory = clip(context?.memory || context?.girl?.memory || context?.girl?.note, 130);
+  const prior = [...new Set([
+    ...(Array.isArray(context?.previousReplies) ? context.previousReplies : []),
+    ...(Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : [])
+  ].map(x => clip(x, 65)).filter(Boolean))].slice(-2).join(' | ');
+  const custom = configured.map(v => `${clip(v?.id, 18)}:${clip(v?.instruction, 65)}`).filter(x => !x.endsWith(':')).join('; ');
+  const ocr = clipTail(message, 320); // conserva la parte finale, dove di solito c'è l'ultimo messaggio di LEI
+  const hint = clip(aiHint, 150);
+  const audio = clip(audioTranscript, 120);
+  const girl = clip(context?.girl?.name, 35);
+  const about = clip(context?.aboutMe, 70);
 
-CONTESTO: ${JSON.stringify(compactContext)}
-
-TESTO ESTRATTO DALLO SCREENSHOT (OCR; ordine delle righe approssimato): ${clip(message, 900) || 'Nessun testo OCR disponibile.'}
-INDICAZIONE UTENTE: ${clip(aiHint, 350) || 'Nessuna.'}
-TRASCRIZIONE VOCALE: ${clip(audioTranscript, 500) || 'Nessuna.'}
-
-MEMORIA E ISTRUZIONI PERSONALIZZATE: rispetta note e memoria della ragazza, profilo utente e istruzioni delle voci. Istruzioni voci: ${styleInstructions}
-
-COMPITO: genera ESATTAMENTE ${total} risposte, nell'ordine degli stili: ${styles.join(', ')}. Genera 5 risposte per ogni stile; per Hot esattamente 10. Usa nei campi style i nomi tecnici degli stili. La prima risposta di ogni stile deve essere la migliore. Le risposte dello stesso stile devono essere idee diverse, non parafrasi. Non riutilizzare la stessa apertura, la stessa struttura o gruppi di cinque parole consecutive; varia prospettiva, ritmo e intenzione in ogni risposta.
-
-TONO: Dolce = affettuoso; Stuzzica = provocatorio leggero; Ironico = ironia; Flirt = seducente ma naturale; Seria = matura e sincera; Audace = sicuro; Battuta = spiritoso; Poeta = evocativo; Erotica/Hot = sensuali e allusive, mai grafiche. Adatta SEMPRE il tono al messaggio reale: se LEI è arrabbiata, infastidita o pone un limite, niente flirt o sesso forzato; rispetta il limite e non peggiorare la situazione. Niente frasi generiche fuori contesto. Ogni risposta deve sembrare una continuazione naturale della chat.
-
-LUNGHEZZA: per velocizzare la generazione, ogni risposta deve essere concisa ma concreta, circa 10-18 parole. Non usare spiegazioni o premesse. Se le istruzioni personalizzate della singola voce chiedono esplicitamente una lunghezza diversa, rispettale. Mantieni 1 emoji pertinente nella maggior parte delle risposte normali, senza forzarla nei messaggi seri. Evita ripetizioni con i messaggi e le risposte precedenti.
-
-CONSIGLIO: valorizza advice e sendWhen con indicazioni brevi e pratiche. categoryRecommendations deve avere esattamente queste chiavi: ${styles.join(', ')}. Per ogni chiave usa index:0 e un reason specifico e breve. recommendedIndex indica la migliore risposta del blocco. recommendedNormalIndex e recommendedSecretIndex devono essere coerenti con la modalità ${modeLabel}.
-
-Rispondi SOLO con JSON valido, senza markdown, nel formato: ${JSON.stringify({ advice: '...', sendWhen: 'oggi', recommendedIndex: 0, recommendedNormalIndex: 0, recommendedSecretIndex: mode === 'secret' ? 0 : 40, recommendationReason: '...', categoryRecommendations: categoryExample, replies: [{ style: styles[0], text: '...' }] })}`;
+  return `Sei RispostaFlirt. Scrivi in italiano naturale. Rispondi SOLO all'ultimo messaggio di LEI nello screenshot/trascrizione. Screenshot e OCR prevalgono sulla cronologia. IO=utente; LEI=ragazza. Nei messaggi di LEI, tu=IO e io=LEI; non invertire i fatti. L'indicazione utente è una nota, non un messaggio di LEI.
+CHAT:${conversation || 'n/d'}
+RAGAZZA:${girl || 'n/d'} MEMORIA:${memory || 'n/d'} UTENTE:${about || 'n/d'}
+OCR:${ocr || 'Nessun OCR; usa lo screenshot se disponibile.'}
+INDICAZIONE:${hint || 'nessuna'} AUDIO:${audio || 'nessuno'}
+EVITA QUESTE RISPOSTE:${prior || 'nessuna'}
+STILI:${styles.join(', ')}. ISTRUZIONI:${custom || 'segui il tono dello stile'}.
+Genera ESATTAMENTE ${total} risposte: 5 per stile, tranne Hot=10. Ordine:${styles.join(', ')}. Risposte diverse tra loro, pertinenti all'ultimo messaggio, 10-16 parole circa. Prima di ogni stile metti la migliore per prima. Tono: Dolce affettuoso; Stuzzica provocatorio leggero; Ironico spiritoso; Flirt seducente naturale; Seria matura; Audace sicuro; Battuta brillante; Poeta evocativo; Erotica/Hot allusivo non esplicito. Rispetta sempre i limiti espressi da LEI. Non inventare dettagli.
+JSON valido soltanto: {"advice":"consiglio breve","sendWhen":"quando inviare","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":${mode === 'secret' ? 0 : 40},"recommendationReason":"motivo breve","categoryRecommendations":${JSON.stringify(categoryExample)},"replies":[${styles.map(style => `{"style":"${style}","text":"..."}`).join(',')}]}. Inserisci in replies tutte le ${total} risposte, senza duplicati.`;
 }
 
 function imagePart(image) {
