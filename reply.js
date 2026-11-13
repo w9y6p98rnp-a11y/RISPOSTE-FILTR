@@ -233,20 +233,20 @@ function promptForOlliteRT(context, message, aiHint = '', audioTranscript = '', 
   const categoryExample = Object.fromEntries(styles.map(style => [style, { index: 0, reason: '...' }]));
   const custom = configured.map(v => ({
     style: String(v?.id || ''),
-    instruction: String(v?.instruction || '').slice(0, 350)
+    instruction: String(v?.instruction || '').slice(0, 160)
   })).filter(v => v.style && v.instruction);
   const clip = (value, max) => String(value || '').slice(0, max);
-  const conversation = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-4).map(m => ({
+  const conversation = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-2).map(m => ({
     role: m?.role === 'me' ? 'IO' : 'LEI',
-    text: clip(m?.text, 260)
+    text: clip(m?.text, 150)
   }));
-  const previousReplies = (Array.isArray(context?.previousReplies) ? context.previousReplies : []).slice(-3).map(x => clip(x, 110));
-  const previousGenerated = [...new Set((Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : []).map(x => clip(x, 130)).filter(Boolean))].slice(-3);
+  const previousReplies = (Array.isArray(context?.previousReplies) ? context.previousReplies : []).slice(-2).map(x => clip(x, 75));
+  const previousGenerated = [...new Set((Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : []).map(x => clip(x, 130)).filter(Boolean))].slice(-2);
   const compactContext = {
     ragazza: clip(context?.girl?.name, 80),
-    noteRagazza: clip(context?.girl?.note, 320),
-    memoriaRagazza: clip(context?.memory || context?.girl?.memory, 600),
-    profiloUtente: clip(context?.aboutMe, 220),
+    noteRagazza: clip(context?.girl?.note, 180),
+    memoriaRagazza: clip(context?.memory || context?.girl?.memory, 300),
+    profiloUtente: clip(context?.aboutMe, 120),
     dataOra: context?.currentTime ? {
       giorno: clip(context.currentTime.weekday, 20),
       data: clip(context.currentTime.date, 20),
@@ -258,25 +258,19 @@ function promptForOlliteRT(context, message, aiHint = '', audioTranscript = '', 
     risposteGiaGenerateDaEvitare: previousGenerated
   };
   const modeLabel = mode === 'secret' ? 'SEGRETE' : 'NORMALI';
-  const screenshotSourceRule = clip(message, 5000)
+  const screenshotSourceRule = clip(message, 1800)
     ? 'Usa il testo OCR seguente come trascrizione primaria dello screenshot; se l’immagine è allegata, usala solo per chiarire dubbi.'
     : 'Non è disponibile testo OCR: analizza direttamente lo screenshot allegato e identifica l’ultima bolla di LEI.';
   const styleInstructions = custom.length ? JSON.stringify(custom) : 'Nessuna.';
-  const replySlotsExample = styles.flatMap(style =>
-    Array.from({ length: count(style) }, (_, index) => ({
-      style,
-      text: `risposta distinta ${index + 1} dello stile ${style}`
-    }))
-  );
   return `Sei RispostaFlirt. Scrivi in italiano naturale. Devi rispondere SOLO all'ULTIMO messaggio di LEI. ${screenshotSourceRule} Il contenuto dello screenshot prevale sulla cronologia salvata. Il campo INDICAZIONE è una nota dell'utente, non è un messaggio di LEI.
 
 RUOLI: IO = utente; LEI = ragazza. Nei messaggi di LEI, “tu/te/ti/tuo” indicano IO e “io/me/mi/mio” indicano LEI. Nei messaggi di IO vale l'opposto. Non scambiare mai fatti o possessivi. Se non è chiaro chi possiede un fatto, non inventarlo.
 
 CONTESTO: ${JSON.stringify(compactContext)}
 
-TESTO ESTRATTO DALLO SCREENSHOT (OCR; ordine delle righe approssimato): ${clip(message, 5000) || 'Nessun testo OCR disponibile.'}
-INDICAZIONE UTENTE: ${clip(aiHint, 900) || 'Nessuna.'}
-TRASCRIZIONE VOCALE: ${clip(audioTranscript, 1200) || 'Nessuna.'}
+TESTO ESTRATTO DALLO SCREENSHOT (OCR; ordine delle righe approssimato): ${clip(message, 1800) || 'Nessun testo OCR disponibile.'}
+INDICAZIONE UTENTE: ${clip(aiHint, 350) || 'Nessuna.'}
+TRASCRIZIONE VOCALE: ${clip(audioTranscript, 500) || 'Nessuna.'}
 
 MEMORIA E ISTRUZIONI PERSONALIZZATE: rispetta note e memoria della ragazza, profilo utente e istruzioni delle voci. Istruzioni voci: ${styleInstructions}
 
@@ -288,7 +282,7 @@ LUNGHEZZA: per velocizzare la generazione, ogni risposta deve essere concisa ma 
 
 CONSIGLIO: valorizza advice e sendWhen con indicazioni brevi e pratiche. categoryRecommendations deve avere esattamente queste chiavi: ${styles.join(', ')}. Per ogni chiave usa index:0 e un reason specifico e breve. recommendedIndex indica la migliore risposta del blocco. recommendedNormalIndex e recommendedSecretIndex devono essere coerenti con la modalità ${modeLabel}.
 
-Rispondi SOLO con JSON valido, senza markdown, nel formato: ${JSON.stringify({ advice: '...', sendWhen: 'oggi', recommendedIndex: 0, recommendedNormalIndex: 0, recommendedSecretIndex: mode === 'secret' ? 0 : 40, recommendationReason: '...', categoryRecommendations: categoryExample, replies: replySlotsExample })}`;
+Rispondi SOLO con JSON valido, senza markdown, nel formato: ${JSON.stringify({ advice: '...', sendWhen: 'oggi', recommendedIndex: 0, recommendedNormalIndex: 0, recommendedSecretIndex: mode === 'secret' ? 0 : 40, recommendationReason: '...', categoryRecommendations: categoryExample, replies: [{ style: styles[0], text: '...' }] })}`;
 }
 
 function imagePart(image) {
@@ -474,7 +468,7 @@ async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs =
         model,
         messages: [{ role: 'user', content }],
         temperature: 0.85,
-        max_tokens: 3000,
+        max_tokens: 1400,
         stream: true
       }),
       signal: controller.signal
@@ -652,11 +646,11 @@ export async function onRequestPost(context) {
       : [];
     const allStyles = configuredStyles.length ? configuredStyles : defaultStyles;
 
-    // I blocchi vengono elaborati in sequenza, con al massimo quattro stili ciascuno.
+    // I blocchi vengono elaborati in sequenza, con al massimo due stili ciascuno per rispettare il contesto breve di Gemma 1B.
     // La sequenza evita di sovraccaricare il realme durante la generazione locale.
     const styleBatches = [];
-    for (let i = 0; i < allStyles.length; i += 4) {
-      styleBatches.push(allStyles.slice(i, i + 4));
+    for (let i = 0; i < allStyles.length; i += 2) {
+      styleBatches.push(allStyles.slice(i, i + 2));
     }
 
     const geminiQuotaExhaustedModels = new Set();
