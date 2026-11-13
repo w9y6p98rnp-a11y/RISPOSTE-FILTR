@@ -258,7 +258,7 @@ function promptForOlliteRT(context, message, aiHint = '', audioTranscript = '', 
     risposteGiaGenerateDaEvitare: previousGenerated
   };
   const modeLabel = mode === 'secret' ? 'SEGRETE' : 'NORMALI';
-  const screenshotSourceRule = clip(message, 1800)
+  const screenshotSourceRule = clip(message, 900)
     ? 'Usa il testo OCR seguente come trascrizione primaria dello screenshot; se l’immagine è allegata, usala solo per chiarire dubbi.'
     : 'Non è disponibile testo OCR: analizza direttamente lo screenshot allegato e identifica l’ultima bolla di LEI.';
   const styleInstructions = custom.length ? JSON.stringify(custom) : 'Nessuna.';
@@ -268,7 +268,7 @@ RUOLI: IO = utente; LEI = ragazza. Nei messaggi di LEI, “tu/te/ti/tuo” indic
 
 CONTESTO: ${JSON.stringify(compactContext)}
 
-TESTO ESTRATTO DALLO SCREENSHOT (OCR; ordine delle righe approssimato): ${clip(message, 1800) || 'Nessun testo OCR disponibile.'}
+TESTO ESTRATTO DALLO SCREENSHOT (OCR; ordine delle righe approssimato): ${clip(message, 900) || 'Nessun testo OCR disponibile.'}
 INDICAZIONE UTENTE: ${clip(aiHint, 350) || 'Nessuna.'}
 TRASCRIZIONE VOCALE: ${clip(audioTranscript, 500) || 'Nessuna.'}
 
@@ -701,7 +701,7 @@ export async function onRequestPost(context) {
             env.OLLITERT_TOKEN,
             env.OLLITERT_MODEL,
             ollitePrompt,
-            image,
+            null, // Gemma3-1B-IT è testuale: evitare il payload immagine che gonfia il contesto. I fallback cloud ricevono ancora lo screenshot.
             300000,
             request.signal
           )
