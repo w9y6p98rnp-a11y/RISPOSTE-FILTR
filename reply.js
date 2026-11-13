@@ -430,7 +430,7 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 11000) {
 }
 
 
-async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs = 90000, parentSignal = null) {
+async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs = 300000, parentSignal = null) {
   const content = [{ type: 'text', text: prompt }];
   if (image) content.push({ type: 'image_url', image_url: { url: image } });
 
@@ -438,36 +438,110 @@ async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs =
   const authorization = /^Bearer\s+/i.test(String(apiToken || ''))
     ? String(apiToken).trim()
     : `Bearer ${String(apiToken || '').trim()}`;
-  const response = await fetchWithTimeout(endpoint, {
-    method: 'POST',
-    headers: {
-      'Authorization': authorization,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content }],
-      temperature: 0.85,
-      max_tokens: 4500
-    })
-  }, timeoutMs, parentSignal);
+  const controller = new AbortController();
+  const abortFromParent = () => controller.abort(parentSignal?.reason);
+  if (parentSignal?.aborted) abortFromParent();
+  else parentSignal?.addEventListener('abort', abortFromParent, { once: true });
+  const timer = setTimeout(() => controller.abort(new Error('Timeout richiesta AI')), timeoutMs);
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail = data?.error?.message || data?.error?.detail || `HTTP ${response.status}`;
-    throw new Error(`OlliteRT (${response.status}): ${String(detail).slice(0, 240)}`);
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': authorization,
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream'
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content }],
+        temperature: 0.85,
+        max_tokens: 4500,
+        stream: true
+      }),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      const detail = data?.error?.message || data?.error?.detail || `HTTP ${response.status}`;
+      throw new Error(`OlliteRT (${response.status}): ${String(detail).slice(0, 240)}`);
+    }
+
+    if (!response.body) throw new Error('OlliteRT: risposta streaming senza corpo.');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let raw = '';
+    let finishReason = 'non indicato';
+    let sawSseData = false;
+
+    const consumeSseLine = (line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith(':') || !trimmed.startsWith('data:')) return;
+      const payload = trimmed.slice(5).trim();
+      if (!payload) return;
+      sawSseData = true;
+      if (payload === '[DONE]') return;
+      let chunk;
+      try { chunk = JSON.parse(payload); }
+      catch (_) { return; }
+      const choice = chunk?.choices?.[0];
+      const delta = choice?.delta || {};
+      const piece = delta.content ?? choice?.message?.content ?? choice?.text ?? '';
+      if (typeof piece === 'string') raw += piece;
+      else if (Array.isArray(piece)) {
+        raw += piece.map(part => typeof part === 'string' ? part : (part?.text || '')).join('');
+      }
+      if (choice?.finish_reason) finishReason = choice.finish_reason;
+    };
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() || '';
+        for (const line of lines) consumeSseLine(line);
+      }
+      buffer += decoder.decode();
+      if (buffer) consumeSseLine(buffer);
+    } finally {
+      try { reader.releaseLock(); } catch (_) {}
+    }
+
+    // Alcuni server compatibili possono ignorare stream=true e restituire JSON normale.
+    if (!sawSseData) {
+      const responseText = raw || buffer;
+      if (responseText.trim()) {
+        try {
+          const data = JSON.parse(responseText);
+          const messageContent = data?.choices?.[0]?.message?.content;
+          raw = Array.isArray(messageContent)
+            ? messageContent.map(part => typeof part === 'string' ? part : (part?.text || '')).join('')
+            : (typeof messageContent === 'string' ? messageContent : '');
+          finishReason = data?.choices?.[0]?.finish_reason || finishReason;
+        } catch (_) {
+          raw = responseText;
+        }
+      }
+    }
+
+    raw = raw.trim();
+    if (!raw) throw new Error(`OlliteRT: risposta senza testo (finish_reason ${finishReason}).`);
+    return extractJson(raw);
+  } catch (error) {
+    if (parentSignal?.aborted) throw new Error('Richiesta interrotta dal client.');
+    if (controller.signal.aborted && error?.name === 'AbortError') {
+      throw new Error('Timeout richiesta AI');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    parentSignal?.removeEventListener('abort', abortFromParent);
   }
-
-  const messageContent = data?.choices?.[0]?.message?.content;
-  const raw = Array.isArray(messageContent)
-    ? messageContent.map(part => typeof part === 'string' ? part : (part?.text || '')).join('').trim()
-    : (typeof messageContent === 'string' ? messageContent.trim() : '');
-
-  if (!raw) {
-    const finishReason = data?.choices?.[0]?.finish_reason || 'non indicato';
-    throw new Error(`OlliteRT: risposta senza testo (finish_reason ${finishReason}).`);
-  }
-  return extractJson(raw);
 }
 
 function isGeminiQuotaError(error) {
