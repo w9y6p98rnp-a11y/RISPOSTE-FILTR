@@ -227,17 +227,17 @@ function promptForOlliteRT(context, message, aiHint = '', audioTranscript = '', 
     instruction: String(v?.instruction || '').slice(0, 350)
   })).filter(v => v.style && v.instruction);
   const clip = (value, max) => String(value || '').slice(0, max);
-  const conversation = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-6).map(m => ({
+  const conversation = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-4).map(m => ({
     role: m?.role === 'me' ? 'IO' : 'LEI',
-    text: clip(m?.text, 350)
+    text: clip(m?.text, 260)
   }));
-  const previousReplies = (Array.isArray(context?.previousReplies) ? context.previousReplies : []).slice(-4).map(x => clip(x, 140));
-  const previousGenerated = [...new Set((Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : []).map(x => clip(x, 130)).filter(Boolean))].slice(-4);
+  const previousReplies = (Array.isArray(context?.previousReplies) ? context.previousReplies : []).slice(-3).map(x => clip(x, 110));
+  const previousGenerated = [...new Set((Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : []).map(x => clip(x, 130)).filter(Boolean))].slice(-3);
   const compactContext = {
     ragazza: clip(context?.girl?.name, 80),
-    noteRagazza: clip(context?.girl?.note, 450),
-    memoriaRagazza: clip(context?.memory || context?.girl?.memory, 900),
-    profiloUtente: clip(context?.aboutMe, 350),
+    noteRagazza: clip(context?.girl?.note, 320),
+    memoriaRagazza: clip(context?.memory || context?.girl?.memory, 600),
+    profiloUtente: clip(context?.aboutMe, 220),
     dataOra: context?.currentTime ? {
       giorno: clip(context.currentTime.weekday, 20),
       data: clip(context.currentTime.date, 20),
@@ -266,7 +266,7 @@ COMPITO: genera ESATTAMENTE ${total} risposte, nell'ordine degli stili: ${styles
 
 TONO: Dolce = affettuoso; Stuzzica = provocatorio leggero; Ironico = ironia; Flirt = seducente ma naturale; Seria = matura e sincera; Audace = sicuro; Battuta = spiritoso; Poeta = evocativo; Erotica/Hot = sensuali e allusive, mai grafiche. Adatta SEMPRE il tono al messaggio reale: se LEI è arrabbiata, infastidita o pone un limite, niente flirt o sesso forzato; rispetta il limite e non peggiorare la situazione. Niente frasi generiche fuori contesto. Ogni risposta deve sembrare una continuazione naturale della chat.
 
-LUNGHEZZA: risposte naturali e mediamente articolate; segui le istruzioni personalizzate della singola voce. Mantieni 1 emoji pertinente nella maggior parte delle risposte normali, senza forzarla nei messaggi seri. Evita ripetizioni con i messaggi e le risposte precedenti.
+LUNGHEZZA: per velocizzare la generazione, ogni risposta deve essere concisa ma concreta, circa 10-18 parole. Non usare spiegazioni o premesse. Se le istruzioni personalizzate della singola voce chiedono esplicitamente una lunghezza diversa, rispettale. Mantieni 1 emoji pertinente nella maggior parte delle risposte normali, senza forzarla nei messaggi seri. Evita ripetizioni con i messaggi e le risposte precedenti.
 
 CONSIGLIO: valorizza advice e sendWhen con indicazioni brevi e pratiche. categoryRecommendations deve avere esattamente queste chiavi: ${styles.join(', ')}. Per ogni chiave usa index:0 e un reason specifico e breve. recommendedIndex indica la migliore risposta del blocco. recommendedNormalIndex e recommendedSecretIndex devono essere coerenti con la modalità ${modeLabel}.
 
@@ -456,7 +456,7 @@ async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs =
         model,
         messages: [{ role: 'user', content }],
         temperature: 0.85,
-        max_tokens: 4500,
+        max_tokens: 3000,
         stream: true
       }),
       signal: controller.signal
