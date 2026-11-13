@@ -1,6 +1,7 @@
 let DB_NAME="RispostaFlirtDB", DB_VERSION=2;
 let db, girls=[], selectedId=null, currentRole="her", deferredInstall=null, selectedImageFile=null, selectedAudioFile=null;
 let currentUser=null, serverSyncEnabled=false, serverSyncTimer=null, serverSyncPaused=false;
+let tesseractScriptPromise=null, tesseractWorkerPromise=null;
 // Stato temporaneo separato per ogni ragazza: screenshot, testo e risultati non vengono condivisi tra chat.
 const girlStates = new Map();
 
@@ -18,11 +19,11 @@ function fmt(t){return new Date(t).toLocaleString("it-IT",{day:"2-digit",month:"
 
 async function renderGirls(){girls=await getAll("girls");girls.sort((a,b)=>b.updatedAt-a.updatedAt);$("girlList").innerHTML=girls.map(g=>`<button class="girl ${g.id===selectedId?"active":""}" data-id="${g.id}"><span class="avatar">${esc((g.name||"?")[0].toUpperCase())}</span><span class="girl-meta"><span class="girl-name">${esc(g.name)}</span></span></button>`).join("");document.querySelectorAll(".girl").forEach(b=>b.onclick=()=>selectGirl(b.dataset.id))}
 function getGirlState(id){
-  if(!girlStates.has(id)) girlStates.set(id,{message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""});
+  if(!girlStates.has(id)) girlStates.set(id,{message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",ocrText:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""});
   return girlStates.get(id);
 }
 async function loadGirlState(id){
-  const base={message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""};
+  const base={message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",ocrText:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""};
   try{
     const saved=await new Promise((res,rej)=>{const r=tx("girlStates").get(id);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
     const st={...base,...(saved||{})};
@@ -38,7 +39,7 @@ async function loadGirlState(id){
 async function persistGirlState(id){
   if(!id)return;
   const st=getGirlState(id);
-  await put("girlStates",{girlId:id,message:st.message||"",lastAnalysisMessage:st.lastAnalysisMessage||"",imageData:st.imageData||null,imageName:st.imageName||"",audioData:st.audioData||null,audioName:st.audioName||"",audioTranscript:st.audioTranscript||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",aiHint:st.aiHint||"",updatedAt:Date.now()});
+  await put("girlStates",{girlId:id,message:st.message||"",lastAnalysisMessage:st.lastAnalysisMessage||"",imageData:st.imageData||null,imageName:st.imageName||"",ocrText:st.ocrText||"",audioData:st.audioData||null,audioName:st.audioName||"",audioTranscript:st.audioTranscript||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",aiHint:st.aiHint||"",updatedAt:Date.now()});
 }
 async function clearGirlState(id){
   girlStates.delete(id);
@@ -69,9 +70,10 @@ function restoreGirlState(id){
   if(st.resultsHtml){
     window.__rfLastAnalysis = {
       girlId: id,
-      message: st.lastAnalysisMessage || st.message || "",
+      message: st.ocrText || st.lastAnalysisMessage || st.message || "",
       aiHint: st.aiHint || "",
-      image: st.imageData || null,
+      image: st.ocrText ? null : (st.imageData || null),
+      ocrText: st.ocrText || "",
       audio: st.audioData || null,
       audioTranscript: st.audioTranscript || ""
     };
@@ -299,6 +301,7 @@ async function showSelectedMedia(e){
    const st=getGirlState(selectedId);
    st.imageFile=imageFile;
    st.imageData=imageFile?await compressImageForAI(imageFile):null;
+   st.ocrText="";
    st.imageName=imageFile ? "Screenshot: "+imageFile.name : "Nessuno screenshot inserito";
    st.audioFile=audioFile;
    st.audioData=audioFile?await fileToDataUrl(audioFile):null;
@@ -449,6 +452,45 @@ async function compressImageForAI(file){
   }
 }
 
+// OCR locale: lo screenshot viene letto sul dispositivo dell'utente, senza inviare
+// l'immagine al modello visivo sul realme. Il worker viene riutilizzato tra analisi.
+async function loadTesseractLibrary(){
+  if(window.Tesseract?.createWorker) return window.Tesseract;
+  if(!tesseractScriptPromise){
+    tesseractScriptPromise=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      script.src='https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js';
+      script.async=true;
+      script.onload=()=>window.Tesseract?.createWorker?resolve(window.Tesseract):reject(new Error('Libreria OCR non disponibile.'));
+      script.onerror=()=>{tesseractScriptPromise=null;reject(new Error('Non riesco a caricare il motore OCR.'));};
+      document.head.appendChild(script);
+    });
+  }
+  return tesseractScriptPromise;
+}
+async function getTesseractWorker(onProgress){
+  if(!tesseractWorkerPromise){
+    tesseractWorkerPromise=(async()=>{
+      const lib=await loadTesseractLibrary();
+      return lib.createWorker('ita+eng',1,{logger:info=>{
+        if(typeof onProgress==='function'){
+          if(info?.status==='recognizing text') onProgress(info.progress||0);
+          else if(info?.status) onProgress(-1,info.status);
+        }
+      }});
+    })().catch(err=>{tesseractWorkerPromise=null;throw err;});
+  }
+  return tesseractWorkerPromise;
+}
+async function extractScreenshotText(source,onProgress){
+  const worker=await getTesseractWorker(onProgress);
+  const result=await worker.recognize(source);
+  const text=String(result?.data?.text||'').replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+  const confidence=Number(result?.data?.confidence||0);
+  if(text.length<18 || confidence<20) throw new Error('Testo OCR insufficiente o poco leggibile.');
+  return text.slice(0,12000);
+}
+
 async function saveReplyToChat(text){
   if(!selectedId || !text) return;
   const st=getGirlState(selectedId);
@@ -478,7 +520,7 @@ function getLastAnalysisContext(){
   if(a?.girlId===selectedId) return a;
   const st=selectedId?getGirlState(selectedId):null;
   if(!st || !st.resultsHtml) return null;
-  const recovered={girlId:selectedId,message:st.lastAnalysisMessage||st.message||"",aiHint:st.aiHint||"",image:st.imageData||null,audio:st.audioData||null,audioTranscript:st.audioTranscript||""};
+  const recovered={girlId:selectedId,message:st.ocrText||st.lastAnalysisMessage||st.message||"",aiHint:st.aiHint||"",image:st.ocrText?null:(st.imageData||null),ocrText:st.ocrText||"",audio:st.audioData||null,audioTranscript:st.audioTranscript||""};
   window.__rfLastAnalysis=recovered;
   return recovered;
 }
@@ -578,7 +620,7 @@ async function loadSecretRepliesLazy(){
     let response;
     try{
       response=await fetch("/api/reply",{method:"POST",headers:{"Content-Type":"application/json"},signal:controller.signal,body:JSON.stringify({
-        girlId:a.girlId,message:a.message,aiHint:a.aiHint,image:a.image,audio:a.audio,audioTranscript:a.audioTranscript||"",currentTime:getCurrentTimeContext(),mode:"secret"
+        girlId:a.girlId,message:a.message,aiHint:a.aiHint,image:a.ocrText?null:a.image,audio:a.audio,audioTranscript:a.audioTranscript||"",currentTime:getCurrentTimeContext(),mode:"secret"
       })});
     }finally{clearTimeout(timer)}
     if(!response.ok){ const detail=await response.text().catch(()=>""); throw new Error(detail||"Server AI non disponibile."); }
@@ -651,6 +693,24 @@ $("generate").onclick=async()=>{
     }else if(state.imageData){
       image=state.imageData;
     }
+    let ocrText=String(state.ocrText||'').trim();
+    if(image && !ocrText){
+      try{
+        const ocrSource=selectedImageFile || image;
+        const extracted=await extractScreenshotText(ocrSource,p=>{
+          const percent=Math.round(p*100);
+          $('generate').textContent=percent>=0?`Leggo screenshot ${percent}%...`:'Preparo OCR...';
+        });
+        if(extracted){
+          ocrText=extracted;
+          state.ocrText=ocrText;
+          await persistGirlState(selectedId);
+        }
+      }catch(ocrError){
+        console.warn('OCR locale non riuscito; uso la lettura visiva originale:',ocrError);
+        ocrText='';
+      }
+    }
     if(selectedAudioFile){
       // Anche l'audio viene già convertito in data URL alla selezione.
       audio=state.audioData || await fileToDataUrl(selectedAudioFile);
@@ -677,9 +737,9 @@ $("generate").onclick=async()=>{
         signal:controller.signal,
         body:JSON.stringify({
           girlId:selectedId,
-          message:text,
+          message:ocrText || text,
           aiHint,
-          image,
+          image:ocrText ? null : image,
           audio,
           currentTime:getCurrentTimeContext(),
           mode:"normal"
@@ -758,7 +818,7 @@ $("generate").onclick=async()=>{
     applySettings();
     state.resultsHtml=$("results").innerHTML;
     await persistGirlState(selectedId);
-    window.__rfLastAnalysis = { girlId: selectedId, message: text, aiHint, image, audio, audioTranscript };
+    window.__rfLastAnalysis = { girlId: selectedId, message: ocrText || text, aiHint, image: ocrText ? null : image, ocrText, audio, audioTranscript };
     bindResultButtons();
     // Dopo l'analisi apri automaticamente solo la prima casella: Risposte normali.
     const normalChoice=document.querySelector('.reply-choice[data-target="normalRepliesPanel"]');

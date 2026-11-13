@@ -113,11 +113,14 @@ function promptFor(context, message, aiHint = "", audioTranscript = "", previous
     if (style === "Hot" || style === "Erotica") return `${style}: circa 18-32 parole per risposta, con contenuto sostanzioso ma naturale.`;
     return `${style}: circa 18-32 parole per risposta; evita risposte di una sola frase telegrafica quando il contesto consente di sviluppare meglio l'idea.`;
   }).join("\n");
-  return `Sei RispostaFlirt. Analizza con precisione lo screenshot, la cronologia e soprattutto l'INDICAZIONE DELL'UTENTE. Devi distinguere SEMPRE e senza eccezioni IO (l'utente che sta usando l'app) da LEI (la persona con cui sta parlando). Rispondi ESCLUSIVAMENTE all'ultimo messaggio realmente ricevuto da LEI.
+  const screenshotSourceRule = String(message || '').trim()
+    ? 'Usa il testo OCR qui sotto come trascrizione primaria dello screenshot; se l’immagine è allegata, usala solo per chiarire dubbi.'
+    : 'Non è disponibile testo OCR: analizza direttamente lo screenshot allegato e identifica l’ultima bolla di LEI.';
+  return `Sei RispostaFlirt. Analizza con precisione il testo estratto dallo screenshot (se presente), l’immagine allegata quando disponibile, la cronologia e soprattutto l'INDICAZIONE DELL'UTENTE. Devi distinguere SEMPRE e senza eccezioni IO (l'utente che sta usando l'app) da LEI (la persona con cui sta parlando). Rispondi ESCLUSIVAMENTE all'ultimo messaggio realmente ricevuto da LEI.
 
 DATA E ORA ATTUALI DEL DISPOSITIVO: ${context?.currentTime?.weekday || ''}, ${context?.currentTime?.date || ''}, ore ${context?.currentTime?.time || ''} (${context?.currentTime?.timeZone || 'fuso locale'}). USA QUESTO COME RIFERIMENTO TEMPORALE PER INTERPRETARE E GENERARE LE RISPOSTE. Se una risposta contiene riferimenti a oggi, domani, ieri, stamattina, stasera o giorni della settimana, devono essere coerenti con questa data e ora. NON scrivere per esempio "iniziare il lunedì" se oggi non è lunedì, salvo che tu stia parlando esplicitamente di un altro giorno. Se il contesto non richiede un riferimento temporale, non inserirlo artificialmente.
 
-PRIORITÀ DELLO SCREENSHOT E DEL TURNO CORRENTE: se è presente uno screenshot, trattalo come la fonte primaria per capire il turno corrente. Leggi la conversazione visibile e identifica l'ULTIMA BOLLA SCRITTA DA LEI. Quella è la frase a cui devi rispondere. Le bolle precedenti servono solo come contesto. Non rispondere a un messaggio vecchio, a una frase precedente o a un dettaglio secondario dello screenshot. Prima di generare, ricostruisci mentalmente: 1) ultimo messaggio di LEI da rispondere; 2) ultimo messaggio di IO che lo precede; 3) eventuali fatti personali rilevanti. Se lo screenshot e una vecchia cronologia salvata sembrano riferirsi a turni diversi, per il turno corrente prevale lo screenshot.
+PRIORITÀ DELLO SCREENSHOT E DEL TURNO CORRENTE: ${screenshotSourceRule} Ricostruisci l'ordine dei messaggi e identifica l'ULTIMA BOLLA SCRITTA DA LEI. Quella è la frase a cui devi rispondere. Le bolle precedenti servono solo come contesto. Non rispondere a un messaggio vecchio, a una frase precedente o a un dettaglio secondario dello screenshot. Prima di generare, ricostruisci mentalmente: 1) ultimo messaggio di LEI da rispondere; 2) ultimo messaggio di IO che lo precede; 3) eventuali fatti personali rilevanti. Se lo screenshot e una vecchia cronologia salvata sembrano riferirsi a turni diversi, per il turno corrente prevale lo screenshot.
 
 L'INDICAZIONE DELL'UTENTE NON È UN MESSAGGIO DI LEI: è una nota/informazione che spiega come interpretare la situazione e come vuoi che vengano costruite le risposte. Non trasformare mai il testo dell'indicazione in un messaggio da parte di LEI e non rispondere direttamente all'indicazione.
 
@@ -249,14 +252,17 @@ function promptForOlliteRT(context, message, aiHint = '', audioTranscript = '', 
     risposteGiaGenerateDaEvitare: previousGenerated
   };
   const modeLabel = mode === 'secret' ? 'SEGRETE' : 'NORMALI';
+  const screenshotSourceRule = clip(message, 9000)
+    ? 'Usa il testo OCR seguente come trascrizione primaria dello screenshot; se l’immagine è allegata, usala solo per chiarire dubbi.'
+    : 'Non è disponibile testo OCR: analizza direttamente lo screenshot allegato e identifica l’ultima bolla di LEI.';
   const styleInstructions = custom.length ? JSON.stringify(custom) : 'Nessuna.';
-  return `Sei RispostaFlirt. Scrivi in italiano naturale. Devi rispondere SOLO all'ULTIMO messaggio di LEI nello screenshot allegato. Lo screenshot, se presente, prevale sulla cronologia salvata. Il campo INDICAZIONE è una nota dell'utente, non è un messaggio di LEI.
+  return `Sei RispostaFlirt. Scrivi in italiano naturale. Devi rispondere SOLO all'ULTIMO messaggio di LEI. ${screenshotSourceRule} Il contenuto dello screenshot prevale sulla cronologia salvata. Il campo INDICAZIONE è una nota dell'utente, non è un messaggio di LEI.
 
 RUOLI: IO = utente; LEI = ragazza. Nei messaggi di LEI, “tu/te/ti/tuo” indicano IO e “io/me/mi/mio” indicano LEI. Nei messaggi di IO vale l'opposto. Non scambiare mai fatti o possessivi. Se non è chiaro chi possiede un fatto, non inventarlo.
 
 CONTESTO: ${JSON.stringify(compactContext)}
 
-MESSAGGIO/SCREENSHOT: analizza lo screenshot per identificare l'ultima bolla di LEI. Testo aggiuntivo: ${clip(message, 1800)}
+TESTO ESTRATTO DALLO SCREENSHOT (OCR; ordine delle righe approssimato): ${clip(message, 9000) || 'Nessun testo OCR disponibile.'}
 INDICAZIONE UTENTE: ${clip(aiHint, 900) || 'Nessuna.'}
 TRASCRIZIONE VOCALE: ${clip(audioTranscript, 1200) || 'Nessuna.'}
 
@@ -570,7 +576,7 @@ export async function onRequestPost(context) {
   try {
     const body = await request.json().catch(() => ({}));
     const { message = '', aiHint = '', image = null, audio = null, audioTranscript: providedAudioTranscript = '', currentTime = null, mode = 'normal', girlId = '' } = body;
-    if (!image && !audio) return json(400, { error: 'Aggiungi uno screenshot oppure una registrazione vocale.' });
+    if (!image && !audio && !String(message || '').trim()) return json(400, { error: 'Aggiungi uno screenshot, il testo estratto oppure una registrazione vocale.' });
     if (!env.DB || !context.user?.id || !girlId) return json(401, { error: 'Sessione o ragazza non valide.' });
 
     // Il contesto usato dall'AI viene letto dal database del proprietario della sessione.
