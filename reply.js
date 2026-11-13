@@ -116,6 +116,12 @@ function promptFor(context, message, aiHint = "", audioTranscript = "", previous
   const screenshotSourceRule = String(message || '').trim()
     ? 'Usa il testo OCR qui sotto come trascrizione primaria dello screenshot; se l’immagine è allegata, usala solo per chiarire dubbi.'
     : 'Non è disponibile testo OCR: analizza direttamente lo screenshot allegato e identifica l’ultima bolla di LEI.';
+  const replySlotsExample = styleOrder.flatMap(style =>
+    Array.from({ length: countForStyle(style) }, (_, index) => ({
+      style,
+      text: `risposta distinta ${index + 1} dello stile ${style}`
+    }))
+  );
   return `Sei RispostaFlirt. Analizza con precisione il testo estratto dallo screenshot (se presente), l’immagine allegata quando disponibile, la cronologia e soprattutto l'INDICAZIONE DELL'UTENTE. Devi distinguere SEMPRE e senza eccezioni IO (l'utente che sta usando l'app) da LEI (la persona con cui sta parlando). Rispondi ESCLUSIVAMENTE all'ultimo messaggio realmente ricevuto da LEI.
 
 DATA E ORA ATTUALI DEL DISPOSITIVO: ${context?.currentTime?.weekday || ''}, ${context?.currentTime?.date || ''}, ore ${context?.currentTime?.time || ''} (${context?.currentTime?.timeZone || 'fuso locale'}). USA QUESTO COME RIFERIMENTO TEMPORALE PER INTERPRETARE E GENERARE LE RISPOSTE. Se una risposta contiene riferimenti a oggi, domani, ieri, stamattina, stasera o giorni della settimana, devono essere coerenti con questa data e ora. NON scrivere per esempio "iniziare il lunedì" se oggi non è lunedì, salvo che tu stia parlando esplicitamente di un altro giorno. Se il contesto non richiede un riferimento temporale, non inserirlo artificialmente.
@@ -178,7 +184,7 @@ RECOMMENDATIONS: categoryRecommendations deve contenere esattamente le chiavi de
 SEGRETE: Erotica e Hot devono essere le voci più sensuali, intense, audaci e provocanti dell'app QUANDO IL CONTESTO LE RENDE APPROPRIATE. HOT deve spingersi al massimo livello consentito: forte tensione, desiderio, doppi sensi, allusioni e linguaggio seducente, senza diventare freddo o timido. Mantieni comunque il contenuto non grafico: non descrivere esplicitamente atti sessuali, genitali o dettagli pornografici. Se il contesto permette un tono molto caldo, non annacquarlo con frasi innocue o generiche. Se invece LEI è arrabbiata, infastidita, sta mettendo un limite o il contesto non sostiene la sessualità, non forzare Hot/Erotica: anche queste risposte devono restare pertinenti al momento e non peggiorare la situazione.
 
 Rispondi SOLO con JSON valido, senza markdown, esattamente nel formato:
-${JSON.stringify({advice:"...",sendWhen:"oggi",recommendedIndex:0,recommendedNormalIndex:0,recommendedSecretIndex:(mode === "secret" ? 0 : 40),recommendationReason:"...",categoryRecommendations:categoryExample,replies:[{style:styleOrder[0],text:"..."}]})}
+${JSON.stringify({advice:"...",sendWhen:"oggi",recommendedIndex:0,recommendedNormalIndex:0,recommendedSecretIndex:(mode === "secret" ? 0 : 40),recommendationReason:"...",categoryRecommendations:categoryExample,replies:replySlotsExample})}
 
 CONTESTO:
 ${JSON.stringify(context || {})}
@@ -252,23 +258,29 @@ function promptForOlliteRT(context, message, aiHint = '', audioTranscript = '', 
     risposteGiaGenerateDaEvitare: previousGenerated
   };
   const modeLabel = mode === 'secret' ? 'SEGRETE' : 'NORMALI';
-  const screenshotSourceRule = clip(message, 9000)
+  const screenshotSourceRule = clip(message, 5000)
     ? 'Usa il testo OCR seguente come trascrizione primaria dello screenshot; se l’immagine è allegata, usala solo per chiarire dubbi.'
     : 'Non è disponibile testo OCR: analizza direttamente lo screenshot allegato e identifica l’ultima bolla di LEI.';
   const styleInstructions = custom.length ? JSON.stringify(custom) : 'Nessuna.';
+  const replySlotsExample = styles.flatMap(style =>
+    Array.from({ length: count(style) }, (_, index) => ({
+      style,
+      text: `risposta distinta ${index + 1} dello stile ${style}`
+    }))
+  );
   return `Sei RispostaFlirt. Scrivi in italiano naturale. Devi rispondere SOLO all'ULTIMO messaggio di LEI. ${screenshotSourceRule} Il contenuto dello screenshot prevale sulla cronologia salvata. Il campo INDICAZIONE è una nota dell'utente, non è un messaggio di LEI.
 
 RUOLI: IO = utente; LEI = ragazza. Nei messaggi di LEI, “tu/te/ti/tuo” indicano IO e “io/me/mi/mio” indicano LEI. Nei messaggi di IO vale l'opposto. Non scambiare mai fatti o possessivi. Se non è chiaro chi possiede un fatto, non inventarlo.
 
 CONTESTO: ${JSON.stringify(compactContext)}
 
-TESTO ESTRATTO DALLO SCREENSHOT (OCR; ordine delle righe approssimato): ${clip(message, 9000) || 'Nessun testo OCR disponibile.'}
+TESTO ESTRATTO DALLO SCREENSHOT (OCR; ordine delle righe approssimato): ${clip(message, 5000) || 'Nessun testo OCR disponibile.'}
 INDICAZIONE UTENTE: ${clip(aiHint, 900) || 'Nessuna.'}
 TRASCRIZIONE VOCALE: ${clip(audioTranscript, 1200) || 'Nessuna.'}
 
 MEMORIA E ISTRUZIONI PERSONALIZZATE: rispetta note e memoria della ragazza, profilo utente e istruzioni delle voci. Istruzioni voci: ${styleInstructions}
 
-COMPITO: genera ESATTAMENTE ${total} risposte, nell'ordine degli stili: ${styles.join(', ')}. Genera 5 risposte per ogni stile; per Hot esattamente 10. Usa nei campi style i nomi tecnici degli stili. La prima risposta di ogni stile deve essere la migliore. Le risposte dello stesso stile devono essere idee diverse, non parafrasi.
+COMPITO: genera ESATTAMENTE ${total} risposte, nell'ordine degli stili: ${styles.join(', ')}. Genera 5 risposte per ogni stile; per Hot esattamente 10. Usa nei campi style i nomi tecnici degli stili. La prima risposta di ogni stile deve essere la migliore. Le risposte dello stesso stile devono essere idee diverse, non parafrasi. Non riutilizzare la stessa apertura, la stessa struttura o gruppi di cinque parole consecutive; varia prospettiva, ritmo e intenzione in ogni risposta.
 
 TONO: Dolce = affettuoso; Stuzzica = provocatorio leggero; Ironico = ironia; Flirt = seducente ma naturale; Seria = matura e sincera; Audace = sicuro; Battuta = spiritoso; Poeta = evocativo; Erotica/Hot = sensuali e allusive, mai grafiche. Adatta SEMPRE il tono al messaggio reale: se LEI è arrabbiata, infastidita o pone un limite, niente flirt o sesso forzato; rispetta il limite e non peggiorare la situazione. Niente frasi generiche fuori contesto. Ogni risposta deve sembrare una continuazione naturale della chat.
 
@@ -276,7 +288,7 @@ LUNGHEZZA: per velocizzare la generazione, ogni risposta deve essere concisa ma 
 
 CONSIGLIO: valorizza advice e sendWhen con indicazioni brevi e pratiche. categoryRecommendations deve avere esattamente queste chiavi: ${styles.join(', ')}. Per ogni chiave usa index:0 e un reason specifico e breve. recommendedIndex indica la migliore risposta del blocco. recommendedNormalIndex e recommendedSecretIndex devono essere coerenti con la modalità ${modeLabel}.
 
-Rispondi SOLO con JSON valido, senza markdown, nel formato: ${JSON.stringify({ advice: '...', sendWhen: 'oggi', recommendedIndex: 0, recommendedNormalIndex: 0, recommendedSecretIndex: mode === 'secret' ? 0 : 40, recommendationReason: '...', categoryRecommendations: categoryExample, replies: [{ style: styles[0] || 'Dolce', text: '...' }] })}`;
+Rispondi SOLO con JSON valido, senza markdown, nel formato: ${JSON.stringify({ advice: '...', sendWhen: 'oggi', recommendedIndex: 0, recommendedNormalIndex: 0, recommendedSecretIndex: mode === 'secret' ? 0 : 40, recommendationReason: '...', categoryRecommendations: categoryExample, replies: replySlotsExample })}`;
 }
 
 function imagePart(image) {
@@ -737,6 +749,26 @@ export async function onRequestPost(context) {
             console.info('[AI-DIAG] Avvio richiesta OlliteRT', JSON.stringify({ model: attempt.model, batch: batchIndex + 1 }));
           }
           const result = await attempt.run();
+          // Non accettare output parziali: ogni stile deve avere tutte le risposte previste
+          // e non devono esserci duplicati letterali all'interno dello stesso stile.
+          const expectedPerStyle = new Map(batchStyles.map(style => [style, style === 'Hot' ? 10 : 5]));
+          const actualByStyle = new Map();
+          for (const item of (Array.isArray(result?.replies) ? result.replies : [])) {
+            const style = String(item?.style || '');
+            if (!expectedPerStyle.has(style)) continue;
+            if (!actualByStyle.has(style)) actualByStyle.set(style, []);
+            actualByStyle.get(style).push(String(item?.text || '').trim());
+          }
+          const incomplete = [...expectedPerStyle.entries()].find(([style, expected]) => {
+            const items = actualByStyle.get(style) || [];
+            const unique = new Set(items.map(text => text.toLocaleLowerCase('it').replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim()));
+            return items.length !== expected || unique.size !== expected || items.some(text => !text);
+          });
+          if (incomplete) {
+            const [style, expected] = incomplete;
+            const actual = (actualByStyle.get(style) || []).length;
+            throw new Error(`${attempt.provider}: output incompleto per ${style} (${actual}/${expected}) o risposte duplicate.`);
+          }
           if (attempt.provider === 'OlliteRT') {
             console.info('[AI-DIAG] OlliteRT OK', JSON.stringify({ model: attempt.model, batch: batchIndex + 1 }));
           }

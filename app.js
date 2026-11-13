@@ -488,7 +488,9 @@ async function extractScreenshotText(source,onProgress){
   const text=String(result?.data?.text||'').replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
   const confidence=Number(result?.data?.confidence||0);
   if(text.length<18 || confidence<20) throw new Error('Testo OCR insufficiente o poco leggibile.');
-  return text.slice(0,12000);
+  // Le ultime righe dello screenshot contengono normalmente i messaggi più recenti.
+  // Manteniamo una trascrizione più compatta per non rallentare la generazione locale.
+  return text.length > 5000 ? text.slice(-5000) : text;
 }
 
 async function saveReplyToChat(text){
