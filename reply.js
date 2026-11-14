@@ -5,11 +5,47 @@ function json(statusCode, payload) {
   });
 }
 
-function extractJson(raw) {
+function extractNumberedReplies(raw, expectedStyles, expectedPerStyle) {
+  if (!Array.isArray(expectedStyles) || !expectedStyles.length) return null;
+  // Alcune versioni di Gemma ignorano il JSON e restituiscono un elenco numerato.
+  // Normalizziamo anche gli escape letterali che possono comparire nel contenuto.
+  const normalized = String(raw || '')
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, ' ')
+    .replace(/\\+"/g, '"');
+  const matches = [...normalized.matchAll(/^\s*(\d{1,2})[.)]\s*["“]?([\s\S]*?)(?=^\s*\d{1,2}[.)]\s*|$)/gm)];
+  const items = matches
+    .map(match => String(match[2] || '').trim().replace(/^[\\/"“'`]+/, '').replace(/[\\/"”'`]+$/, '').trim())
+    .filter(Boolean);
+  const expectedTotal = expectedStyles.length * expectedPerStyle;
+  if (items.length !== expectedTotal) return null;
+  const replies = [];
+  items.forEach((text, index) => {
+    const style = expectedStyles[Math.floor(index / expectedPerStyle)];
+    replies.push({ style, text });
+  });
+  return {
+    replies,
+    recommendedIndex: 0,
+    recommendedNormalIndex: 0,
+    recommendedSecretIndex: 24,
+    recommendationReason: 'La prima risposta di ogni stile è proposta come scelta iniziale.',
+    advice: '',
+    sendWhen: '',
+    categoryRecommendations: {}
+  };
+}
+
+function extractJson(raw, expectedStyles = [], expectedPerStyle = 3) {
   if (!raw) throw new Error('Risposta AI vuota.');
   const cleaned = String(raw).trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '');
   const match = cleaned.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('Risposta AI non valida.');
+  if (!match) {
+    const numbered = extractNumberedReplies(cleaned, expectedStyles, expectedPerStyle);
+    if (numbered) return numbered;
+    throw new Error('Risposta AI non valida: formato JSON o elenco numerato non riconosciuto.');
+  }
   const candidate = match[0];
   try {
     const parsed = JSON.parse(candidate);
@@ -52,7 +88,9 @@ function extractJson(raw) {
       // anche in caso di output molto lungo.
       return { replies, recommendedIndex, recommendedNormalIndex: normalRecommendedIndex, recommendedSecretIndex: secretRecommendedIndex, recommendationReason: reason, advice, sendWhen, categoryRecommendations };
     }
-    throw new Error('Risposta AI non valida.');
+    const numbered = extractNumberedReplies(cleaned, expectedStyles, expectedPerStyle);
+    if (numbered) return numbered;
+    throw new Error('Risposta AI non valida: formato JSON o elenco numerato non riconosciuto.');
   }
 }
 
@@ -420,7 +458,7 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 11000) {
 }
 
 
-async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs = 300000, parentSignal = null) {
+async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs = 300000, parentSignal = null, expectedStyles = [], expectedPerStyle = 3) {
   const content = [{ type: 'text', text: prompt }];
   if (image) content.push({ type: 'image_url', image_url: { url: image } });
 
@@ -521,7 +559,7 @@ async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs =
 
     raw = raw.trim();
     if (!raw) throw new Error(`OlliteRT: risposta senza testo (finish_reason ${finishReason}).`);
-    return extractJson(raw);
+    return extractJson(raw, expectedStyles, expectedPerStyle);
   } catch (error) {
     if (parentSignal?.aborted) throw new Error('Richiesta interrotta dal client.');
     if (controller.signal.aborted && error?.name === 'AbortError') {
@@ -681,7 +719,9 @@ export async function onRequestPost(context) {
             ollitePrompt,
             null, // Gemma3-1B-IT è testuale: evitare il payload immagine che gonfia il contesto. I fallback cloud ricevono ancora lo screenshot.
             300000,
-            request.signal
+            request.signal,
+            batchStyles,
+            secretMode ? 5 : 3
           )
         });
       }
