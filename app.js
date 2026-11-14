@@ -1,7 +1,6 @@
 let DB_NAME="RispostaFlirtDB", DB_VERSION=2;
 let db, girls=[], selectedId=null, currentRole="her", deferredInstall=null, selectedImageFile=null, selectedAudioFile=null;
 let currentUser=null, serverSyncEnabled=false, serverSyncTimer=null, serverSyncPaused=false;
-let tesseractScriptPromise=null, tesseractWorkerPromise=null;
 // Stato temporaneo separato per ogni ragazza: screenshot, testo e risultati non vengono condivisi tra chat.
 const girlStates = new Map();
 
@@ -19,11 +18,11 @@ function fmt(t){return new Date(t).toLocaleString("it-IT",{day:"2-digit",month:"
 
 async function renderGirls(){girls=await getAll("girls");girls.sort((a,b)=>b.updatedAt-a.updatedAt);$("girlList").innerHTML=girls.map(g=>`<button class="girl ${g.id===selectedId?"active":""}" data-id="${g.id}"><span class="avatar">${esc((g.name||"?")[0].toUpperCase())}</span><span class="girl-meta"><span class="girl-name">${esc(g.name)}</span></span></button>`).join("");document.querySelectorAll(".girl").forEach(b=>b.onclick=()=>selectGirl(b.dataset.id))}
 function getGirlState(id){
-  if(!girlStates.has(id)) girlStates.set(id,{message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",ocrText:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""});
+  if(!girlStates.has(id)) girlStates.set(id,{message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""});
   return girlStates.get(id);
 }
 async function loadGirlState(id){
-  const base={message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",ocrText:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""};
+  const base={message:"",lastAnalysisMessage:"",imageFile:null,imageData:null,imageName:"",audioFile:null,audioData:null,audioName:"",audioTranscript:"",resultsHtml:"",role:"her",aiHint:""};
   try{
     const saved=await new Promise((res,rej)=>{const r=tx("girlStates").get(id);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
     const st={...base,...(saved||{})};
@@ -39,7 +38,7 @@ async function loadGirlState(id){
 async function persistGirlState(id){
   if(!id)return;
   const st=getGirlState(id);
-  await put("girlStates",{girlId:id,message:st.message||"",lastAnalysisMessage:st.lastAnalysisMessage||"",imageData:st.imageData||null,imageName:st.imageName||"",ocrText:st.ocrText||"",audioData:st.audioData||null,audioName:st.audioName||"",audioTranscript:st.audioTranscript||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",aiHint:st.aiHint||"",updatedAt:Date.now()});
+  await put("girlStates",{girlId:id,message:st.message||"",lastAnalysisMessage:st.lastAnalysisMessage||"",imageData:st.imageData||null,imageName:st.imageName||"",audioData:st.audioData||null,audioName:st.audioName||"",audioTranscript:st.audioTranscript||"",resultsHtml:st.resultsHtml||"",role:st.role||"her",aiHint:st.aiHint||"",updatedAt:Date.now()});
 }
 async function clearGirlState(id){
   girlStates.delete(id);
@@ -70,10 +69,9 @@ function restoreGirlState(id){
   if(st.resultsHtml){
     window.__rfLastAnalysis = {
       girlId: id,
-      message: st.ocrText || st.lastAnalysisMessage || st.message || "",
+      message: st.lastAnalysisMessage || st.message || "",
       aiHint: st.aiHint || "",
-      image: st.ocrText ? null : (st.imageData || null),
-      ocrText: st.ocrText || "",
+      image: st.imageData || null,
       audio: st.audioData || null,
       audioTranscript: st.audioTranscript || ""
     };
@@ -301,7 +299,6 @@ async function showSelectedMedia(e){
    const st=getGirlState(selectedId);
    st.imageFile=imageFile;
    st.imageData=imageFile?await compressImageForAI(imageFile):null;
-   st.ocrText="";
    st.imageName=imageFile ? "Screenshot: "+imageFile.name : "Nessuno screenshot inserito";
    st.audioFile=audioFile;
    st.audioData=audioFile?await fileToDataUrl(audioFile):null;
@@ -452,47 +449,6 @@ async function compressImageForAI(file){
   }
 }
 
-// OCR locale: lo screenshot viene letto sul dispositivo dell'utente, senza inviare
-// l'immagine al modello visivo sul realme. Il worker viene riutilizzato tra analisi.
-async function loadTesseractLibrary(){
-  if(window.Tesseract?.createWorker) return window.Tesseract;
-  if(!tesseractScriptPromise){
-    tesseractScriptPromise=new Promise((resolve,reject)=>{
-      const script=document.createElement('script');
-      script.src='https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js';
-      script.async=true;
-      script.onload=()=>window.Tesseract?.createWorker?resolve(window.Tesseract):reject(new Error('Libreria OCR non disponibile.'));
-      script.onerror=()=>{tesseractScriptPromise=null;reject(new Error('Non riesco a caricare il motore OCR.'));};
-      document.head.appendChild(script);
-    });
-  }
-  return tesseractScriptPromise;
-}
-async function getTesseractWorker(onProgress){
-  if(!tesseractWorkerPromise){
-    tesseractWorkerPromise=(async()=>{
-      const lib=await loadTesseractLibrary();
-      return lib.createWorker('ita+eng',1,{logger:info=>{
-        if(typeof onProgress==='function'){
-          if(info?.status==='recognizing text') onProgress(info.progress||0);
-          else if(info?.status) onProgress(-1,info.status);
-        }
-      }});
-    })().catch(err=>{tesseractWorkerPromise=null;throw err;});
-  }
-  return tesseractWorkerPromise;
-}
-async function extractScreenshotText(source,onProgress){
-  const worker=await getTesseractWorker(onProgress);
-  const result=await worker.recognize(source);
-  const text=String(result?.data?.text||'').replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
-  const confidence=Number(result?.data?.confidence||0);
-  if(text.length<18 || confidence<20) throw new Error('Testo OCR insufficiente o poco leggibile.');
-  // Le ultime righe dello screenshot contengono normalmente i messaggi più recenti.
-  // Manteniamo una trascrizione più compatta per non rallentare la generazione locale.
-  return text.length > 5000 ? text.slice(-5000) : text;
-}
-
 async function saveReplyToChat(text){
   if(!selectedId || !text) return;
   const st=getGirlState(selectedId);
@@ -522,7 +478,7 @@ function getLastAnalysisContext(){
   if(a?.girlId===selectedId) return a;
   const st=selectedId?getGirlState(selectedId):null;
   if(!st || !st.resultsHtml) return null;
-  const recovered={girlId:selectedId,message:st.ocrText||st.lastAnalysisMessage||st.message||"",aiHint:st.aiHint||"",image:st.ocrText?null:(st.imageData||null),ocrText:st.ocrText||"",audio:st.audioData||null,audioTranscript:st.audioTranscript||""};
+  const recovered={girlId:selectedId,message:st.lastAnalysisMessage||st.message||"",aiHint:st.aiHint||"",image:st.imageData||null,audio:st.audioData||null,audioTranscript:st.audioTranscript||""};
   window.__rfLastAnalysis=recovered;
   return recovered;
 }
@@ -578,23 +534,6 @@ function bindResultButtons(){
 }
 
 
-function formatAIProviderLabel(provider){
-  const raw=String(provider||"").trim();
-  if(!raw) return "Provider non indicato";
-  return raw.split(/\s*\+\s*/).map(item=>{
-    const parts=item.split("/");
-    const name=(parts[0]||"").trim();
-    const model=parts.slice(1).join("/").trim();
-    if(name.toLowerCase()==="ollitert") return model ? `Gemma · ${model} (OlliteRT)` : "Gemma (OlliteRT)";
-    if(name.toLowerCase()==="gemini") return model ? `Gemini · ${model}` : "Gemini";
-    if(name.toLowerCase()==="openrouter") return model ? `OpenRouter · ${model}` : "OpenRouter";
-    return item;
-  }).join(" + ");
-}
-function providerInfoHtml(provider){
-  return `<div class="ai-provider-info">🧠 Motore AI utilizzato: <b>${escapeHtml(formatAIProviderLabel(provider))}</b></div>`;
-}
-
 function getCurrentTimeContext(){
   const now=new Date();
   const weekday=new Intl.DateTimeFormat('it-IT',{weekday:'long'}).format(now);
@@ -618,16 +557,15 @@ async function loadSecretRepliesLazy(){
   try{
     if(navigator.onLine===false) throw new Error("Nessuna connessione internet.");
     const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),660000);
+    const timer=setTimeout(()=>controller.abort(),45000);
     let response;
     try{
       response=await fetch("/api/reply",{method:"POST",headers:{"Content-Type":"application/json"},signal:controller.signal,body:JSON.stringify({
-        girlId:a.girlId,message:a.message,aiHint:a.aiHint,image:a.ocrText?null:a.image,audio:a.audio,audioTranscript:a.audioTranscript||"",currentTime:getCurrentTimeContext(),mode:"secret"
+        girlId:a.girlId,message:a.message,aiHint:a.aiHint,image:a.image,audio:a.audio,audioTranscript:a.audioTranscript||"",currentTime:getCurrentTimeContext(),mode:"secret"
       })});
     }finally{clearTimeout(timer)}
     if(!response.ok){ const detail=await response.text().catch(()=>""); throw new Error(detail||"Server AI non disponibile."); }
     const data=await response.json();
-    const providerHtml=providerInfoHtml(data.provider);
     const replies=Array.isArray(data.replies)?data.replies:[];
     if(!replies.length) throw new Error("Nessuna risposta segreta restituita dall'AI.");
     const voiceOrder=loadVoiceSettings();
@@ -651,7 +589,7 @@ async function loadSecretRepliesLazy(){
       const moreBlock=moreCount?`<div id="${groupId}_more" class="reply-category-more hidden">${otherCards}</div><button type="button" class="category-more-toggle" data-target="${groupId}_more" data-count="${moreCount}">⌄ Mostra le altre ${moreCount} risposte</button>`:"";
       return `<div id="${groupId}" class="reply-category-group secret-category-group"><div class="reply-category-title">${escapeHtml(getVoiceLabel(style))} <span class="reply-category-count">${cat.length} risposte</span></div>${recommendedCard}${moreBlock}</div>`;
     }).join("");
-    content.innerHTML=providerHtml+(groups||"<div class='secret-lazy-text'>Nessuna risposta segreta disponibile.</div>");
+    content.innerHTML=groups||"<div class='secret-lazy-text'>Nessuna risposta segreta disponibile.</div>";
     bindResultButtons();
     const state=getGirlState(a.girlId);
     if(state){ state.resultsHtml=document.getElementById("results")?.innerHTML||state.resultsHtml; await persistGirlState(a.girlId); }
@@ -675,53 +613,27 @@ $("generate").onclick=async()=>{
   $("generate").disabled=true;
   $("generate").textContent="Analizzo...";
   try{
-    // Evita una lettura IndexedDB aggiuntiva: il backend riceve girlId e recupera
-    // il contesto persistente dal server. Il valore context non veniva usato.
+    const context=await buildContext();
     let image=null;
     let audio=null;
     state.message="";
     state.lastAnalysisMessage=text;
     state.aiHint=aiHint;
     if(selectedImageFile){
-      // showSelectedMedia ha già compresso e salvato lo screenshot al momento
-      // della selezione. Riutilizzalo invece di ripetere il lavoro sul telefono.
-      image=state.imageData || await compressImageForAI(selectedImageFile);
-      if(!state.imageData){
-        state.imageData=image;
-        state.imageFile=selectedImageFile;
-        state.imageName="Screenshot: "+selectedImageFile.name;
-        await persistGirlState(selectedId);
-      }
+      image=await compressImageForAI(selectedImageFile);
+      state.imageData=image;
+      state.imageFile=selectedImageFile;
+      state.imageName="Screenshot: "+selectedImageFile.name;
+      await persistGirlState(selectedId);
     }else if(state.imageData){
       image=state.imageData;
     }
-    let ocrText=String(state.ocrText||'').trim();
-    if(image && !ocrText){
-      try{
-        const ocrSource=selectedImageFile || image;
-        const extracted=await extractScreenshotText(ocrSource,p=>{
-          const percent=Math.round(p*100);
-          $('generate').textContent=percent>=0?`Leggo screenshot ${percent}%...`:'Preparo OCR...';
-        });
-        if(extracted){
-          ocrText=extracted;
-          state.ocrText=ocrText;
-          await persistGirlState(selectedId);
-        }
-      }catch(ocrError){
-        console.warn('OCR locale non riuscito; uso la lettura visiva originale:',ocrError);
-        ocrText='';
-      }
-    }
     if(selectedAudioFile){
-      // Anche l'audio viene già convertito in data URL alla selezione.
-      audio=state.audioData || await fileToDataUrl(selectedAudioFile);
-      if(!state.audioData){
-        state.audioData=audio;
-        state.audioFile=selectedAudioFile;
-        state.audioName=selectedAudioFile.name;
-        await persistGirlState(selectedId);
-      }
+      audio=await fileToDataUrl(selectedAudioFile);
+      state.audioData=audio;
+      state.audioFile=selectedAudioFile;
+      state.audioName=selectedAudioFile.name;
+      await persistGirlState(selectedId);
     }else if(state.audioData){
       audio=state.audioData;
     }
@@ -730,7 +642,7 @@ $("generate").onclick=async()=>{
       throw new Error("Nessuna connessione internet.");
     }
     const controller=new AbortController();
-    const clientTimer=setTimeout(()=>controller.abort(),660000);
+    const clientTimer=setTimeout(()=>controller.abort(),62000);
     let response;
     try{
       response=await fetch("/api/reply",{
@@ -739,9 +651,9 @@ $("generate").onclick=async()=>{
         signal:controller.signal,
         body:JSON.stringify({
           girlId:selectedId,
-          message:ocrText || text,
+          message:text,
           aiHint,
-          image:ocrText ? null : image,
+          image,
           audio,
           currentTime:getCurrentTimeContext(),
           mode:"normal"
@@ -753,7 +665,6 @@ $("generate").onclick=async()=>{
       throw new Error(detail || "Server AI non disponibile.");
     }
     const data=await response.json();
-    const providerHtml=providerInfoHtml(data.provider);
     const audioTranscript=String(data.audioTranscript||"").trim();
     if(audioTranscript){
       state.audioTranscript=audioTranscript;
@@ -810,17 +721,17 @@ $("generate").onclick=async()=>{
     const normalCards=styleOrder.slice(0,8).map(style=>renderCategory(style,normalIndexes,false)).join("");
     const secretCards=styleOrder.slice(8).map(style=>renderCategory(style,secretIndexes,true)).join("");
     const transcriptHtml=audioTranscript?`<div class="audio-transcript-card"><div class="audio-transcript-title">🎙️ Trascrizione della registrazione</div><div class="audio-transcript-text">${escapeHtml(audioTranscript)}</div></div>`:"";
-    const columns=`${providerHtml}${transcriptHtml}${adviceHtml}<div class="reply-choice-grid">
-      <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>3 per stile: Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Battuta, Poeta</small></span><span class="reply-choice-arrow">›</span></button>
-      <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>3 Erotiche + 10 Hot • vengono generate quando le apri</small></span><span class="reply-choice-arrow">›</span></button>
+    const columns=`${transcriptHtml}${adviceHtml}<div class="reply-choice-grid">
+      <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>5 per stile: Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Battuta, Poeta</small></span><span class="reply-choice-arrow">›</span></button>
+      <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>5 Erotiche + 10 Hot • vengono generate quando le apri</small></span><span class="reply-choice-arrow">›</span></button>
     </div>
     <section id="normalRepliesPanel" class="reply-panel hidden"><div class="reply-panel-head"><div><b>💬 Risposte normali</b><small>Quella consigliata è evidenziata.</small></div><button type="button" class="reply-panel-close" data-close-panel="normalRepliesPanel">×</button></div><div class="reply-panel-list">${normalCards}</div></section>
-    <section id="secretRepliesPanel" class="reply-panel secret-panel hidden"><div class="reply-panel-head"><div><b>🔒 Risposte segrete</b><small>Vengono generate solo quando le apri.</small></div><button type="button" class="reply-panel-close" data-close-panel="secretRepliesPanel">×</button></div><div id="secretRepliesContent" class="reply-panel-list"><div class="secret-lazy-card"><div class="secret-lazy-title">🔥 Risposte segrete</div><div class="secret-lazy-text">Le 13 risposte segrete vengono generate automaticamente quando apri questa sezione: 3 Erotiche + 10 Hot.</div></div></div></section>`;
+    <section id="secretRepliesPanel" class="reply-panel secret-panel hidden"><div class="reply-panel-head"><div><b>🔒 Risposte segrete</b><small>Vengono generate solo quando le apri.</small></div><button type="button" class="reply-panel-close" data-close-panel="secretRepliesPanel">×</button></div><div id="secretRepliesContent" class="reply-panel-list"><div class="secret-lazy-card"><div class="secret-lazy-title">🔥 Risposte segrete</div><div class="secret-lazy-text">Le 15 risposte segrete vengono generate automaticamente quando apri questa sezione: 5 Erotiche + 10 Hot.</div></div></div></section>`;
     $("results").innerHTML=columns;
     applySettings();
     state.resultsHtml=$("results").innerHTML;
     await persistGirlState(selectedId);
-    window.__rfLastAnalysis = { girlId: selectedId, message: ocrText || text, aiHint, image: ocrText ? null : image, ocrText, audio, audioTranscript };
+    window.__rfLastAnalysis = { girlId: selectedId, message: text, aiHint, image, audio, audioTranscript };
     bindResultButtons();
     // Dopo l'analisi apri automaticamente solo la prima casella: Risposte normali.
     const normalChoice=document.querySelector('.reply-choice[data-target="normalRepliesPanel"]');
@@ -1165,3 +1076,4 @@ $("logoutBtn")?.addEventListener("click",async()=>{
 (async function boot(){
   await initAuth();
 })();
+

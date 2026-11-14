@@ -97,7 +97,7 @@ function promptFor(context, message, aiHint = "", audioTranscript = "", previous
   const prev = Array.isArray(previousGeneratedReplies)
     ? [...new Set(previousGeneratedReplies.map(x => String(x).trim()).filter(Boolean))].slice(-12)
     : [];
-  const countForStyle = style => style === "Hot" ? 10 : 3;
+  const countForStyle = style => style === "Hot" ? 10 : 5;
   const totalReplies = styleOrder.reduce((sum, style) => sum + countForStyle(style), 0);
   const sectionName = mode === "secret" ? "SOLO RISPOSTE SEGRETE" : "SOLO RISPOSTE NORMALI";
   const settingsById = new Map();
@@ -113,20 +113,11 @@ function promptFor(context, message, aiHint = "", audioTranscript = "", previous
     if (style === "Hot" || style === "Erotica") return `${style}: circa 18-32 parole per risposta, con contenuto sostanzioso ma naturale.`;
     return `${style}: circa 18-32 parole per risposta; evita risposte di una sola frase telegrafica quando il contesto consente di sviluppare meglio l'idea.`;
   }).join("\n");
-  const screenshotSourceRule = String(message || '').trim()
-    ? 'Usa il testo OCR qui sotto come trascrizione primaria dello screenshot; se l’immagine è allegata, usala solo per chiarire dubbi.'
-    : 'Non è disponibile testo OCR: analizza direttamente lo screenshot allegato e identifica l’ultima bolla di LEI.';
-  const replySlotsExample = styleOrder.flatMap(style =>
-    Array.from({ length: countForStyle(style) }, (_, index) => ({
-      style,
-      text: `risposta distinta ${index + 1} dello stile ${style}`
-    }))
-  );
-  return `Sei RispostaFlirt. Analizza con precisione il testo estratto dallo screenshot (se presente), l’immagine allegata quando disponibile, la cronologia e soprattutto l'INDICAZIONE DELL'UTENTE. Devi distinguere SEMPRE e senza eccezioni IO (l'utente che sta usando l'app) da LEI (la persona con cui sta parlando). Rispondi ESCLUSIVAMENTE all'ultimo messaggio realmente ricevuto da LEI.
+  return `Sei RispostaFlirt. Analizza con precisione lo screenshot, la cronologia e soprattutto l'INDICAZIONE DELL'UTENTE. Devi distinguere SEMPRE e senza eccezioni IO (l'utente che sta usando l'app) da LEI (la persona con cui sta parlando). Rispondi ESCLUSIVAMENTE all'ultimo messaggio realmente ricevuto da LEI.
 
 DATA E ORA ATTUALI DEL DISPOSITIVO: ${context?.currentTime?.weekday || ''}, ${context?.currentTime?.date || ''}, ore ${context?.currentTime?.time || ''} (${context?.currentTime?.timeZone || 'fuso locale'}). USA QUESTO COME RIFERIMENTO TEMPORALE PER INTERPRETARE E GENERARE LE RISPOSTE. Se una risposta contiene riferimenti a oggi, domani, ieri, stamattina, stasera o giorni della settimana, devono essere coerenti con questa data e ora. NON scrivere per esempio "iniziare il lunedì" se oggi non è lunedì, salvo che tu stia parlando esplicitamente di un altro giorno. Se il contesto non richiede un riferimento temporale, non inserirlo artificialmente.
 
-PRIORITÀ DELLO SCREENSHOT E DEL TURNO CORRENTE: ${screenshotSourceRule} Ricostruisci l'ordine dei messaggi e identifica l'ULTIMA BOLLA SCRITTA DA LEI. Quella è la frase a cui devi rispondere. Le bolle precedenti servono solo come contesto. Non rispondere a un messaggio vecchio, a una frase precedente o a un dettaglio secondario dello screenshot. Prima di generare, ricostruisci mentalmente: 1) ultimo messaggio di LEI da rispondere; 2) ultimo messaggio di IO che lo precede; 3) eventuali fatti personali rilevanti. Se lo screenshot e una vecchia cronologia salvata sembrano riferirsi a turni diversi, per il turno corrente prevale lo screenshot.
+PRIORITÀ DELLO SCREENSHOT E DEL TURNO CORRENTE: se è presente uno screenshot, trattalo come la fonte primaria per capire il turno corrente. Leggi la conversazione visibile e identifica l'ULTIMA BOLLA SCRITTA DA LEI. Quella è la frase a cui devi rispondere. Le bolle precedenti servono solo come contesto. Non rispondere a un messaggio vecchio, a una frase precedente o a un dettaglio secondario dello screenshot. Prima di generare, ricostruisci mentalmente: 1) ultimo messaggio di LEI da rispondere; 2) ultimo messaggio di IO che lo precede; 3) eventuali fatti personali rilevanti. Se lo screenshot e una vecchia cronologia salvata sembrano riferirsi a turni diversi, per il turno corrente prevale lo screenshot.
 
 L'INDICAZIONE DELL'UTENTE NON È UN MESSAGGIO DI LEI: è una nota/informazione che spiega come interpretare la situazione e come vuoi che vengano costruite le risposte. Non trasformare mai il testo dell'indicazione in un messaggio da parte di LEI e non rispondere direttamente all'indicazione.
 
@@ -134,7 +125,7 @@ REGOLA ASSOLUTA SULLA PROSPETTIVA: ogni fatto espresso dall'utente con "io", "so
 
 RICOSTRUZIONE DEI RUOLI E DEI POSSESSIVI: prima di generare qualsiasi risposta, identifica chiaramente chi parla in ogni bolla. Nell'ultima bolla di LEI, i riferimenti "tu", "te", "ti", "tuo", "tua", "tuoi", "tue" indicano l'UTENTE; i riferimenti "io", "me", "mi", "mio", "mia", "miei", "mie" indicano LEI. Nelle bolle di IO vale l'opposto. Esempio fondamentale: se LEI scrive "la tua estetista", l'estetista è quella dell'UTENTE; se LEI scrive "la mia estetista", è quella di LEI. Non invertire questi riferimenti e non decidere il proprietario in base a supposizioni o al tono della frase. Se una risposta parla di una persona, oggetto, lavoro, familiare o attività citata con un possessivo, conserva esattamente il proprietario indicato dal parlante. Prima di scrivere, costruisci mentalmente una tabella: IO = utente; LEI = ragazza; "tuo/tua" detto da LEI = IO; "mio/mia" detto da LEI = LEI.
 
-GENERA ESATTAMENTE ${totalReplies} RISPOSTE, con 3 risposte per ogni stile tranne Hot che deve avere ESATTAMENTE 10 risposte. Nell'ordine personalizzato scelto dall'utente. MODALITÀ: ${sectionName}:
+GENERA ESATTAMENTE ${totalReplies} RISPOSTE, con 5 risposte per ogni stile tranne Hot che deve avere ESATTAMENTE 10 risposte. Nell'ordine personalizzato scelto dall'utente. MODALITÀ: ${sectionName}:
 ${styleOrder.map((style,i)=>`${i+1} ${style}`).join("\n")}
 Genera SOLO gli stili elencati sopra. La prima risposta di OGNI stile deve essere la migliore di quello stile. Rispetta esattamente questo ordine anche nell'array replies.
 
@@ -143,7 +134,7 @@ PERSONALIZZAZIONE DELLE VOCI: l'utente può aver modificato il nome visualizzato
 ISTRUZIONI PERSONALIZZATE DELLE VOCI:
 ${JSON.stringify(context?.voiceSettings || {})}
 
-PRIORITÀ DELLE ISTRUZIONI PERSONALIZZATE: le istruzioni scritte dall'utente per una voce sono vincolanti e hanno priorità sulle regole generali di stile e lunghezza, purché siano compatibili con il contesto, la memoria, i vincoli dell'utente e la sicurezza. Non ignorarle e non ridurle a un semplice suggerimento. Se l'utente chiede esplicitamente "risposte più lunghe", "più corte", "più dirette", "più dolci", "più provocatorie" o qualcosa di analogo, applica quella richiesta in modo concreto a TUTTE le risposte previste per quella voce (3 per gli altri stili, 10 per Hot).
+PRIORITÀ DELLE ISTRUZIONI PERSONALIZZATE: le istruzioni scritte dall'utente per una voce sono vincolanti e hanno priorità sulle regole generali di stile e lunghezza, purché siano compatibili con il contesto, la memoria, i vincoli dell'utente e la sicurezza. Non ignorarle e non ridurle a un semplice suggerimento. Se l'utente chiede esplicitamente "risposte più lunghe", "più corte", "più dirette", "più dolci", "più provocatorie" o qualcosa di analogo, applica quella richiesta in modo concreto a TUTTE le risposte previste per quella voce (5 per gli altri stili, 10 per Hot).
 
 OUTPUT E VELOCITÀ: mantieni il JSON compatto. I reason delle categorie devono essere brevi (una frase), advice e sendWhen devono essere sintetici. Non aggiungere spiegazioni fuori dal JSON.
 
@@ -151,7 +142,7 @@ LUNGHEZZA: la lunghezza NON dipende dal telefono, dal browser o dal sistema oper
 REGOLE DI LUNGHEZZA PER VOCE:
 ${lengthRules}
 
-VARIETÀ: tutte le risposte devono essere realmente diverse e, soprattutto, le risposte dello stesso stile devono sembrare tre idee differenti. Per ogni gruppo di 3 cambia apertura, struttura della frase, ritmo, vocabolario, angolazione e tipo di risposta. Non creare cinque parafrasi della prima. Evita di iniziare più risposte con le stesse parole. Almeno una risposta può essere centrata sulla situazione, una su un'osservazione o autoironia, una su un cambio naturale di argomento e le altre su angolazioni diverse, quando il contesto lo permette. Confronta sempre le 50 risposte tra loro e con le RISPOSTE PRECEDENTI DA EVITARE prima di finalizzare.
+VARIETÀ: tutte le risposte devono essere realmente diverse e, soprattutto, le risposte dello stesso stile devono sembrare cinque idee differenti. Per ogni gruppo di 5 cambia apertura, struttura della frase, ritmo, vocabolario, angolazione e tipo di risposta. Non creare cinque parafrasi della prima. Evita di iniziare più risposte con le stesse parole. Almeno una risposta può essere centrata sulla situazione, una su un'osservazione o autoironia, una su un cambio naturale di argomento e le altre su angolazioni diverse, quando il contesto lo permette. Confronta sempre le 50 risposte tra loro e con le RISPOSTE PRECEDENTI DA EVITARE prima di finalizzare.
 
 EMOJI: nella maggior parte delle risposte normali usa 1 emoji naturale e pertinente; non forzarla nei messaggi seri. Varia le emoji.
 
@@ -179,12 +170,12 @@ TEST DI RISPOSTA: prima di finalizzare ogni frase, immagina di incollarla subito
 
 CONSIGLIO: advice e sendWhen devono essere sempre valorizzati con il consiglio operativo migliore e il momento corretto per inviare. Se l'indicazione dell'utente chiede una decisione, rispettala. Non inventare il motivo del consiglio.
 
-RECOMMENDATIONS: categoryRecommendations deve contenere esattamente le chiavi degli stili richiesti in questo blocco, nell'ordine ${styleOrder.join(", ")}. Ogni chiave ha index:0 e un reason specifico. recommendedIndex deve indicare la migliore risposta tra quelle generate in questo blocco. recommendedNormalIndex e recommendedSecretIndex devono essere coerenti con la modalità richiesta.
+RECOMMENDATIONS: categoryRecommendations deve avere esattamente queste 10 chiavi nell'ordine personalizzato ${styleOrder.join(", ")}. Ogni chiave ha index:0 e un reason specifico. recommendedNormalIndex deve indicare una delle prime 40; recommendedSecretIndex deve indicare una delle risposte segrete (Erotica o Hot); recommendedIndex la migliore assoluta.
 
 SEGRETE: Erotica e Hot devono essere le voci più sensuali, intense, audaci e provocanti dell'app QUANDO IL CONTESTO LE RENDE APPROPRIATE. HOT deve spingersi al massimo livello consentito: forte tensione, desiderio, doppi sensi, allusioni e linguaggio seducente, senza diventare freddo o timido. Mantieni comunque il contenuto non grafico: non descrivere esplicitamente atti sessuali, genitali o dettagli pornografici. Se il contesto permette un tono molto caldo, non annacquarlo con frasi innocue o generiche. Se invece LEI è arrabbiata, infastidita, sta mettendo un limite o il contesto non sostiene la sessualità, non forzare Hot/Erotica: anche queste risposte devono restare pertinenti al momento e non peggiorare la situazione.
 
 Rispondi SOLO con JSON valido, senza markdown, esattamente nel formato:
-${JSON.stringify({advice:"...",sendWhen:"oggi",recommendedIndex:0,recommendedNormalIndex:0,recommendedSecretIndex:(mode === "secret" ? 0 : 40),recommendationReason:"...",categoryRecommendations:categoryExample,replies:replySlotsExample})}
+${JSON.stringify({advice:"...",sendWhen:"oggi",recommendedIndex:0,recommendedNormalIndex:0,recommendedSecretIndex:(mode === "secret" ? 0 : 40),recommendationReason:"...",categoryRecommendations:categoryExample,replies:[{style:styleOrder[0],text:"..."}]})}
 
 CONTESTO:
 ${JSON.stringify(context || {})}
@@ -218,77 +209,6 @@ CONTROLLO FINALE OBBLIGATORIO PRIMA DEL JSON:
 - Se LEI è arrabbiata o infastidita, verifica che nessuna risposta la provochi inutilmente o trasformi la situazione in flirt/sesso senza una base reale.
 - Verifica che ogni stile sia diverso nel tono ma coerente con la stessa situazione concreta.
 - Se una risposta non supera il TEST DI RISPOSTA, scartala e sostituiscila prima di produrre il JSON.`;
-}
-
-// Prompt compatto dedicato a Gemma locale: mantiene le regole essenziali e
-// limita i dati di contesto inviati al telefono. Il prompt completo resta
-// invariato per Gemini/OpenRouter come fallback.
-function promptForOlliteRT(context, message, aiHint = '', audioTranscript = '', previousGeneratedReplies = [], mode = 'normal') {
-  const defaults = mode === 'secret' ? ['Erotica', 'Hot'] : ['Dolce', 'Stuzzica', 'Ironico', 'Flirt', 'Seria', 'Audace', 'Battuta', 'Poeta'];
-  const settings = context?.voiceSettings || {};
-  const configured = Array.isArray(settings[mode]) ? settings[mode] : [];
-  const styles = configured.length ? configured.map(v => String(v?.id || '')).filter(Boolean) : defaults;
-  const count = style => style === 'Hot' ? 10 : 3;
-  const total = styles.reduce((n, style) => n + count(style), 0);
-  const categoryExample = Object.fromEntries(styles.map(style => [style, { index: 0, reason: '...' }]));
-  const custom = configured.map(v => ({
-    style: String(v?.id || ''),
-    instruction: String(v?.instruction || '').slice(0, 350)
-  })).filter(v => v.style && v.instruction);
-  const clip = (value, max) => String(value || '').slice(0, max);
-  const conversation = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-4).map(m => ({
-    role: m?.role === 'me' ? 'IO' : 'LEI',
-    text: clip(m?.text, 260)
-  }));
-  const previousReplies = (Array.isArray(context?.previousReplies) ? context.previousReplies : []).slice(-3).map(x => clip(x, 110));
-  const previousGenerated = [...new Set((Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : []).map(x => clip(x, 130)).filter(Boolean))].slice(-3);
-  const compactContext = {
-    ragazza: clip(context?.girl?.name, 80),
-    noteRagazza: clip(context?.girl?.note, 320),
-    memoriaRagazza: clip(context?.memory || context?.girl?.memory, 600),
-    profiloUtente: clip(context?.aboutMe, 220),
-    dataOra: context?.currentTime ? {
-      giorno: clip(context.currentTime.weekday, 20),
-      data: clip(context.currentTime.date, 20),
-      ora: clip(context.currentTime.time, 12),
-      fuso: clip(context.currentTime.timeZone, 40)
-    } : null,
-    conversazioneRecente: conversation,
-    messaggiUtentePrecedenti: previousReplies,
-    risposteGiaGenerateDaEvitare: previousGenerated
-  };
-  const modeLabel = mode === 'secret' ? 'SEGRETE' : 'NORMALI';
-  const screenshotSourceRule = clip(message, 5000)
-    ? 'Usa il testo OCR seguente come trascrizione primaria dello screenshot; se l’immagine è allegata, usala solo per chiarire dubbi.'
-    : 'Non è disponibile testo OCR: analizza direttamente lo screenshot allegato e identifica l’ultima bolla di LEI.';
-  const styleInstructions = custom.length ? JSON.stringify(custom) : 'Nessuna.';
-  const replySlotsExample = styles.flatMap(style =>
-    Array.from({ length: count(style) }, (_, index) => ({
-      style,
-      text: `risposta distinta ${index + 1} dello stile ${style}`
-    }))
-  );
-  return `Sei RispostaFlirt. Scrivi in italiano naturale. Devi rispondere SOLO all'ULTIMO messaggio di LEI. ${screenshotSourceRule} Il contenuto dello screenshot prevale sulla cronologia salvata. Il campo INDICAZIONE è una nota dell'utente, non è un messaggio di LEI.
-
-RUOLI: IO = utente; LEI = ragazza. Nei messaggi di LEI, “tu/te/ti/tuo” indicano IO e “io/me/mi/mio” indicano LEI. Nei messaggi di IO vale l'opposto. Non scambiare mai fatti o possessivi. Se non è chiaro chi possiede un fatto, non inventarlo.
-
-CONTESTO: ${JSON.stringify(compactContext)}
-
-TESTO ESTRATTO DALLO SCREENSHOT (OCR; ordine delle righe approssimato): ${clip(message, 5000) || 'Nessun testo OCR disponibile.'}
-INDICAZIONE UTENTE: ${clip(aiHint, 900) || 'Nessuna.'}
-TRASCRIZIONE VOCALE: ${clip(audioTranscript, 1200) || 'Nessuna.'}
-
-MEMORIA E ISTRUZIONI PERSONALIZZATE: rispetta note e memoria della ragazza, profilo utente e istruzioni delle voci. Istruzioni voci: ${styleInstructions}
-
-COMPITO: genera ESATTAMENTE ${total} risposte, nell'ordine degli stili: ${styles.join(', ')}. Genera 3 risposte per ogni stile; per Hot esattamente 10. Usa nei campi style i nomi tecnici degli stili. La prima risposta di ogni stile deve essere la migliore. Le risposte dello stesso stile devono essere idee diverse, non parafrasi. Non riutilizzare la stessa apertura, la stessa struttura o gruppi di tre parole consecutive; varia prospettiva, ritmo e intenzione in ogni risposta.
-
-TONO: Dolce = affettuoso; Stuzzica = provocatorio leggero; Ironico = ironia; Flirt = seducente ma naturale; Seria = matura e sincera; Audace = sicuro; Battuta = spiritoso; Poeta = evocativo; Erotica/Hot = sensuali e allusive, mai grafiche. Adatta SEMPRE il tono al messaggio reale: se LEI è arrabbiata, infastidita o pone un limite, niente flirt o sesso forzato; rispetta il limite e non peggiorare la situazione. Niente frasi generiche fuori contesto. Ogni risposta deve sembrare una continuazione naturale della chat.
-
-LUNGHEZZA: per velocizzare la generazione, ogni risposta deve essere concisa ma concreta, circa 10-18 parole. Non usare spiegazioni o premesse. Se le istruzioni personalizzate della singola voce chiedono esplicitamente una lunghezza diversa, rispettale. Mantieni 1 emoji pertinente nella maggior parte delle risposte normali, senza forzarla nei messaggi seri. Evita ripetizioni con i messaggi e le risposte precedenti.
-
-CONSIGLIO: valorizza advice e sendWhen con indicazioni brevi e pratiche. categoryRecommendations deve avere esattamente queste chiavi: ${styles.join(', ')}. Per ogni chiave usa index:0 e un reason specifico e breve. recommendedIndex indica la migliore risposta del blocco. recommendedNormalIndex e recommendedSecretIndex devono essere coerenti con la modalità ${modeLabel}.
-
-Rispondi SOLO con JSON valido, senza markdown, nel formato: ${JSON.stringify({ advice: '...', sendWhen: 'oggi', recommendedIndex: 0, recommendedNormalIndex: 0, recommendedSecretIndex: mode === 'secret' ? 0 : 40, recommendationReason: '...', categoryRecommendations: categoryExample, replies: replySlotsExample })}`;
 }
 
 function imagePart(image) {
@@ -328,17 +248,13 @@ async function transcribeAudio(apiKey, audio, timeoutMs = 16000) {
   return text;
 }
 
-async function fetchWithTimeout(url, options, ms = 18000, parentSignal = null) {
+async function fetchWithTimeout(url, options, ms = 18000) {
   const controller = new AbortController();
-  const abortFromParent = () => controller.abort(parentSignal?.reason);
-  if (parentSignal?.aborted) abortFromParent();
-  else parentSignal?.addEventListener('abort', abortFromParent, { once: true });
-  const timer = setTimeout(() => controller.abort(new Error('Timeout richiesta AI')), ms);
+  const timer = setTimeout(() => controller.abort(), ms);
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
     clearTimeout(timer);
-    parentSignal?.removeEventListener('abort', abortFromParent);
   }
 }
 
@@ -380,215 +296,42 @@ async function callGemini(apiKey, model, prompt, image, timeoutMs = 55000) {
   return extractJson(raw);
 }
 
-async function callOpenRouter(apiKey, prompt, image, timeoutMs = 11000) {
+async function callOpenRouter(apiKey, prompt, image, timeoutMs = 55000) {
   const content = [{ type: 'text', text: prompt }];
   if (image) content.push({ type: 'image_url', image_url: { url: image } });
 
-  // Il router gratuito può assegnare modelli diversi: facciamo al massimo
-  // due tentativi brevi e riportiamo il motivo reale se non arriva testo.
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    let response;
-    let data = {};
-    try {
-      response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://risposte-filtr.984hg549k6.workers.dev',
-          'X-Title': 'RispostaFlirt'
-        },
-        body: JSON.stringify({
-          model: 'openrouter/free',
-          messages: [{ role: 'user', content }],
-          temperature: 0.85,
-          max_tokens: 4500,
-          response_format: { type: 'json_object' }
-        })
-      }, timeoutMs);
-      data = await response.json().catch(() => ({}));
-    } catch (err) {
-      if (attempt === 1 && (err?.name === 'AbortError' || /network|fetch/i.test(String(err?.message || err)))) {
-        continue;
-      }
-      throw err;
-    }
+  const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://rispostaflirt.netlify.app',
+      'X-Title': 'RispostaFlirt'
+    },
+    body: JSON.stringify({
+      model: 'openrouter/free',
+      messages: [{ role: 'user', content }],
+      temperature: 0.85,
+      max_tokens: 2600,
+      response_format: { type: 'json_object' }
+    })
+  }, timeoutMs);
 
-    if (!response.ok) {
-      const status = response.status;
-      const detail = data?.error?.message || data?.error?.metadata?.raw || `HTTP ${status}`;
-      if (attempt === 1 && (status === 429 || status >= 500)) continue;
-      throw new Error(`OpenRouter (${status}): ${String(detail).slice(0, 240)}`);
-    }
-
-    const choice = data?.choices?.[0] || {};
-    const message = choice?.message || {};
-    const messageContent = message?.content;
-    const raw = Array.isArray(messageContent)
-      ? messageContent.map(part => typeof part === 'string' ? part : (part?.text || '')).join('').trim()
-      : (typeof messageContent === 'string' ? messageContent.trim() : '');
-
-    if (raw) {
-      try {
-        return extractJson(raw);
-      } catch (err) {
-        if (attempt === 1) continue;
-        throw new Error(`OpenRouter: risposta ricevuta ma JSON non valido (${String(err?.message || err).slice(0, 180)}).`);
-      }
-    }
-
-    const finishReason = choice?.finish_reason || 'non indicato';
-    const returnedModel = data?.model || 'modello non indicato';
-    const refusal = message?.refusal ? `; refusal: ${String(message.refusal).slice(0, 120)}` : '';
-    const emptyError = `OpenRouter: risposta senza testo (modello ${returnedModel}, finish_reason ${finishReason}${refusal}).`;
-    if (attempt === 2) throw new Error(emptyError);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error('OpenRouter: servizio non disponibile');
   }
-
-  throw new Error('OpenRouter: nessuna risposta testuale dopo due tentativi.');
-}
-
-
-async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs = 300000, parentSignal = null) {
-  const content = [{ type: 'text', text: prompt }];
-  if (image) content.push({ type: 'image_url', image_url: { url: image } });
-
-  const endpoint = `${String(baseUrl || '').replace(/\/+$/, '')}/chat/completions`;
-  const authorization = /^Bearer\s+/i.test(String(apiToken || ''))
-    ? String(apiToken).trim()
-    : `Bearer ${String(apiToken || '').trim()}`;
-  const controller = new AbortController();
-  const abortFromParent = () => controller.abort(parentSignal?.reason);
-  if (parentSignal?.aborted) abortFromParent();
-  else parentSignal?.addEventListener('abort', abortFromParent, { once: true });
-  const timer = setTimeout(() => controller.abort(new Error('Timeout richiesta AI')), timeoutMs);
-
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': authorization,
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream'
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content }],
-        temperature: 0.85,
-        max_tokens: 3000,
-        stream: true
-      }),
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      const detail = data?.error?.message || data?.error?.detail || `HTTP ${response.status}`;
-      throw new Error(`OlliteRT (${response.status}): ${String(detail).slice(0, 240)}`);
-    }
-
-    if (!response.body) throw new Error('OlliteRT: risposta streaming senza corpo.');
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let raw = '';
-    let finishReason = 'non indicato';
-    let sawSseData = false;
-
-    const consumeSseLine = (line) => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith(':') || !trimmed.startsWith('data:')) return;
-      const payload = trimmed.slice(5).trim();
-      if (!payload) return;
-      sawSseData = true;
-      if (payload === '[DONE]') return;
-      let chunk;
-      try { chunk = JSON.parse(payload); }
-      catch (_) { return; }
-      const choice = chunk?.choices?.[0];
-      const delta = choice?.delta || {};
-      const piece = delta.content ?? choice?.message?.content ?? choice?.text ?? '';
-      if (typeof piece === 'string') raw += piece;
-      else if (Array.isArray(piece)) {
-        raw += piece.map(part => typeof part === 'string' ? part : (part?.text || '')).join('');
-      }
-      if (choice?.finish_reason) finishReason = choice.finish_reason;
-    };
-
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split(/\r?\n/);
-        buffer = lines.pop() || '';
-        for (const line of lines) consumeSseLine(line);
-      }
-      buffer += decoder.decode();
-      if (buffer) consumeSseLine(buffer);
-    } finally {
-      try { reader.releaseLock(); } catch (_) {}
-    }
-
-    // Alcuni server compatibili possono ignorare stream=true e restituire JSON normale.
-    if (!sawSseData) {
-      const responseText = raw || buffer;
-      if (responseText.trim()) {
-        try {
-          const data = JSON.parse(responseText);
-          const messageContent = data?.choices?.[0]?.message?.content;
-          raw = Array.isArray(messageContent)
-            ? messageContent.map(part => typeof part === 'string' ? part : (part?.text || '')).join('')
-            : (typeof messageContent === 'string' ? messageContent : '');
-          finishReason = data?.choices?.[0]?.finish_reason || finishReason;
-        } catch (_) {
-          raw = responseText;
-        }
-      }
-    }
-
-    raw = raw.trim();
-    if (!raw) throw new Error(`OlliteRT: risposta senza testo (finish_reason ${finishReason}).`);
-    return extractJson(raw);
-  } catch (error) {
-    if (parentSignal?.aborted) throw new Error('Richiesta interrotta dal client.');
-    if (controller.signal.aborted && error?.name === 'AbortError') {
-      throw new Error('Timeout richiesta AI');
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-    parentSignal?.removeEventListener('abort', abortFromParent);
-  }
-}
-
-function isGeminiQuotaError(error) {
-  const message = String(error?.message || error || '');
-  return /RESOURCE_EXHAUSTED|quota exceeded|exceeded your current quota|generate_content_free_tier_requests|retry in \d+/i.test(message);
+  return extractJson(data?.choices?.[0]?.message?.content || '');
 }
 
 export async function onRequestPost(context) {
   const request = context.request;
   const env = context.env;
 
-  // L'URL registrato da Termux ha precedenza sulla variabile statica.
-  // Il fallback mantiene compatibilità con la configurazione precedente.
-  let olliteBaseUrl = String(env.OLLITERT_BASE_URL || '');
-  try {
-    if (env.DB) {
-      const tunnelRow = await env.DB.prepare(
-        "SELECT base_url AS baseUrl FROM tunnel_config WHERE id='ollitert' LIMIT 1"
-      ).first();
-      if (tunnelRow?.baseUrl) olliteBaseUrl = String(tunnelRow.baseUrl);
-    }
-  } catch (error) {
-    console.warn('[AI-DIAG] Lettura URL tunnel da D1 non riuscita; uso variabile statica.', error?.message || String(error));
-  }
-
   try {
     const body = await request.json().catch(() => ({}));
     const { message = '', aiHint = '', image = null, audio = null, audioTranscript: providedAudioTranscript = '', currentTime = null, mode = 'normal', girlId = '' } = body;
-    if (!image && !audio && !String(message || '').trim()) return json(400, { error: 'Aggiungi uno screenshot, il testo estratto oppure una registrazione vocale.' });
+    if (!image && !audio) return json(400, { error: 'Aggiungi uno screenshot oppure una registrazione vocale.' });
     if (!env.DB || !context.user?.id || !girlId) return json(401, { error: 'Sessione o ragazza non valide.' });
 
     // Il contesto usato dall'AI viene letto dal database del proprietario della sessione.
@@ -644,229 +387,59 @@ export async function onRequestPost(context) {
     }
 
     if (providedAudioTranscript) audioTranscript = String(providedAudioTranscript).slice(0, 12000);
-    const secretMode = mode === 'secret';
-    const voiceKey = secretMode ? 'secret' : 'normal';
-    const defaultStyles = secretMode ? ['Erotica', 'Hot'] : ['Dolce', 'Stuzzica', 'Ironico', 'Flirt', 'Seria', 'Audace', 'Battuta', 'Poeta'];
-    const configuredStyles = Array.isArray(serverContext?.voiceSettings?.[voiceKey])
-      ? serverContext.voiceSettings[voiceKey].map(v => String(v?.id || '')).filter(Boolean)
-      : [];
-    const allStyles = configuredStyles.length ? configuredStyles : defaultStyles;
+    const prompt = promptFor(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
+    const errors = [];
 
-    // I blocchi vengono elaborati in sequenza, con al massimo quattro stili ciascuno.
-    // La sequenza evita di sovraccaricare il realme durante la generazione locale.
-    const styleBatches = [];
-    for (let i = 0; i < allStyles.length; i += 4) {
-      styleBatches.push(allStyles.slice(i, i + 4));
-    }
+    // NON avviare tutti i provider in parallelo: ogni tentativo può consumare quota.
+    // Proviamo un solo servizio alla volta e passiamo al successivo solo se il precedente
+    // è esaurito/non disponibile. In questo modo una richiesta normale usa una sola quota.
+    const attempts = [];
 
-    const geminiQuotaExhaustedModels = new Set();
-    // Dopo un timeout 524/abort del tunnel non inviamo altre richieste locali: OlliteRT
-    // potrebbe continuare a elaborare la richiesta precedente anche dopo la chiusura HTTP.
-    let olliteCircuitOpen = false;
-
-    async function generateBatch(batchStyles, batchIndex) {
-      const originalSettings = serverContext?.voiceSettings || {};
-      const batchVoiceSettings = {
-        ...originalSettings,
-        [voiceKey]: batchStyles.map(style =>
-          (Array.isArray(originalSettings[voiceKey])
-            ? originalSettings[voiceKey].find(v => String(v?.id || '') === style)
-            : null) || { id: style }
-        )
-      };
-      const batchContext = { ...serverContext, voiceSettings: batchVoiceSettings };
-      const modeForPrompt = secretMode ? 'secret' : 'normal';
-      const prompt = promptFor(
-        batchContext, message, aiHint, audioTranscript,
-        previousGeneratedReplies, modeForPrompt
-      );
-      const ollitePrompt = promptForOlliteRT(
-        batchContext, message, aiHint, audioTranscript,
-        previousGeneratedReplies, modeForPrompt
-      );
-
-      const attempts = [];
-      // Diagnostica sicura: non registrare token, prompt, screenshot o dati personali.
-      const olliteConfig = {
-        baseUrlPresent: Boolean(olliteBaseUrl),
-        modelPresent: Boolean(env.OLLITERT_MODEL),
-        tokenPresent: Boolean(env.OLLITERT_TOKEN),
-        baseUrlLooksValid: /^https:\/\//i.test(olliteBaseUrl),
-        model: env.OLLITERT_MODEL ? String(env.OLLITERT_MODEL).slice(0, 80) : null
-      };
-      console.info('[AI-DIAG] Configurazione OlliteRT', JSON.stringify(olliteConfig));
-
-      // Gemma locale su OlliteRT è il provider principale; Gemini e OpenRouter
-      // restano disponibili come fallback se il telefono/tunnel non risponde.
-      if (!olliteCircuitOpen && olliteBaseUrl && env.OLLITERT_MODEL && env.OLLITERT_TOKEN) {
-        attempts.push({
-          provider: 'OlliteRT',
-          model: env.OLLITERT_MODEL,
-          run: () => callOlliteRT(
-            olliteBaseUrl,
-            env.OLLITERT_TOKEN,
-            env.OLLITERT_MODEL,
-            ollitePrompt,
-            image,
-            300000,
-            request.signal
-          )
+    if (env.GEMINI_API_KEY) {
+      // Ordine: modello economico/free prima, poi fallback più robusti.
+      for (const model of ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash']) {
+        attempts.push(async () => {
+          try {
+            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 55000);
+            return { result, provider: 'Gemini', model };
+          } catch (err) {
+            throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
+          }
         });
       }
-
-      if (env.GEMINI_API_KEY && !geminiQuotaExhaustedModels.has('gemini-3.5-flash-lite')) {
-        attempts.push({
-          provider: 'Gemini',
-          model: 'gemini-3.5-flash-lite',
-          run: () => callGemini(env.GEMINI_API_KEY, 'gemini-3.5-flash-lite', prompt, image, 15000)
-        });
-      }
-
-      if (env.OPENROUTER_API_KEY) {
-        attempts.push({
-          provider: 'OpenRouter',
-          model: 'openrouter/free',
-          run: () => callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 18000)
-        });
-      }
-
-      if (env.GEMINI_API_KEY) {
-        for (const model of ['gemini-3.6-flash', 'gemini-3.8-flash']) {
-          attempts.push({
-            provider: 'Gemini',
-            model,
-            fallback: true,
-            run: () => callGemini(env.GEMINI_API_KEY, model, prompt, image, 15000)
-          });
-        }
-      }
-
-      const errors = [];
-      for (const attempt of attempts) {
-        if (attempt.provider === 'Gemini' && geminiQuotaExhaustedModels.has(attempt.model)) continue;
-        try {
-          if (attempt.provider === 'OlliteRT') {
-            console.info('[AI-DIAG] Avvio richiesta OlliteRT', JSON.stringify({ model: attempt.model, batch: batchIndex + 1 }));
-          }
-          const result = await attempt.run();
-          // Non accettare output parziali: ogni stile deve avere tutte le risposte previste
-          // e non devono esserci duplicati letterali all'interno dello stesso stile.
-          const expectedPerStyle = new Map(batchStyles.map(style => [style, style === 'Hot' ? 10 : 3]));
-          const actualByStyle = new Map();
-          for (const item of (Array.isArray(result?.replies) ? result.replies : [])) {
-            const style = String(item?.style || '');
-            if (!expectedPerStyle.has(style)) continue;
-            if (!actualByStyle.has(style)) actualByStyle.set(style, []);
-            actualByStyle.get(style).push(String(item?.text || '').trim());
-          }
-          const incomplete = [...expectedPerStyle.entries()].find(([style, expected]) => {
-            const items = actualByStyle.get(style) || [];
-            const unique = new Set(items.map(text => text.toLocaleLowerCase('it').replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim()));
-            return items.length !== expected || unique.size !== expected || items.some(text => !text);
-          });
-          if (incomplete) {
-            const [style, expected] = incomplete;
-            const actual = (actualByStyle.get(style) || []).length;
-            throw new Error(`${attempt.provider}: output incompleto per ${style} (${actual}/${expected}) o risposte duplicate.`);
-          }
-          if (attempt.provider === 'OlliteRT') {
-            console.info('[AI-DIAG] OlliteRT OK', JSON.stringify({ model: attempt.model, batch: batchIndex + 1 }));
-          }
-          return {
-            batchIndex,
-            result,
-            provider: `${attempt.provider}/${attempt.model}`,
-            errors
-          };
-        } catch (err) {
-          if (request.signal?.aborted) {
-            return { batchIndex, result: null, provider: '', errors: ['Richiesta interrotta dal client.'] };
-          }
-          const detail = err?.name === 'AbortError'
-            ? `${attempt.provider} ${attempt.model}: timeout`
-            : (err?.message || String(err));
-          errors.push(`Blocco ${batchIndex + 1}: ${detail}`);
-          if (attempt.provider === 'OlliteRT') {
-            const olliteTimedOut = /HTTP 524|HTTP 522|HTTP 504|timeout|aborted|aborterror/i.test(String(detail));
-            if (olliteTimedOut) olliteCircuitOpen = true;
-            console.error('[AI-DIAG] OlliteRT FALLITO', JSON.stringify({
-              model: attempt.model,
-              batch: batchIndex + 1,
-              error: String(detail).slice(0, 300),
-              circuitOpen: olliteCircuitOpen,
-              fallbackNext: attempts.some((candidate, index) => index > attempts.indexOf(attempt))
-            }));
-          }
-          if (attempt.provider === 'Gemini' && isGeminiQuotaError(err)) {
-            geminiQuotaExhaustedModels.add(attempt.model);
-          }
-        }
-      }
-      return { batchIndex, result: null, provider: '', errors };
-    }
-
-    // Esegui un blocco alla volta: il telefono ha risorse limitate e le generazioni
-    // Gemma simultanee possono saturare CPU/RAM e causare timeout.
-    // Se il tunnel va in timeout, il circuito OlliteRT resta aperto per i blocchi
-    // successivi: usiamo i fallback senza accodare altro lavoro sul telefono.
-    const batchResults = [];
-    for (let index = 0; index < styleBatches.length; index++) {
-      if (request.signal?.aborted) {
-        return json(499, { error: 'Richiesta interrotta dal client.' });
-      }
-      batchResults.push(await generateBatch(styleBatches[index], index));
-    }
-    const errors = batchResults.flatMap(item => item.errors);
-    const failedBatch = batchResults.find(item => !item.result);
-    if (failedBatch) {
-      return new Response(JSON.stringify({
-        error: 'Non è stato possibile completare tutte le categorie. I servizi AI gratuiti sono saturi o hanno restituito una risposta incompleta.',
-        details: errors
-      }), { status: 503, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
-    }
-
-    const combined = {
-      replies: [],
-      recommendedIndex: 0,
-      recommendedNormalIndex: 0,
-      recommendedSecretIndex: 40,
-      recommendationReason: '',
-      advice: '',
-      sendWhen: '',
-      categoryRecommendations: {}
-    };
-    const winningProviders = [];
-
-    for (let batchIndex = 0; batchIndex < batchResults.length; batchIndex++) {
-      const batchResult = batchResults[batchIndex].result;
-      winningProviders.push(batchResults[batchIndex].provider);
-      const offset = combined.replies.length;
-      combined.replies.push(...(Array.isArray(batchResult.replies) ? batchResult.replies : []));
-      Object.assign(combined.categoryRecommendations, batchResult.categoryRecommendations || {});
-
-      // Consiglio generale e indici: conserviamo quello calcolato dal primo blocco.
-      if (batchIndex === 0) {
-        combined.recommendedIndex = offset + (Number.isInteger(batchResult.recommendedIndex) ? batchResult.recommendedIndex : 0);
-        combined.recommendationReason = batchResult.recommendationReason || '';
-        combined.advice = batchResult.advice || '';
-        combined.sendWhen = batchResult.sendWhen || '';
-      }
-    }
-
-    if (secretMode) {
-      combined.recommendedSecretIndex = 40 + combined.recommendedIndex;
-      combined.recommendedNormalIndex = 0;
     } else {
-      combined.recommendedNormalIndex = combined.recommendedIndex;
-      combined.recommendedSecretIndex = 40;
+      errors.push('GEMINI_API_KEY non configurata');
     }
 
+    if (env.OPENROUTER_API_KEY) {
+      attempts.push(async () => {
+        try {
+          const result = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 55000);
+          return { result, provider: 'OpenRouter', model: 'openrouter/free' };
+        } catch (err) {
+          throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
+        }
+      });
+    } else {
+      errors.push('OPENROUTER_API_KEY non configurata');
+    }
+
+    for (const attempt of attempts) {
+      try {
+        const winner = await attempt();
+        return new Response(JSON.stringify({ ...winner.result, audioTranscript, provider: winner.provider, model: winner.model }), { status: 200, headers: { "Content-Type": "application/json" } });
+      } catch (err) {
+        errors.push(err?.message || String(err));
+      }
+    }
+
+    const retryable = errors.some(e => /429|RESOURCE_EXHAUSTED|quota|rate limit|temporarily|unavailable|503/i.test(String(e)));
     return new Response(JSON.stringify({
-      ...combined,
-      audioTranscript,
-      provider: [...new Set(winningProviders)].join(' + '),
-      model: 'batch-generation'
-    }), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+      error: retryable
+        ? 'Il servizio AI gratuito è momentaneamente saturo o ha raggiunto un limite. Riprova tra poco.'
+        : 'Nessun servizio AI gratuito disponibile in questo momento.',
+      details: errors
+    }), { status: 503, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
     return new Response(JSON.stringify({ error: error?.message || 'Errore del server AI.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
