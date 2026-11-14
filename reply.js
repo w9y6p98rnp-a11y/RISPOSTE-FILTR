@@ -7,24 +7,69 @@ function json(statusCode, payload) {
 
 function extractNumberedReplies(raw, expectedStyles, expectedPerStyle) {
   if (!Array.isArray(expectedStyles) || !expectedStyles.length) return null;
-  // Alcune versioni di Gemma ignorano il JSON e restituiscono un elenco numerato.
-  // Normalizziamo anche gli escape letterali che possono comparire nel contenuto.
+
+  // Gemma può ignorare il JSON e restituire un elenco numerato.
+  // Accettiamo le varianti comuni della numerazione Markdown, mantenendo
+  // il controllo rigoroso sul numero totale di risposte prima di usarle.
   const normalized = String(raw || '')
     .replace(/\\r\\n/g, '\n')
     .replace(/\\n/g, '\n')
     .replace(/\\t/g, ' ')
-    .replace(/\\+"/g, '"');
-  const matches = [...normalized.matchAll(/^\s*(\d{1,2})[.)]\s*["“]?([\s\S]*?)(?=^\s*\d{1,2}[.)]\s*|$)/gm)];
-  const items = matches
-    .map(match => String(match[2] || '').trim().replace(/^[\\/"“'`]+/, '').replace(/[\\/"”'`]+$/, '').trim())
-    .filter(Boolean);
+    .replace(/\\+"/g, '"')
+    .replace(/\r\n?/g, '\n')
+    .replace(/```(?:text|markdown)?/gi, '');
+
+  const items = [];
+  let current = '';
+
+  const finishItem = () => {
+    const value = current
+      .replace(/^[\s"'“”'`*]+/, '')
+      .replace(/[\s"'“”'`*]+$/, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (value) items.push(value);
+    current = '';
+  };
+
+  for (const originalLine of normalized.split('\n')) {
+    const line = originalLine.trim();
+    if (!line) continue;
+
+    // Esempi accettati: "1. testo", "1) testo", "**1.** testo",
+    // "- 1. testo", "1 - testo" e "1: testo".
+    const numbered = line.match(/^(?:[-*•]\s*)?(?:\*\*)?(\d{1,2})\s*(?:[.)]|:|-)(?:\*\*)?\s*(.*)$/);
+    if (numbered) {
+      finishItem();
+      current = numbered[2] || '';
+      continue;
+    }
+
+    // Le intestazioni degli stili possono comparire tra un gruppo e l'altro.
+    const heading = line.replace(/^#+\s*/, '').replace(/[*_`]/g, '').replace(/:$/, '').trim();
+    if (expectedStyles.some(style => heading.toLocaleLowerCase('it') === String(style).toLocaleLowerCase('it'))) {
+      finishItem();
+      continue;
+    }
+
+    // Le intestazioni e le note introduttive non sono risposte.
+    if (/^(?:ecco|risposte|stile|categoria|output)\b/i.test(heading)) {
+      continue;
+    }
+
+    // Conserva eventuali righe successive appartenenti alla stessa risposta.
+    if (current) current += (current ? ' ' : '') + line;
+  }
+  finishItem();
+
   const expectedTotal = expectedStyles.length * expectedPerStyle;
   if (items.length !== expectedTotal) return null;
-  const replies = [];
-  items.forEach((text, index) => {
-    const style = expectedStyles[Math.floor(index / expectedPerStyle)];
-    replies.push({ style, text });
-  });
+
+  const replies = items.map((text, index) => ({
+    style: expectedStyles[Math.floor(index / expectedPerStyle)],
+    text
+  }));
+
   return {
     replies,
     recommendedIndex: 0,
