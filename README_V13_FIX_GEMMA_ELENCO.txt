@@ -1,15 +1,25 @@
-RISPOSTAFLIRT V13 – FIX RISPOSTE GEMMA IN ELENCO NUMERATO
+RISPOSTAFLIRT V13 – FIX COMPATIBILITÀ GEMMA3 / ELENCO NUMERATO
 
-Basata sulla V12 con quantità ridotte.
+Basata sull'archivio V13 corretto precedente.
 
-Modifica:
-- Il Worker riconosce anche le risposte di Gemma restituite come elenco numerato, senza JSON.
-- Le risposte vengono associate agli stili nell'ordine richiesto dal prompt.
-- Il Worker accetta l'elenco solo se contiene esattamente il numero previsto per il blocco e per ciascuno stile.
-- Quantità mantenute: 3 per ogni stile normale; 5 Erotica + 5 Hot.
-- Il JSON valido continua a essere accettato come prima.
-- Gemini e OpenRouter restano disponibili solo come fallback se la risposta locale è vuota, incompleta o non riconoscibile.
+Modifiche in reply.js:
+- Il Worker continua ad accettare il JSON valido come prima.
+- Se Gemma restituisce un elenco numerato, il Worker recupera le risposte e le converte nel formato { style, text } richiesto dall'app.
+- Se Gemma fornisce intestazioni STILE: NOME per tutti gli stili del blocco, vengono rispettate.
+- Se Gemma omette le intestazioni, gli stili vengono assegnati usando l'ordine noto della richiesta: prima tutte le risposte del primo stile, poi quelle del secondo.
+- Se le intestazioni sono incomplete, viene usato l'ordine della richiesta invece di attribuire tutte le risposte al primo stile.
+- Un output realmente incompleto continua a essere rifiutato: non vengono inventate le risposte mancanti e resta disponibile il fallback Gemini/OpenRouter.
+- Il prompt locale specifica anche un formato testuale alternativo con intestazioni di stile, se Gemma non riesce a produrre JSON.
+- Il limite di generazione locale passa da 1400 a 1800 token per ridurre il rischio di troncamento dell'output.
 
-Non sono stati modificati memoria, cronologia, profili, tunnel, token, configurazione CPU o impostazioni Cloudflare.
+Quantità mantenute: 3 risposte per ogni stile normale; 5 per ogni stile segreto.
+Non sono stati modificati worker.js, app.js, interfaccia, memoria, cronologia, profili, tunnel, token, database o configurazione Cloudflare.
 
-Distribuzione: sostituire i file del progetto con quelli contenuti in questo archivio e distribuire il Worker aggiornato su Cloudflare. Non modificare i segreti o il database.
+Verifiche eseguite:
+- controllo sintassi JavaScript con node --check;
+- test parser su elenco numerato senza etichette;
+- test parser con intestazioni esplicite per ogni stile;
+- test parser con intestazione parziale e assegnazione secondo l'ordine richiesto;
+- verifica che un elenco incompleto venga ancora rifiutato.
+
+Distribuzione: sostituire i file del progetto con quelli contenuti nell'archivio e distribuire il Worker aggiornato su Cloudflare. Non modificare i segreti o il database.

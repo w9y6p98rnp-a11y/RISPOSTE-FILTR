@@ -8,9 +8,9 @@ function json(statusCode, payload) {
 function extractNumberedReplies(raw, expectedStyles, expectedPerStyle) {
   if (!Array.isArray(expectedStyles) || !expectedStyles.length) return null;
 
-  // Gemma può ignorare il JSON e restituire un elenco numerato.
-  // Accettiamo le varianti comuni della numerazione Markdown, mantenendo
-  // il controllo rigoroso sul numero totale di risposte prima di usarle.
+  // Gemma può restituire un elenco numerato invece del JSON richiesto.
+  // Se indica lo stile lo usiamo; se lo omette, il Worker assegna i gruppi
+  // nell'ordine degli stili richiesti nel prompt.
   const normalized = String(raw || '')
     .replace(/\\r\\n/g, '\n')
     .replace(/\\n/g, '\n')
@@ -19,16 +19,18 @@ function extractNumberedReplies(raw, expectedStyles, expectedPerStyle) {
     .replace(/\r\n?/g, '\n')
     .replace(/```(?:text|markdown)?/gi, '');
 
+  const styleMap = new Map(expectedStyles.map(style => [
+    String(style).trim().toLocaleLowerCase('it'), String(style)
+  ]));
   const items = [];
+  const seenStyles = new Set();
   let current = '';
+  let activeStyle = '';
 
   const finishItem = () => {
-    const value = current
-      .replace(/^[\s"'“”'`*]+/, '')
-      .replace(/[\s"'“”'`*]+$/, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (value) items.push(value);
+    const text = current.replace(/^[\s"“”'`*]+/, '')
+      .replace(/[\s"“”'`*]+$/, '').replace(/\s+/g, ' ').trim();
+    if (text) items.push({ text, style: activeStyle });
     current = '';
   };
 
@@ -36,49 +38,58 @@ function extractNumberedReplies(raw, expectedStyles, expectedPerStyle) {
     const line = originalLine.trim();
     if (!line) continue;
 
-    // Esempi accettati: "1. testo", "1) testo", "**1.** testo",
-    // "- 1. testo", "1 - testo" e "1: testo".
-    const numbered = line.match(/^(?:[-*•]\s*)?(?:\*\*)?(\d{1,2})\s*(?:[.)]|:|-)(?:\*\*)?\s*(.*)$/);
+    const heading = line.replace(/^#+\s*/, '').replace(/[*_`]/g, '')
+      .replace(/:$/, '').replace(/^(?:stile|categoria)\s*[:=-]\s*/i, '').trim();
+    const headingStyle = styleMap.get(heading.toLocaleLowerCase('it'));
+    if (headingStyle) {
+      finishItem();
+      activeStyle = headingStyle;
+      seenStyles.add(headingStyle);
+      continue;
+    }
+
+    const numbered = line.match(/^(?:[-*•]\s*)?(?:\*\*)?(\d{1,2})\s*(?:[.)]|:|-)\s*(?:\*\*)?\s*(.*)$/);
     if (numbered) {
       finishItem();
       current = numbered[2] || '';
       continue;
     }
 
-    // Le intestazioni degli stili possono comparire tra un gruppo e l'altro.
-    const heading = line.replace(/^#+\s*/, '').replace(/[*_`]/g, '').replace(/:$/, '').trim();
-    if (expectedStyles.some(style => heading.toLocaleLowerCase('it') === String(style).toLocaleLowerCase('it'))) {
-      finishItem();
-      continue;
-    }
-
-    // Le intestazioni e le note introduttive non sono risposte.
-    if (/^(?:ecco|risposte|stile|categoria|output)\b/i.test(heading)) {
-      continue;
-    }
-
-    // Conserva eventuali righe successive appartenenti alla stessa risposta.
-    if (current) current += (current ? ' ' : '') + line;
+    if (/^(?:ecco|risposte|output|json)\b/i.test(heading)) continue;
+    if (current) current += ' ' + line;
   }
   finishItem();
 
   const expectedTotal = expectedStyles.length * expectedPerStyle;
   if (items.length !== expectedTotal) return null;
 
-  const replies = items.map((text, index) => ({
-    style: expectedStyles[Math.floor(index / expectedPerStyle)],
-    text
-  }));
+  const hasCompleteHeadings = expectedStyles.every(style => seenStyles.has(style));
+  const counts = new Map(expectedStyles.map(style => [style, 0]));
+  const replies = items.map((item, index) => {
+    const positionalStyle = expectedStyles[Math.floor(index / expectedPerStyle)];
+    const style = hasCompleteHeadings && item.style && counts.has(item.style)
+      ? item.style
+      : positionalStyle;
+    counts.set(style, (counts.get(style) || 0) + 1);
+    return { style, text: item.text };
+  });
 
+  // Non associare silenziosamente risposte al gruppo sbagliato se le intestazioni
+  // esplicite hanno prodotto gruppi incompleti o fuori ordine.
+  if (expectedStyles.some(style => counts.get(style) !== expectedPerStyle)) return null;
+
+  const categoryRecommendations = Object.fromEntries(expectedStyles.map(style => [
+    style, { index: 0, reason: 'Prima risposta proposta per questo stile.' }
+  ]));
   return {
     replies,
     recommendedIndex: 0,
     recommendedNormalIndex: 0,
-    recommendedSecretIndex: 24,
+    recommendedSecretIndex: 0,
     recommendationReason: 'La prima risposta di ogni stile è proposta come scelta iniziale.',
     advice: '',
     sendWhen: '',
-    categoryRecommendations: {}
+    categoryRecommendations
   };
 }
 
@@ -343,7 +354,7 @@ INDICAZIONE:${hint || 'nessuna'} AUDIO:${audio || 'nessuno'}
 EVITA QUESTE RISPOSTE:${prior || 'nessuna'}
 STILI:${styles.join(', ')}. ISTRUZIONI:${custom || 'segui il tono dello stile'}.
 Genera ESATTAMENTE ${total} risposte: ${mode === 'secret' ? '5 per ciascuno stile segreto' : '3 per ciascuno stile normale'}. Ordine:${styles.join(', ')}. Risposte diverse tra loro, pertinenti all'ultimo messaggio, 10-16 parole circa. Prima di ogni stile metti la migliore per prima. Tono: Dolce affettuoso; Stuzzica provocatorio leggero; Ironico spiritoso; Flirt seducente naturale; Seria matura; Audace sicuro; Battuta brillante; Poeta evocativo; Erotica/Hot allusivo non esplicito. Rispetta sempre i limiti espressi da LEI. Non inventare dettagli.
-JSON valido soltanto: {"advice":"consiglio breve","sendWhen":"quando inviare","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":${mode === 'secret' ? 0 : 40},"recommendationReason":"motivo breve","categoryRecommendations":${JSON.stringify(categoryExample)},"replies":[${styles.map(style => `{"style":"${style}","text":"..."}`).join(',')}]}. Inserisci in replies tutte le ${total} risposte, senza duplicati.`;
+JSON valido soltanto: {"advice":"consiglio breve","sendWhen":"quando inviare","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":${mode === 'secret' ? 0 : 40},"recommendationReason":"motivo breve","categoryRecommendations":${JSON.stringify(categoryExample)},"replies":[${styles.map(style => `{"style":"${style}","text":"..."}`).join(',')}]}. Inserisci in replies tutte le ${total} risposte, senza duplicati. Se non riesci a produrre JSON, scrivi un elenco testuale con intestazioni esatte STILE: NOME per ogni stile richiesto e poi le relative risposte numerate da 1 a ${count(styles[0])}; non mescolare mai risposte di stili diversi.`;
 }
 
 function imagePart(image) {
@@ -529,7 +540,7 @@ async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs =
         model,
         messages: [{ role: 'user', content }],
         temperature: 0.85,
-        max_tokens: 1400,
+        max_tokens: 1800,
         stream: true
       }),
       signal: controller.signal
