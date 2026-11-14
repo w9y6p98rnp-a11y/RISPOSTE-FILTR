@@ -13,3 +13,4 @@ not_found_handling = "single-page-application"
 binding = "DB"
 database_name = "rispostaflirt-auth"
 database_id = "9372e6cb-0118-412f-b7f2-9c37e7911b94"
+npx wrangler deploy
