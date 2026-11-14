@@ -770,7 +770,7 @@ $("generate").onclick=async()=>{
     const secretIndexes=[];
     replies.forEach((r,i)=>{
       const style=typeof r==="string"?"":(r.style||"");
-      if(secretStyles.has(style) || i>=40) secretIndexes.push(i); else normalIndexes.push(i);
+      if(secretStyles.has(style)) secretIndexes.push(i); else normalIndexes.push(i);
     });
     const validIndex=(value,list,fallback)=>{
       const n=Number(value);
@@ -811,11 +811,11 @@ $("generate").onclick=async()=>{
     const secretCards=styleOrder.slice(8).map(style=>renderCategory(style,secretIndexes,true)).join("");
     const transcriptHtml=audioTranscript?`<div class="audio-transcript-card"><div class="audio-transcript-title">🎙️ Trascrizione della registrazione</div><div class="audio-transcript-text">${escapeHtml(audioTranscript)}</div></div>`:"";
     const columns=`${providerHtml}${transcriptHtml}${adviceHtml}<div class="reply-choice-grid">
-      <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>5 per stile: Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Battuta, Poeta</small></span><span class="reply-choice-arrow">›</span></button>
-      <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>5 Erotiche + 10 Hot • vengono generate quando le apri</small></span><span class="reply-choice-arrow">›</span></button>
+      <button type="button" class="reply-choice normal-choice" data-target="normalRepliesPanel"><span class="reply-choice-icon">💬</span><span><b>Risposte normali</b><small>3 per stile: Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Battuta, Poeta</small></span><span class="reply-choice-arrow">›</span></button>
+      <button type="button" class="reply-choice secret-choice" data-target="secretRepliesPanel"><span class="reply-choice-icon">🔒</span><span><b>Risposte segrete</b><small>5 Erotiche + 5 Hot • vengono generate quando le apri</small></span><span class="reply-choice-arrow">›</span></button>
     </div>
     <section id="normalRepliesPanel" class="reply-panel hidden"><div class="reply-panel-head"><div><b>💬 Risposte normali</b><small>Quella consigliata è evidenziata.</small></div><button type="button" class="reply-panel-close" data-close-panel="normalRepliesPanel">×</button></div><div class="reply-panel-list">${normalCards}</div></section>
-    <section id="secretRepliesPanel" class="reply-panel secret-panel hidden"><div class="reply-panel-head"><div><b>🔒 Risposte segrete</b><small>Vengono generate solo quando le apri.</small></div><button type="button" class="reply-panel-close" data-close-panel="secretRepliesPanel">×</button></div><div id="secretRepliesContent" class="reply-panel-list"><div class="secret-lazy-card"><div class="secret-lazy-title">🔥 Risposte segrete</div><div class="secret-lazy-text">Le 15 risposte segrete vengono generate automaticamente quando apri questa sezione: 5 Erotiche + 10 Hot.</div></div></div></section>`;
+    <section id="secretRepliesPanel" class="reply-panel secret-panel hidden"><div class="reply-panel-head"><div><b>🔒 Risposte segrete</b><small>Vengono generate solo quando le apri.</small></div><button type="button" class="reply-panel-close" data-close-panel="secretRepliesPanel">×</button></div><div id="secretRepliesContent" class="reply-panel-list"><div class="secret-lazy-card"><div class="secret-lazy-title">🔥 Risposte segrete</div><div class="secret-lazy-text">Le 10 risposte segrete vengono generate automaticamente quando apri questa sezione: 5 Erotiche + 5 Hot.</div></div></div></section>`;
     $("results").innerHTML=columns;
     applySettings();
     state.resultsHtml=$("results").innerHTML;
