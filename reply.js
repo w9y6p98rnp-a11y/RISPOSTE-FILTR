@@ -324,9 +324,45 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 55000) {
   return { result: extractJson(data?.choices?.[0]?.message?.content || ''), actualModel: data?.model || 'openrouter/free' };
 }
 
+function compactGroqPrompt(context, message, aiHint = '', audioTranscript = '', previousGeneratedReplies = [], mode = 'normal') {
+  // Groq ha un limite ITPM più basso: inviamo un prompt dedicato e compatto,
+  // senza ripetere più volte le stesse regole contenute nel prompt completo Gemini/OpenRouter.
+  const defaults = ['Dolce','Stuzzica','Ironico','Flirt','Seria','Audace','Battuta','Poeta','Erotica','Hot'];
+  const normal = Array.isArray(context?.voiceSettings?.normal) && context.voiceSettings.normal.length
+    ? context.voiceSettings.normal.map(v => String(v.id || '')).filter(Boolean) : defaults.slice(0, 8);
+  const secret = Array.isArray(context?.voiceSettings?.secret) && context.voiceSettings.secret.length
+    ? context.voiceSettings.secret.map(v => String(v.id || '')).filter(Boolean) : defaults.slice(8);
+  const styles = mode === 'secret' ? secret : normal;
+  const settings = new Map();
+  for (const group of [context?.voiceSettings?.normal, context?.voiceSettings?.secret]) {
+    if (Array.isArray(group)) for (const item of group) if (item?.id) settings.set(String(item.id), item);
+  }
+  const styleRules = styles.map(style => {
+    const instruction = String(settings.get(style)?.instruction || '').slice(0, 240);
+    return `${style}: ${instruction || 'Tono coerente con il nome dello stile; resta naturale e pertinente.'}`;
+  }).join('\n');
+  const history = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-6).map(x => ({
+    ruolo: String(x.role || '').slice(0, 12), testo: String(x.text || '').slice(-650)
+  }));
+  const previous = [...new Set((Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : [])
+    .map(x => String(x).trim()).filter(Boolean))].slice(-5).map(x => x.slice(0, 180));
+  const compactContext = {
+    nome: String(context?.girl?.name || '').slice(0, 80),
+    nota: String(context?.girl?.note || '').slice(0, 650),
+    memoria: String(context?.girl?.memory || context?.memory || '').slice(0, 1600),
+    profiloUtente: String(context?.aboutMe || '').slice(0, 700),
+    dataOra: context?.currentTime || null,
+    cronologiaRecente: history
+  };
+  const total = styles.reduce((n, style) => n + (style === 'Hot' ? 10 : 5), 0);
+  const categoryExample = Object.fromEntries(styles.map(style => [style, { index: 0, reason: '...' }]));
+  return `Sei RispostaFlirt. Leggi l'immagine e individua l'ULTIMO messaggio scritto da LEI; rispondi a quello, non a messaggi precedenti. L'immagine è la fonte primaria per il turno corrente. Distingui sempre IO (utente) da LEI: non invertire fatti o possessivi. Usa memoria e cronologia solo come contesto, non inventare fatti. Rispondi alla domanda specifica; se lei è seria, arrabbiata o pone un limite, sii rispettoso e non forzare flirt o sessualità. Ogni frase deve essere pertinente al messaggio reale, non generica. Evita ripetizioni e varia davvero aperture e idee.\n\nCONTESTO: ${JSON.stringify(compactContext)}\nMESSAGGIO/NOTA UTENTE: ${String(message || '').slice(0, 2400)}\nINDICAZIONE UTENTE: ${String(aiHint || '').slice(0, 900)}\nTRASCRIZIONE: ${String(audioTranscript || '').slice(0, 1600)}\nRISPOSTE DA NON RIPETERE: ${JSON.stringify(previous)}\n\nSTILI DA GENERARE: ${styles.join(', ')}. Istruzioni stile: ${styleRules}\nGenera ${total} risposte totali: 5 per ogni stile, 10 se lo stile è Hot. In ogni stile le proposte devono essere distinte, naturali e di lunghezza media, salvo istruzioni personalizzate. Per ogni risposta usa il campo style e text. Usa 1 emoji naturale nelle risposte leggere, senza forzarla nei messaggi seri.\n\nRestituisci SOLO JSON valido, senza markdown, con questa struttura e tutti i campi: ${JSON.stringify({ advice: 'consiglio operativo breve', sendWhen: 'momento consigliato', recommendedIndex: 0, recommendedNormalIndex: 0, recommendedSecretIndex: mode === 'secret' ? 0 : 40, recommendationReason: 'motivo breve', categoryRecommendations: categoryExample, replies: [{ style: styles[0] || 'Dolce', text: 'risposta' }] })}. categoryRecommendations deve contenere esattamente le chiavi degli stili richiesti, ciascuna con index e reason. recommendedIndex deve puntare a una risposta valida; recommendedNormalIndex tra 0 e 39; recommendedSecretIndex tra 40 e 59.`;
+}
+
 async function callGroq(apiKey, prompt, image, timeoutMs = 45000) {
   const content = [{ type: 'text', text: prompt }];
-  if (image) content.push({ type: 'image_url', image_url: { url: image } });
+  // detail=low riduce il costo dei token visivi per gli screenshot lunghi.
+  if (image) content.push({ type: 'image_url', image_url: { url: image, detail: 'low' } });
 
   const response = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -466,7 +502,8 @@ export async function onRequestPost(context) {
         }
         attempts.push(async () => {
           try {
-            const output = await callGroq(env.GROQ_API_KEY, prompt, image, 45000);
+            const groqPrompt = compactGroqPrompt(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
+            const output = await callGroq(env.GROQ_API_KEY, groqPrompt, image, 45000);
             return { result: output.result, provider: 'Groq', model: output.actualModel };
           } catch (err) {
             throw new Error(err?.name === 'AbortError' ? 'Groq: timeout' : err.message);
