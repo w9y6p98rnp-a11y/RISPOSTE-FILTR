@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css?v=20261101-password1">
+<title>RispostaFlirt</title>
+<style>
+.ai-model-control{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:9px 0 5px;font-size:12px;color:var(--muted,#9aa4b2)}
+.ai-model-control label{font-weight:700}
+.ai-model-control select{max-width:100%;padding:7px 10px;border:1px solid var(--border,#334155);border-radius:9px;background:var(--panel,#111827);color:inherit;font:inherit}
+.ai-model-status{flex-basis:100%;font-size:11px;opacity:.8}
+.memory-menu{display:grid;gap:10px;margin:12px 0}
+.memory-menu-option{display:flex;align-items:center;gap:12px;width:100%;padding:14px;border:1px solid var(--border,#334155);border-radius:12px;background:var(--panel,#111827);color:inherit;text-align:left;cursor:pointer}
+.memory-menu-option>span:nth-child(2){display:grid;gap:4px;flex:1}
+.memory-menu-option small{opacity:.7;font-size:12px}
+</style>
+</head>
+<body>
+<div id="authScreen" class="auth-screen hidden">
+  <div class="auth-card">
+    <div class="auth-logo">💬</div>
+    <h1>RispostaFlirt</h1>
+    <p class="auth-subtitle">Accedi per mantenere private le tue conversazioni.</p>
+
+    <form id="loginForm" class="auth-form">
+      <input id="loginEmail" type="email" autocomplete="email" placeholder="Email" required>
+      <div class="password-field"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password" required><button type="button" class="password-toggle" data-password-target="loginPassword" aria-label="Mostra password" title="Mostra password">👁</button></div>
+      <button class="primary auth-submit" type="submit">ACCEDI</button>
+    </form>
+
+    <button id="forgotPassword" type="button" class="auth-link">Password dimenticata?</button>
+
+    <button id="showRegister" type="button" class="auth-create">Crea un account</button>
+    <div id="authMessage" class="auth-message hidden"></div>
+  </div>
+</div>
+
+<div id="registerModal" class="modal hidden">
+  <div class="modal-card auth-modal-card">
+    <div class="auth-modal-head"><div><h2>Crea un account</h2><p class="hint">Usa un nickname che vedrai nel tuo profilo.</p></div><button type="button" id="closeRegister" class="memory-close">×</button></div>
+    <form id="registerForm" class="auth-form">
+      <input id="registerNickname" type="text" maxlength="40" autocomplete="nickname" placeholder="Nickname" required>
+      <input id="registerEmail" type="email" autocomplete="email" placeholder="Email" required>
+      <div class="password-field"><input id="registerPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Password (minimo 8 caratteri)" required><button type="button" class="password-toggle" data-password-target="registerPassword" aria-label="Mostra password" title="Mostra password">👁</button></div>
+      <div class="password-field"><input id="registerPassword2" type="password" minlength="8" autocomplete="new-password" placeholder="Ripeti password" required><button type="button" class="password-toggle" data-password-target="registerPassword2" aria-label="Mostra password" title="Mostra password">👁</button></div>
+      <button class="primary" type="submit">CREA ACCOUNT</button>
+    </form>
+  </div>
+</div>
+
+<div id="forgotModal" class="modal hidden">
+  <div class="modal-card auth-modal-card">
+    <div class="auth-modal-head"><div><h2>Password dimenticata?</h2><p class="hint">Inserisci la tua email e ti invieremo un link per reimpostarla.</p></div><button type="button" id="closeForgot" class="memory-close">×</button></div>
+    <form id="forgotForm" class="auth-form">
+      <input id="forgotEmail" type="email" autocomplete="email" placeholder="Email" required>
+      <button class="primary" type="submit">INVIA LINK</button>
+    </form>
+    <div id="forgotMessage" class="auth-message hidden"></div>
+  </div>
+</div>
+
+<div id="resetModal" class="modal hidden">
+  <div class="modal-card auth-modal-card">
+    <div class="auth-modal-head"><div><h2>Nuova password</h2><p class="hint">Scegli una nuova password per il tuo account.</p></div></div>
+    <form id="resetForm" class="auth-form">
+      <div class="password-field"><input id="resetPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Nuova password" required><button type="button" class="password-toggle" data-password-target="resetPassword" aria-label="Mostra password" title="Mostra password">👁</button></div>
+      <div class="password-field"><input id="resetPassword2" type="password" minlength="8" autocomplete="new-password" placeholder="Ripeti password" required><button type="button" class="password-toggle" data-password-target="resetPassword2" aria-label="Mostra password" title="Mostra password">👁</button></div>
+      <button class="primary" type="submit">SALVA PASSWORD</button>
+    </form>
+    <div id="resetMessage" class="auth-message hidden"></div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <aside id="sidebar" class="sidebar">
+    <div class="side-head"><b>RispostaFlirt</b><button id="closeSide">×</button></div>
+    <button id="newGirl" class="primary">＋ Nuova ragazza</button>
+    <div id="girlList" class="girl-list"></div>
+    <div class="side-bottom">
+      <button id="openMemory" class="side-memory" title="Cose da ricordare">🧠 <span>Cose da ricordare</span></button>
+      <button id="deleteChat" class="danger side-delete">🗑️ Elimina chat</button>
+      <button id="openSettings" class="side-settings" title="Altre impostazioni">⚙️ <span>Altre impostazioni</span></button>
+    </div>
+    <div class="privacy">I tuoi dati saranno associati al tuo account.</div>
+  </aside>
+  <div id="overlay"></div>
+  <main class="main">
+    <header class="topbar">
+      <button id="menuBtn" class="icon">☰</button>
+      <div>
+        <div id="girlTitle" class="title">Seleziona una ragazza</div>
+        <div id="girlSub" class="sub">Le conversazioni restano separate</div>
+      </div>
+      <button id="accountBtn" class="account-btn" title="Profilo account" aria-label="Apri profilo account">👤</button>
+    </header>
+
+    <section id="empty" class="empty">
+      <h2>Inizia una conversazione</h2>
+      <p>Crea la prima scheda ragazza. Ogni chat avrà memoria separata.</p>
+      <button id="emptyNew" class="primary">＋ Nuova ragazza</button>
+    </section>
+
+    <section id="chat" class="chat hidden">
+      <div class="tabs single-tab">
+        <button class="tab active">Conversazione</button>
+      </div>
+
+      <div id="chatTab" class="tabpage">
+        <div id="messages" class="messages"></div>
+        <div class="composer screenshot-composer">
+          <div class="screenshot-box">
+            <input id="screenshotInput" type="file" accept="image/*" hidden>
+            <div class="screenshot-actions">
+              <button id="chooseScreenshot" type="button" class="secondary screenshot-upload-btn">✨ Aggiungi screenshot</button>
+            </div>
+            <div id="aiModelControl" class="ai-model-control">
+              <label for="aiModelSelect">Motore AI</label>
+              <select id="aiModelSelect">
+                <option value="auto">Automatico (fallback)</option>
+                <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
+                <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+                <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+                <option value="openrouter/free">OpenRouter Free</option>
+              </select>
+              <div id="aiModelStatus" class="ai-model-status">Motore preferito: Automatico (fallback)</div>
+            </div>
+            <div id="imageName" class="image-name">Nessuno screenshot inserito</div>
+          <div class="ai-hint-box">
+            <label for="aiHint">💡 Indicazione per l'AI (facoltativa)</label>
+            <textarea id="aiHint" rows="2" placeholder="Es. Voglio essere più provocatorio… oppure: cambia argomento e falla incuriosire. Dopo le risposte puoi scrivere una nuova indicazione e premere di nuovo Analizza."></textarea>
+          </div>
+          </div>
+          <div class="actions">
+            <button id="generate" class="primary">Analizza e dammi risposte</button>
+          </div>
+        </div>
+        <div id="results" class="results"></div>
+      </div>
+
+    </section>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <h2>Nuova ragazza</h2>
+    <input id="girlName" placeholder="Nome" maxlength="80">
+    <input id="girlNote" placeholder="Nota breve (facoltativa)" maxlength="160">
+    <div class="modal-actions">
+      <button type="button" id="cancelGirl" class="secondary">Annulla</button>
+      <button type="button" id="createGirl" class="primary">Crea</button>
+    </div>
+  </div>
+</div>
+
+<div id="memoryModal" class="modal hidden">
+  <div class="modal-card memory-modal-card">
+    <div class="memory-modal-head">
+      <div>
+        <h2>🧠 Cose da ricordare</h2>
+        <p id="memoryModalHint" class="hint">Prima scegli a quale ragazza vuoi associare le informazioni.</p>
+      </div>
+      <button type="button" id="closeMemory" class="memory-close">×</button>
+    </div>
+
+    <div id="memoryMenu" class="memory-menu">
+      <button type="button" id="renameGirlOption" class="memory-menu-option">✏️ <span><b>Rinomina ragazza</b><small>Cambia il nome senza modificare la chat</small></span><span>›</span></button>
+      <button type="button" id="memoryThingsOption" class="memory-menu-option">🧠 <span><b>Cose da ricordare</b><small>Aggiungi o modifica la memoria della ragazza selezionata</small></span><span>›</span></button>
+    </div>
+    <div id="memoryGirlSelectLabel" class="memory-select-label hidden">👩 Ragazza</div>
+    <div id="memoryGirlList" class="memory-girl-list hidden"></div>
+
+    <div id="memoryEditor" class="memory-editor hidden">
+      <div id="memorySelectedGirl" class="memory-selected-girl"></div>
+      <textarea id="memoryInput" rows="8" placeholder="Scrivi qui cosa vuoi ricordare di lei: che tipo di ragazza è, quando vi siete conosciuti, cosa le piace, cosa avete fatto, dettagli importanti..."></textarea>
+      <div class="memory-help">Queste informazioni verranno considerate dall'AI quando genera le risposte per questa ragazza.</div>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" id="cancelMemory" class="secondary">Chiudi</button>
+      <button type="button" id="saveMemory" class="primary" disabled>Salva memoria</button>
+    </div>
+  </div>
+</div>
+
+<div id="renameGirlModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="memory-modal-head">
+      <div><h2>✏️ Rinomina ragazza</h2><p class="hint">Verrà aggiornato solo il nome della scheda.</p></div>
+      <button type="button" id="closeRenameGirl" class="memory-close">×</button>
+    </div>
+    <input id="renameGirlInput" type="text" maxlength="80" placeholder="Nuovo nome">
+    <div class="modal-actions">
+      <button type="button" id="cancelRenameGirl" class="secondary">Annulla</button>
+      <button type="button" id="saveRenameGirl" class="primary">Salva nome</button>
+    </div>
+  </div>
+</div>
+
+<div id="accountModal" class="modal hidden">
+  <div class="modal-card account-card">
+    <div class="account-head">
+      <div>
+        <h2>👤 Il mio profilo</h2>
+        <p class="hint">Il tuo account RispostaFlirt</p>
+      </div>
+      <button type="button" id="closeAccount" class="memory-close">×</button>
+    </div>
+
+    <div class="account-profile">
+      <div id="accountAvatar" class="account-avatar">?</div>
+      <div class="account-profile-info">
+        <div id="accountNickname" class="account-nickname">Il tuo nickname</div>
+        <div id="accountEmail" class="account-email">La tua email</div>
+      </div>
+    </div>
+
+    <button type="button" id="openAboutMe" class="setting-option account-about-btn">
+      <span class="setting-option-icon">🧑</span>
+      <span class="setting-option-copy"><b>Cose su di me</b><small>Descrivi come sei, il tuo carattere e il tuo stile</small></span>
+      <span class="setting-option-arrow">›</span>
+    </button>
+
+    <button type="button" id="logoutBtn" class="danger account-logout">↪️ Esci dall'account</button>
+  </div>
+</div>
+
+<div id="aboutMeModal" class="modal hidden">
+  <div class="modal-card about-me-card">
+    <div class="settings-head">
+      <div><h2>🧑 Cose su di me</h2><p class="hint">Scrivi come sei fatto e come vuoi che l'AI costruisca le risposte.</p></div>
+      <button type="button" id="closeAboutMe" class="memory-close">×</button>
+    </div>
+    <textarea id="aboutMeInput" rows="10" placeholder="Esempio: sono ironico, mi piace stuzzicare ma senza esagerare, preferisco essere elegante e sicuro di me, non mi piace sembrare insistente..."></textarea>
+    <div class="memory-help">Queste informazioni vengono usate insieme alla conversazione e alle “Cose da ricordare” di ogni ragazza per rendere le risposte più adatte a te.</div>
+    <div class="modal-actions"><button type="button" id="cancelAboutMe" class="secondary">Annulla</button><button type="button" id="saveAboutMe" class="primary">Salva</button></div>
+  </div>
+</div>
+
+<div id="settingsModal" class="modal hidden">
+  <div class="modal-card settings-card">
+    <div class="settings-head"><div><h2>⚙️ Altre impostazioni</h2><p class="hint">Personalizza l’aspetto dell’app e la dimensione delle sole risposte.</p></div><button type="button" id="closeSettings" class="memory-close">×</button></div>
+    <div class="setting-row"><div><b>🌗 Tema</b><div class="setting-help">Scegli tra chiaro e scuro.</div></div><div class="theme-switch"><button type="button" class="theme-option" data-theme="dark">Scuro</button><button type="button" class="theme-option" data-theme="light">Chiaro</button></div></div>
+    <div class="setting-row"><div><b>🔎 Zoom interfaccia</b><div class="setting-help">Modifica la dimensione delle risposte, della barra laterale e delle finestre come “Cose da ricordare”.</div></div><div class="zoom-control"><input id="replyZoom" type="range" min="80" max="150" step="5" value="100"><span id="replyZoomValue">100%</span></div></div>
+    <button type="button" id="openFontSettings" class="setting-option">
+      <span class="setting-option-icon">🔤</span>
+      <span class="setting-option-copy"><b>Font della scrittura</b><small id="fontSettingValue">Sistema</small></span>
+      <span class="setting-option-arrow">›</span>
+    </button>
+    <button type="button" id="openVoiceSettings" class="setting-option">
+      <span class="setting-option-icon">🎙️</span>
+      <span class="setting-option-copy"><b>Modifica voci</b><small>Personalizza le risposte normali e segrete</small></span>
+      <span class="setting-option-arrow">›</span>
+    </button>
+    <div class="modal-actions"><button type="button" id="closeSettingsBottom" class="primary">Fatto</button></div>
+  </div>
+</div>
+
+<div id="voiceChoiceModal" class="modal hidden">
+  <div class="modal-card voice-choice-card">
+    <div class="settings-head"><div><h2>🎙️ Modifica voci</h2><p class="hint">Scegli cosa vuoi personalizzare e poi premi Avanti.</p></div><button type="button" id="closeVoiceChoice" class="memory-close">×</button></div>
+    <div class="voice-choice-list">
+      <button type="button" class="voice-choice" id="editNormalVoices" data-voice-group="normal" aria-pressed="false"><span class="voice-choice-radio"></span><span class="voice-choice-icon">💬</span><div><b>Risposte normali</b><small>Modifica Dolce, Stuzzica, Ironico, Flirt, Seria, Audace, Battuta e Poeta.</small></div></button>
+      <button type="button" class="voice-choice" id="editSecretVoices" data-voice-group="secret" aria-pressed="false"><span class="voice-choice-radio"></span><span class="voice-choice-icon">🔥</span><div><b>Risposte segrete</b><small>Modifica Erotica e Hot come preferisci.</small></div></button>
+    </div>
+    <div class="modal-actions voice-choice-actions"><button type="button" id="cancelVoiceChoice" class="secondary">Annulla</button><button type="button" id="continueVoiceChoice" class="primary" disabled>Avanti&nbsp;→</button></div>
+  </div>
+</div>
+
+<div id="voiceEditorModal" class="modal hidden">
+  <div class="modal-card voice-editor-card">
+    <div class="settings-head"><div><h2 id="voiceEditorTitle">💬 Risposte normali</h2><p class="hint">Puoi cambiare il nome, spiegare all’AI come vuoi che risponda e modificare l’ordine delle voci con ↑ e ↓.</p></div><button type="button" id="closeVoiceEditor" class="memory-close">×</button></div>
+    <div id="voiceEditorList" class="voice-editor-list"></div>
+    <div class="voice-editor-note">Queste preferenze vengono salvate nel tuo account e usate nelle analisi future. I nomi personalizzati cambiano ciò che vedi nell’app, mentre l’AI mantiene la funzione di ogni voce.</div>
+    <div class="modal-actions"><button type="button" id="resetVoiceSettings" class="secondary">Ripristina</button><button type="button" id="cancelVoiceEditor" class="secondary">Annulla</button><button type="button" id="saveVoiceSettings" class="primary">Salva</button></div>
+  </div>
+</div>
+
+<div id="fontModal" class="modal hidden">
+  <div class="modal-card font-modal-card">
+    <div class="settings-head"><div><h2>🔤 Scegli il font</h2><p class="hint">Seleziona il carattere che vuoi usare nell'app, poi premi Salva.</p></div><button type="button" id="closeFontModal" class="memory-close">×</button></div>
+    <div id="fontList" class="font-list"></div>
+    <div class="modal-actions"><button type="button" id="cancelFont" class="secondary">Annulla</button><button type="button" id="saveFont" class="primary">Salva</button></div>
+  </div>
+</div>
+
+<div id="deleteModal" class="modal hidden">
+  <div class="modal-card delete-modal-card">
+    <h2>🗑️ Scegli le chat da cancellare</h2>
+    <p class="hint">Seleziona una o più chat. Verranno eliminate completamente solo le chat selezionate, compresi nome, messaggi e cose da ricordare. Le altre resteranno intatte.</p>
+    <div class="delete-select-actions">
+      <button type="button" id="selectAllChats" class="secondary">Seleziona tutte</button>
+      <button type="button" id="clearAllChats" class="secondary">Deseleziona</button>
+    </div>
+    <div id="deleteChatList" class="delete-chat-list"></div>
+    <div class="modal-actions">
+      <button type="button" id="cancelDelete" class="secondary">Annulla</button>
+      <button type="button" id="confirmDelete" class="danger">Cancella selezionate</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js?v=20261115-modelmenu1"></script>
+</body>
+</html>

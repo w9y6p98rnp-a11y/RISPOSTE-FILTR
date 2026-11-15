@@ -321,7 +321,7 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 55000) {
   if (!response.ok) {
     throw new Error('OpenRouter: servizio non disponibile');
   }
-  return extractJson(data?.choices?.[0]?.message?.content || '');
+  return { result: extractJson(data?.choices?.[0]?.message?.content || ''), actualModel: data?.model || 'openrouter/free' };
 }
 
 export async function onRequestPost(context) {
@@ -330,7 +330,7 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { message = '', aiHint = '', image = null, audio = null, audioTranscript: providedAudioTranscript = '', currentTime = null, mode = 'normal', girlId = '' } = body;
+    const { message = '', aiHint = '', image = null, audio = null, audioTranscript: providedAudioTranscript = '', currentTime = null, mode = 'normal', girlId = '', aiModel = 'auto' } = body;
     if (!image && !audio) return json(400, { error: 'Aggiungi uno screenshot oppure una registrazione vocale.' });
     if (!env.DB || !context.user?.id || !girlId) return json(401, { error: 'Sessione o ragazza non valide.' });
 
@@ -390,14 +390,21 @@ export async function onRequestPost(context) {
     const prompt = promptFor(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
     const errors = [];
 
-    // NON avviare tutti i provider in parallelo: ogni tentativo può consumare quota.
-    // Proviamo un solo servizio alla volta e passiamo al successivo solo se il precedente
-    // è esaurito/non disponibile. In questo modo una richiesta normale usa una sola quota.
+    // Il modello scelto viene provato per primo; se non è disponibile si passa
+    // automaticamente agli altri motori configurati. "auto" conserva l'ordine predefinito.
+    const allowedModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash', 'openrouter/free'];
+    const preferred = allowedModels.includes(String(aiModel)) ? String(aiModel) : 'auto';
+    const order = preferred === 'auto'
+      ? allowedModels
+      : [preferred, ...allowedModels.filter(model => model !== preferred)];
     const attempts = [];
 
-    if (env.GEMINI_API_KEY) {
-      // Ordine: modello economico/free prima, poi fallback più robusti.
-      for (const model of ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash']) {
+    for (const model of order) {
+      if (model.startsWith('gemini-')) {
+        if (!env.GEMINI_API_KEY) {
+          errors.push(`${model}: GEMINI_API_KEY non configurata`);
+          continue;
+        }
         attempts.push(async () => {
           try {
             const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 55000);
@@ -406,22 +413,20 @@ export async function onRequestPost(context) {
             throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
           }
         });
-      }
-    } else {
-      errors.push('GEMINI_API_KEY non configurata');
-    }
-
-    if (env.OPENROUTER_API_KEY) {
-      attempts.push(async () => {
-        try {
-          const result = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 55000);
-          return { result, provider: 'OpenRouter', model: 'openrouter/free' };
-        } catch (err) {
-          throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
+      } else if (model === 'openrouter/free') {
+        if (!env.OPENROUTER_API_KEY) {
+          errors.push('OPENROUTER_API_KEY non configurata');
+          continue;
         }
-      });
-    } else {
-      errors.push('OPENROUTER_API_KEY non configurata');
+        attempts.push(async () => {
+          try {
+            const output = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 55000);
+            return { result: output.result, provider: 'OpenRouter', model: output.actualModel };
+          } catch (err) {
+            throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
+          }
+        });
+      }
     }
 
     for (const attempt of attempts) {

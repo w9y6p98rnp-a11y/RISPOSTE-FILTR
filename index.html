@@ -8,6 +8,16 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="style.css?v=20261101-password1">
 <title>RispostaFlirt</title>
+<style>
+.ai-model-control{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:9px 0 5px;font-size:12px;color:var(--muted,#9aa4b2)}
+.ai-model-control label{font-weight:700}
+.ai-model-control select{max-width:100%;padding:7px 10px;border:1px solid var(--border,#334155);border-radius:9px;background:var(--panel,#111827);color:inherit;font:inherit}
+.ai-model-status{flex-basis:100%;font-size:11px;opacity:.8}
+.memory-menu{display:grid;gap:10px;margin:12px 0}
+.memory-menu-option{display:flex;align-items:center;gap:12px;width:100%;padding:14px;border:1px solid var(--border,#334155);border-radius:12px;background:var(--panel,#111827);color:inherit;text-align:left;cursor:pointer}
+.memory-menu-option>span:nth-child(2){display:grid;gap:4px;flex:1}
+.memory-menu-option small{opacity:.7;font-size:12px}
+</style>
 </head>
 <body>
 <div id="authScreen" class="auth-screen hidden">
@@ -107,6 +117,17 @@
             <div class="screenshot-actions">
               <button id="chooseScreenshot" type="button" class="secondary screenshot-upload-btn">✨ Aggiungi screenshot</button>
             </div>
+            <div id="aiModelControl" class="ai-model-control">
+              <label for="aiModelSelect">Motore AI</label>
+              <select id="aiModelSelect">
+                <option value="auto">Automatico (fallback)</option>
+                <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
+                <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+                <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+                <option value="openrouter/free">OpenRouter Free</option>
+              </select>
+              <div id="aiModelStatus" class="ai-model-status">Motore preferito: Automatico (fallback)</div>
+            </div>
             <div id="imageName" class="image-name">Nessuno screenshot inserito</div>
           <div class="ai-hint-box">
             <label for="aiHint">💡 Indicazione per l'AI (facoltativa)</label>
@@ -146,8 +167,12 @@
       <button type="button" id="closeMemory" class="memory-close">×</button>
     </div>
 
-    <div id="memoryGirlSelectLabel" class="memory-select-label">👩 Ragazza</div>
-    <div id="memoryGirlList" class="memory-girl-list"></div>
+    <div id="memoryMenu" class="memory-menu">
+      <button type="button" id="renameGirlOption" class="memory-menu-option">✏️ <span><b>Rinomina ragazza</b><small>Cambia il nome senza modificare la chat</small></span><span>›</span></button>
+      <button type="button" id="memoryThingsOption" class="memory-menu-option">🧠 <span><b>Cose da ricordare</b><small>Aggiungi o modifica la memoria della ragazza selezionata</small></span><span>›</span></button>
+    </div>
+    <div id="memoryGirlSelectLabel" class="memory-select-label hidden">👩 Ragazza</div>
+    <div id="memoryGirlList" class="memory-girl-list hidden"></div>
 
     <div id="memoryEditor" class="memory-editor hidden">
       <div id="memorySelectedGirl" class="memory-selected-girl"></div>
@@ -162,6 +187,19 @@
   </div>
 </div>
 
+<div id="renameGirlModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="memory-modal-head">
+      <div><h2>✏️ Rinomina ragazza</h2><p class="hint">Verrà aggiornato solo il nome della scheda.</p></div>
+      <button type="button" id="closeRenameGirl" class="memory-close">×</button>
+    </div>
+    <input id="renameGirlInput" type="text" maxlength="80" placeholder="Nuovo nome">
+    <div class="modal-actions">
+      <button type="button" id="cancelRenameGirl" class="secondary">Annulla</button>
+      <button type="button" id="saveRenameGirl" class="primary">Salva nome</button>
+    </div>
+  </div>
+</div>
 
 <div id="accountModal" class="modal hidden">
   <div class="modal-card account-card">
@@ -266,6 +304,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20261102-lazy3"></script>
+<script src="app.js?v=20261115-modelmenu1"></script>
 </body>
 </html>

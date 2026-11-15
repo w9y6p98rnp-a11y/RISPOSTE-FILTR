@@ -1,0 +1,5 @@
+# Dopo aver creato il database D1, copia questo blocco nel wrangler.toml.
+[[d1_databases]]
+binding = "DB"
+database_name = "rispostaflirt-auth"
+database_id = "INCOLLA_QUI_IL_DATABASE_ID"

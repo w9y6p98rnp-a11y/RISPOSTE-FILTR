@@ -371,14 +371,13 @@ async function selectMemoryGirl(id){
   const g=await getGirl(id);
   $("memoryInput").value=g?.memory||"";
   $("memorySelectedGirl").innerHTML=`🧠 Memoria di <strong>${esc(g?.name||"Ragazza")}</strong>`;
-  // Dopo la scelta, nascondi completamente l'elenco: la seconda schermata
-  // deve riguardare solo la ragazza appena selezionata.
+  $("memoryMenu").classList.add("hidden");
   $("memoryGirlList").classList.add("hidden");
   $("memoryGirlSelectLabel").classList.add("hidden");
   $("memoryModalHint").classList.add("hidden");
   $("memoryEditor").classList.remove("hidden");
-  $("saveMemory").disabled=false;
-  document.querySelectorAll(".memory-girl-option").forEach(x=>x.classList.toggle("active",x.dataset.memoryGirl===id));
+  $("saveMemory").disabled=!g;
+  $("cancelMemory").textContent="Indietro";
   setTimeout(()=>$("memoryInput").focus(),0);
 }
 
@@ -386,12 +385,16 @@ async function openMemoryModal(){
   memorySelectedGirlId=null;
   $("memoryInput").value="";
   $("memoryEditor").classList.add("hidden");
-  $("memoryGirlList").classList.remove("hidden");
-  $("memoryGirlSelectLabel").classList.remove("hidden");
+  $("memoryGirlList").classList.add("hidden");
+  $("memoryGirlSelectLabel").classList.add("hidden");
+  $("memoryMenu").classList.remove("hidden");
+  $("memoryModalHint").textContent=selectedId
+    ? `Scegli cosa vuoi modificare per ${((await getGirl(selectedId))?.name||"la ragazza selezionata")}.`
+    : "Prima crea o seleziona una ragazza.";
   $("memoryModalHint").classList.remove("hidden");
   $("saveMemory").disabled=true;
+  $("cancelMemory").textContent="Chiudi";
   $("memoryModal").classList.remove("hidden");
-  await renderMemoryGirlList();
 }
 
 $("saveMemory").onclick=async()=>{
@@ -421,7 +424,44 @@ function bindMemoryButton(){
 bindMemoryButton();
 
 $("closeMemory").onclick=closeMemoryModal;
-$("cancelMemory").onclick=closeMemoryModal;
+$("cancelMemory").onclick=()=>{
+  if(memorySelectedGirlId){
+    memorySelectedGirlId=null;
+    $("memoryEditor").classList.add("hidden");
+    $("memoryMenu").classList.remove("hidden");
+    $("memoryModalHint").classList.remove("hidden");
+    $("saveMemory").disabled=true;
+    $("cancelMemory").textContent="Chiudi";
+  }else closeMemoryModal();
+};
+$("memoryThingsOption").onclick=async()=>{
+  if(!selectedId){alert("Seleziona prima una ragazza.");return;}
+  await selectMemoryGirl(selectedId);
+};
+$("renameGirlOption").onclick=async()=>{
+  if(!selectedId){alert("Seleziona prima una ragazza.");return;}
+  const g=await getGirl(selectedId);
+  if(!g)return;
+  $("renameGirlInput").value=g.name||"";
+  $("memoryModal").classList.add("hidden");
+  $("renameGirlModal").classList.remove("hidden");
+  $("renameGirlInput").focus();
+};
+$("closeRenameGirl").onclick=$("cancelRenameGirl").onclick=()=> $("renameGirlModal").classList.add("hidden");
+$("renameGirlModal").addEventListener("click",e=>{if(e.target===$("renameGirlModal"))$("renameGirlModal").classList.add("hidden")});
+$("saveRenameGirl").onclick=async()=>{
+  const name=$("renameGirlInput").value.trim().replace(/\s+/g," ").slice(0,80);
+  if(name.length<1){alert("Inserisci un nome.");$("renameGirlInput").focus();return;}
+  const g=await getGirl(selectedId);
+  if(!g)return;
+  g.name=name;
+  g.updatedAt=Date.now();
+  await put("girls",g);
+  $("girlTitle").textContent=name;
+  await renderGirls();
+  $("renameGirlModal").classList.add("hidden");
+  alert("Nome aggiornato. La conversazione e la memoria sono rimaste intatte.");
+};
 $("memoryModal").addEventListener("click",e=>{if(e.target===$("memoryModal"))closeMemoryModal()});
 
 async function buildContext(){const g=await getGirl(selectedId),ms=await messagesFor(selectedId),settings=loadSettings();return {aboutMe:settings.aboutMe||"",voiceSettings:loadVoiceSettings(),girl:{id:g?.id,name:g?.name,note:g?.note||"",memory:g?.memory||""},memory:g?.memory||"",conversation:ms.slice(-16),previousReplies:ms.filter(x=>x.role==="me").map(x=>x.text).slice(-12)}}
@@ -561,11 +601,12 @@ async function loadSecretRepliesLazy(){
     let response;
     try{
       response=await fetch("/api/reply",{method:"POST",headers:{"Content-Type":"application/json"},signal:controller.signal,body:JSON.stringify({
-        girlId:a.girlId,message:a.message,aiHint:a.aiHint,image:a.image,audio:a.audio,audioTranscript:a.audioTranscript||"",currentTime:getCurrentTimeContext(),mode:"secret"
+        girlId:a.girlId,message:a.message,aiHint:a.aiHint,image:a.image,audio:a.audio,audioTranscript:a.audioTranscript||"",currentTime:getCurrentTimeContext(),mode:"secret",aiModel:loadSettings().aiModel||"auto"
       })});
     }finally{clearTimeout(timer)}
     if(!response.ok){ const detail=await response.text().catch(()=>""); throw new Error(detail||"Server AI non disponibile."); }
     const data=await response.json();
+    updateAiModelStatus(data.provider,data.model);
     const replies=Array.isArray(data.replies)?data.replies:[];
     if(!replies.length) throw new Error("Nessuna risposta segreta restituita dall'AI.");
     const voiceOrder=loadVoiceSettings();
@@ -656,7 +697,8 @@ $("generate").onclick=async()=>{
           image,
           audio,
           currentTime:getCurrentTimeContext(),
-          mode:"normal"
+          mode:"normal",
+          aiModel:loadSettings().aiModel||"auto"
         })
       });
     }finally{clearTimeout(clientTimer)}
@@ -665,6 +707,7 @@ $("generate").onclick=async()=>{
       throw new Error(detail || "Server AI non disponibile.");
     }
     const data=await response.json();
+    updateAiModelStatus(data.provider,data.model);
     const audioTranscript=String(data.audioTranscript||"").trim();
     if(audioTranscript){
       state.audioTranscript=audioTranscript;
@@ -888,6 +931,32 @@ function settingsKey(){return `RispostaFlirtSettings_${currentUser?.id||"local"}
 function loadSettings(){try{return {...{theme:"dark",replyZoom:100,font:"system",aboutMe:""},...(JSON.parse(localStorage.getItem(settingsKey())||"{}"))}}catch(e){return {theme:"dark",replyZoom:100,font:"system",aboutMe:""}}}
 function applySettings(){const s=loadSettings();document.body.classList.toggle("light-theme",s.theme==="light");const zoom=String((Number(s.replyZoom)||100)/100);document.documentElement.style.setProperty("--ui-zoom",zoom);const r=$("results");if(r)r.style.setProperty("--reply-zoom",zoom);const font=getFontOption(s.font);document.documentElement.style.setProperty("--app-font",font.stack);document.querySelectorAll(".theme-option").forEach(b=>b.classList.toggle("active",b.dataset.theme===s.theme));if($("replyZoom"))$("replyZoom").value=String(s.replyZoom||100);if($("replyZoomValue"))$("replyZoomValue").textContent=(s.replyZoom||100)+"%";if($("fontSettingValue"))$("fontSettingValue").textContent=font.name;}
 function saveSettings(patch){const next={...loadSettings(),...patch};localStorage.setItem(settingsKey(),JSON.stringify(next));if(serverSyncEnabled) scheduleServerSync();applySettings()}
+const AI_MODEL_LABELS={
+  auto:"Automatico (fallback)",
+  "gemini-3.5-flash-lite":"Gemini 3.5 Flash-Lite",
+  "gemini-3.6-flash":"Gemini 3.6 Flash",
+  "gemini-3.8-flash":"Gemini 3.8 Flash",
+  "openrouter/free":"OpenRouter Free"
+};
+function updateAiModelStatus(provider,model){
+  const el=$("aiModelStatus");
+  if(!el)return;
+  if(provider&&model){
+    const known=AI_MODEL_LABELS[model]||model;
+    el.textContent=`Ultima risposta generata da: ${provider} · ${known}`;
+  }else{
+    const selected=loadSettings().aiModel||"auto";
+    el.textContent=`Motore preferito: ${AI_MODEL_LABELS[selected]||AI_MODEL_LABELS.auto}`;
+  }
+}
+if($("aiModelSelect")){
+  $("aiModelSelect").value=loadSettings().aiModel||"auto";
+  $("aiModelSelect").addEventListener("change",e=>{
+    saveSettings({aiModel:e.target.value});
+    updateAiModelStatus();
+  });
+  updateAiModelStatus();
+}
 function renderFontList(){const current=getFontOption(pendingFontId);$("fontList").innerHTML=FONT_OPTIONS.map(f=>`<button type="button" class="font-option ${f.id===current.id?"selected":""}" data-font-id="${f.id}"><span class="font-option-name">${esc(f.name)}</span><span class="font-option-preview" style="font-family:${f.stack}">Aa — RispostaFlirt</span><span class="font-option-check">✓</span></button>`).join("");document.querySelectorAll(".font-option").forEach(b=>b.onclick=()=>{pendingFontId=b.dataset.fontId;renderFontList()});}
 function openFontModal(){pendingFontId=loadSettings().font||"system";renderFontList();$("fontModal").classList.remove("hidden")}
 function closeFontModal(){$("fontModal").classList.add("hidden")}
@@ -1002,6 +1071,8 @@ async function startUserApp(user){
   $("authScreen").classList.add("hidden"); $("app").classList.remove("hidden");
   try{
     await prepareUserData();
+    if($("aiModelSelect")) $("aiModelSelect").value=loadSettings().aiModel||"auto";
+    updateAiModelStatus();
     await renderGirls();
     const saved=localStorage.getItem(`selectedGirl_${currentUser.id}`);
     if(saved && girls.some(g=>g.id===saved)) await selectGirl(saved);
