@@ -606,7 +606,7 @@ async function loadSecretRepliesLazy(){
     }finally{clearTimeout(timer)}
     if(!response.ok){ const detail=await response.text().catch(()=>""); throw new Error(detail||"Server AI non disponibile."); }
     const data=await response.json();
-    updateAiModelStatus(data.provider,data.model);
+    updateAiModelStatus(data.provider,data.model,data.fallbackErrors);
     const replies=Array.isArray(data.replies)?data.replies:[];
     if(!replies.length) throw new Error("Nessuna risposta segreta restituita dall'AI.");
     const voiceOrder=loadVoiceSettings();
@@ -707,7 +707,7 @@ $("generate").onclick=async()=>{
       throw new Error(detail || "Server AI non disponibile.");
     }
     const data=await response.json();
-    updateAiModelStatus(data.provider,data.model);
+    updateAiModelStatus(data.provider,data.model,data.fallbackErrors);
     const audioTranscript=String(data.audioTranscript||"").trim();
     if(audioTranscript){
       state.audioTranscript=audioTranscript;
@@ -940,12 +940,16 @@ const AI_MODEL_LABELS={
   "groq/qwen3.8-27b":"Groq · Qwen 3.8 27B",
   "qwen/qwen3.8-27b":"Qwen 3.8 27B"
 };
-function updateAiModelStatus(provider,model){
+function updateAiModelStatus(provider,model,fallbackErrors=[]){
   const el=$("aiModelStatus");
   if(!el)return;
   if(provider&&model){
     const known=AI_MODEL_LABELS[model]||model;
     el.textContent=`Ultima risposta generata da: ${provider} · ${known}`;
+    // Se il motore scelto non è riuscito e si è attivato il fallback,
+    // mostra il motivo tecnico senza esporre chiavi o dati riservati.
+    const groqIssue=(Array.isArray(fallbackErrors)?fallbackErrors:[]).find(e=>/Groq:|GROQ_API_KEY/i.test(String(e)));
+    if(groqIssue) el.textContent+=` · Groq non riuscito: ${String(groqIssue).slice(0,180)}`;
   }else{
     const selected=loadSettings().aiModel||"auto";
     el.textContent=`Motore preferito: ${AI_MODEL_LABELS[selected]||AI_MODEL_LABELS.auto}`;

@@ -478,7 +478,7 @@ export async function onRequestPost(context) {
     for (const attempt of attempts) {
       try {
         const winner = await attempt();
-        return new Response(JSON.stringify({ ...winner.result, audioTranscript, provider: winner.provider, model: winner.model }), { status: 200, headers: { "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ ...winner.result, audioTranscript, provider: winner.provider, model: winner.model, fallbackErrors: errors }), { status: 200, headers: { "Content-Type": "application/json" } });
       } catch (err) {
         errors.push(err?.message || String(err));
       }
