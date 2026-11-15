@@ -489,6 +489,33 @@ async function compressImageForAI(file){
   }
 }
 
+
+async function compressImageForGroq(file){
+  const isDataUrl=typeof file==="string";
+  const src=isDataUrl?file:URL.createObjectURL(file);
+  try{
+    const img=await new Promise((resolve,reject)=>{
+      const el=new Image();
+      el.onload=()=>resolve(el);
+      el.onerror=reject;
+      el.src=src;
+    });
+    // Immagine dedicata a Groq: riduzione forte dei pixel per contenere i token visivi.
+    const maxW=512, maxH=768;
+    const scale=Math.min(1,maxW/img.naturalWidth,maxH/img.naturalHeight);
+    const w=Math.max(1,Math.round(img.naturalWidth*scale));
+    const h=Math.max(1,Math.round(img.naturalHeight*scale));
+    const canvas=document.createElement('canvas');
+    canvas.width=w; canvas.height=h;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+    ctx.drawImage(img,0,0,w,h);
+    return canvas.toDataURL('image/jpeg',0.42);
+  }finally{
+    if(!isDataUrl) URL.revokeObjectURL(src);
+  }
+}
+
 async function saveReplyToChat(text){
   if(!selectedId || !text) return;
   const st=getGirlState(selectedId);
@@ -656,6 +683,7 @@ $("generate").onclick=async()=>{
   try{
     const context=await buildContext();
     let image=null;
+    let imageGroq=null;
     let audio=null;
     state.message="";
     state.lastAnalysisMessage=text;
@@ -668,6 +696,11 @@ $("generate").onclick=async()=>{
       await persistGirlState(selectedId);
     }else if(state.imageData){
       image=state.imageData;
+    }
+    if(image){
+      // Variante alleggerita solo per Groq; Gemini e OpenRouter ricevono lo screenshot originale compresso.
+      if(selectedImageFile) imageGroq=await compressImageForGroq(selectedImageFile);
+      else imageGroq=await compressImageForGroq(image);
     }
     if(selectedAudioFile){
       audio=await fileToDataUrl(selectedAudioFile);
@@ -695,6 +728,7 @@ $("generate").onclick=async()=>{
           message:text,
           aiHint,
           image,
+          imageGroq,
           audio,
           currentTime:getCurrentTimeContext(),
           mode:"normal",

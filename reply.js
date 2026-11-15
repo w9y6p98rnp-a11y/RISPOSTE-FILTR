@@ -325,40 +325,48 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 55000) {
 }
 
 function compactGroqPrompt(context, message, aiHint = '', audioTranscript = '', previousGeneratedReplies = [], mode = 'normal') {
-  // Groq ha un limite ITPM più basso: inviamo un prompt dedicato e compatto,
-  // senza ripetere più volte le stesse regole contenute nel prompt completo Gemini/OpenRouter.
+  // Prompt volutamente breve: il piano gratuito Groq ha una quota TPM condivisa.
   const defaults = ['Dolce','Stuzzica','Ironico','Flirt','Seria','Audace','Battuta','Poeta','Erotica','Hot'];
   const normal = Array.isArray(context?.voiceSettings?.normal) && context.voiceSettings.normal.length
     ? context.voiceSettings.normal.map(v => String(v.id || '')).filter(Boolean) : defaults.slice(0, 8);
   const secret = Array.isArray(context?.voiceSettings?.secret) && context.voiceSettings.secret.length
     ? context.voiceSettings.secret.map(v => String(v.id || '')).filter(Boolean) : defaults.slice(8);
-  const styles = mode === 'secret' ? secret : normal;
+  const styles = (mode === 'secret' ? secret : normal).slice(0, 8);
   const settings = new Map();
   for (const group of [context?.voiceSettings?.normal, context?.voiceSettings?.secret]) {
     if (Array.isArray(group)) for (const item of group) if (item?.id) settings.set(String(item.id), item);
   }
   const styleRules = styles.map(style => {
-    const instruction = String(settings.get(style)?.instruction || '').slice(0, 240);
-    return `${style}: ${instruction || 'Tono coerente con il nome dello stile; resta naturale e pertinente.'}`;
-  }).join('\n');
-  const history = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-6).map(x => ({
-    ruolo: String(x.role || '').slice(0, 12), testo: String(x.text || '').slice(-650)
+    const instruction = String(settings.get(style)?.instruction || '').replace(/\s+/g, ' ').slice(0, 75);
+    return `${style}${instruction ? ': ' + instruction : ''}`;
+  }).join('; ');
+  const history = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-2).map(x => ({
+    chi: String(x.role || '').slice(0, 4),
+    testo: String(x.text || '').replace(/\s+/g, ' ').slice(-180)
   }));
   const previous = [...new Set((Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : [])
-    .map(x => String(x).trim()).filter(Boolean))].slice(-5).map(x => x.slice(0, 180));
+    .map(x => String(x).trim()).filter(Boolean))].slice(-2).map(x => x.slice(0, 90));
   const compactContext = {
-    nome: String(context?.girl?.name || '').slice(0, 80),
-    nota: String(context?.girl?.note || '').slice(0, 650),
-    memoria: String(context?.girl?.memory || context?.memory || '').slice(0, 1600),
-    profiloUtente: String(context?.aboutMe || '').slice(0, 700),
-    dataOra: context?.currentTime || null,
-    cronologiaRecente: history
+    nome: String(context?.girl?.name || '').slice(0, 45),
+    nota: String(context?.girl?.note || '').replace(/\s+/g, ' ').slice(0, 180),
+    memoria: String(context?.girl?.memory || context?.memory || '').replace(/\s+/g, ' ').slice(0, 300),
+    profilo: String(context?.aboutMe || '').replace(/\s+/g, ' ').slice(0, 120),
+    chat: history
   };
-  // Per il piano gratuito Groq limitiamo l'output a una risposta per stile, così
-  // la generazione resta entro il budget di 512 token e il limite OTPM.
-  const total = styles.length;
   const categoryExample = Object.fromEntries(styles.map(style => [style, { index: 0, reason: '...' }]));
-  return `Sei RispostaFlirt. Leggi l'immagine e individua l'ULTIMO messaggio scritto da LEI; rispondi a quello, non a messaggi precedenti. L'immagine è la fonte primaria per il turno corrente. Distingui sempre IO (utente) da LEI: non invertire fatti o possessivi. Usa memoria e cronologia solo come contesto, non inventare fatti. Rispondi alla domanda specifica; se lei è seria, arrabbiata o pone un limite, sii rispettoso e non forzare flirt o sessualità. Ogni frase deve essere pertinente al messaggio reale, non generica. Evita ripetizioni e varia davvero aperture e idee.\n\nCONTESTO: ${JSON.stringify(compactContext)}\nMESSAGGIO/NOTA UTENTE: ${String(message || '').slice(0, 2400)}\nINDICAZIONE UTENTE: ${String(aiHint || '').slice(0, 900)}\nTRASCRIZIONE: ${String(audioTranscript || '').slice(0, 1600)}\nRISPOSTE DA NON RIPETERE: ${JSON.stringify(previous)}\n\nSTILI DA GENERARE: ${styles.join(', ')}. Istruzioni stile: ${styleRules}\nGenera ${total} risposte totali: UNA per ogni stile richiesto. Ogni risposta deve essere concreta, naturale, pertinente e di lunghezza breve-media. Dai priorità alla qualità e alla pertinenza rispetto alla quantità. Per ogni risposta usa il campo style e text. Usa 1 emoji naturale nelle risposte leggere, senza forzarla nei messaggi seri.\n\nRestituisci SOLO JSON valido, senza markdown, con questa struttura e tutti i campi: ${JSON.stringify({ advice: 'consiglio operativo breve', sendWhen: 'momento consigliato', recommendedIndex: 0, recommendedNormalIndex: 0, recommendedSecretIndex: mode === 'secret' ? 0 : 40, recommendationReason: 'motivo breve', categoryRecommendations: categoryExample, replies: [{ style: styles[0] || 'Dolce', text: 'risposta' }] })}. categoryRecommendations deve contenere esattamente le chiavi degli stili richiesti, ciascuna con index e reason. recommendedIndex deve puntare a una risposta valida; recommendedNormalIndex tra 0 e 39; recommendedSecretIndex tra 40 e 59.`;
+  return `Sei RispostaFlirt. Leggi lo screenshot e rispondi all'ULTIMO messaggio di LEI. Distingui Lei da Io. Rispondi alla domanda concreta; rispetta sempre un suo limite. Usa il contesto solo se utile, non inventare fatti. Tono naturale, breve, non ripetitivo.\n` +
+    `CONTESTO:${JSON.stringify(compactContext)}\n` +
+    `MESSAGGIO:${String(message || '').replace(/\s+/g, ' ').slice(0, 350)}\n` +
+    `INDICAZIONE:${String(aiHint || '').replace(/\s+/g, ' ').slice(0, 180)}\n` +
+    `AUDIO:${String(audioTranscript || '').replace(/\s+/g, ' ').slice(0, 180)}\n` +
+    `EVITA:${JSON.stringify(previous)}\n` +
+    `STILI:${styles.join(', ')}. Regole:${styleRules}\n` +
+    `Crea una risposta breve per ciascuno stile, massimo 1 frase ciascuna. JSON soltanto: ${JSON.stringify({
+      advice: 'consiglio breve', sendWhen: 'momento', recommendedIndex: 0,
+      recommendedNormalIndex: 0, recommendedSecretIndex: mode === 'secret' ? 0 : 40,
+      recommendationReason: 'motivo', categoryRecommendations: categoryExample,
+      replies: [{ style: styles[0] || 'Dolce', text: 'risposta breve' }]
+    })}. Mantieni tutte le chiavi e tutti gli stili.`;
 }
 
 async function callGroq(apiKey, prompt, image, timeoutMs = 45000) {
@@ -401,7 +409,7 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { message = '', aiHint = '', image = null, audio = null, audioTranscript: providedAudioTranscript = '', currentTime = null, mode = 'normal', girlId = '', aiModel = 'auto' } = body;
+    const { message = '', aiHint = '', image = null, imageGroq = null, audio = null, audioTranscript: providedAudioTranscript = '', currentTime = null, mode = 'normal', girlId = '', aiModel = 'auto' } = body;
     if (!image && !audio) return json(400, { error: 'Aggiungi uno screenshot oppure una registrazione vocale.' });
     if (!env.DB || !context.user?.id || !girlId) return json(401, { error: 'Sessione o ragazza non valide.' });
 
@@ -505,7 +513,7 @@ export async function onRequestPost(context) {
         attempts.push(async () => {
           try {
             const groqPrompt = compactGroqPrompt(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
-            const output = await callGroq(env.GROQ_API_KEY, groqPrompt, image, 45000);
+            const output = await callGroq(env.GROQ_API_KEY, groqPrompt, imageGroq || image, 45000);
             return { result: output.result, provider: 'Groq', model: output.actualModel };
           } catch (err) {
             throw new Error(err?.name === 'AbortError' ? 'Groq: timeout' : err.message);
