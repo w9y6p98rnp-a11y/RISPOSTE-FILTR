@@ -2,7 +2,7 @@ name = "risposte-filtr"
 main = "worker.js"
 compatibility_date = "2026-10-31"
 [vars]
-OLLITERT_MODEL = "Gemma3-1B-IT"
+OLLITERT_MODEL = "Gemma-4-E2B-it"
 [assets]
 directory = "."
 binding = "ASSETS"

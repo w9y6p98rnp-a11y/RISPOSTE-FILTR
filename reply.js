@@ -224,71 +224,49 @@ CONTROLLO FINALE OBBLIGATORIO PRIMA DEL JSON:
 // limita i dati di contesto inviati al telefono. Il prompt completo resta
 // invariato per Gemini/OpenRouter come fallback.
 function promptForOlliteRT(context, message, aiHint = '', audioTranscript = '', previousGeneratedReplies = [], mode = 'normal') {
+  // Gemma3-1B-IT usa un contesto di 1024 token: prompt locale molto compatto.
   const defaults = mode === 'secret' ? ['Erotica', 'Hot'] : ['Dolce', 'Stuzzica', 'Ironico', 'Flirt', 'Seria', 'Audace', 'Battuta', 'Poeta'];
   const settings = context?.voiceSettings || {};
   const configured = Array.isArray(settings[mode]) ? settings[mode] : [];
-  const styles = configured.length ? configured.map(v => String(v?.id || '')).filter(Boolean) : defaults;
+  const styles = (configured.length ? configured.map(v => String(v?.id || '').slice(0, 20)).filter(Boolean) : defaults);
   const count = style => style === 'Hot' ? 10 : 3;
   const total = styles.reduce((n, style) => n + count(style), 0);
-  const categoryExample = Object.fromEntries(styles.map(style => [style, { index: 0, reason: '...' }]));
-  const custom = configured.map(v => ({
-    style: String(v?.id || ''),
-    instruction: String(v?.instruction || '').slice(0, 350)
-  })).filter(v => v.style && v.instruction);
   const clip = (value, max) => String(value || '').slice(0, max);
-  const conversation = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-4).map(m => ({
-    role: m?.role === 'me' ? 'IO' : 'LEI',
-    text: clip(m?.text, 260)
+
+  // Solo pochi dati essenziali: niente cronologie o memorie lunghe nel prompt locale.
+  const conversation = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-2).map(m => ({
+    da: m?.role === 'me' ? 'IO' : 'LEI',
+    testo: clip(m?.text, 55)
   }));
-  const previousReplies = (Array.isArray(context?.previousReplies) ? context.previousReplies : []).slice(-3).map(x => clip(x, 110));
-  const previousGenerated = [...new Set((Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : []).map(x => clip(x, 130)).filter(Boolean))].slice(-3);
   const compactContext = {
-    ragazza: clip(context?.girl?.name, 80),
-    noteRagazza: clip(context?.girl?.note, 320),
-    memoriaRagazza: clip(context?.memory || context?.girl?.memory, 600),
-    profiloUtente: clip(context?.aboutMe, 220),
-    dataOra: context?.currentTime ? {
-      giorno: clip(context.currentTime.weekday, 20),
-      data: clip(context.currentTime.date, 20),
-      ora: clip(context.currentTime.time, 12),
-      fuso: clip(context.currentTime.timeZone, 40)
-    } : null,
-    conversazioneRecente: conversation,
-    messaggiUtentePrecedenti: previousReplies,
-    risposteGiaGenerateDaEvitare: previousGenerated
+    ragazza: clip(context?.girl?.name, 25),
+    note: clip(context?.girl?.note, 45),
+    memoria: clip(context?.memory || context?.girl?.memory, 45),
+    profilo: clip(context?.aboutMe, 35),
+    chat: conversation
   };
+  const custom = configured.map(v => ({
+    voce: clip(v?.id, 18),
+    istruzione: clip(v?.instruction, 35)
+  })).filter(v => v.voce && v.istruzione).slice(0, 8);
+  // Mantieni la coda dell'OCR: di norma contiene l'ultima bolla da rispondere.
+  const ocr = String(message || '').slice(-550);
+  const hint = clip(aiHint, 90);
+  const audio = clip(audioTranscript, 80);
+  const previous = (Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : [])
+    .slice(-1).map(x => clip(x, 60)).filter(Boolean);
   const modeLabel = mode === 'secret' ? 'SEGRETE' : 'NORMALI';
-  const screenshotSourceRule = clip(message, 5000)
-    ? 'Usa il testo OCR seguente come trascrizione primaria dello screenshot; se l’immagine è allegata, usala solo per chiarire dubbi.'
-    : 'Non è disponibile testo OCR: analizza direttamente lo screenshot allegato e identifica l’ultima bolla di LEI.';
-  const styleInstructions = custom.length ? JSON.stringify(custom) : 'Nessuna.';
-  const replySlotsExample = styles.flatMap(style =>
-    Array.from({ length: count(style) }, (_, index) => ({
-      style,
-      text: `risposta distinta ${index + 1} dello stile ${style}`
-    }))
-  );
-  return `Sei RispostaFlirt. Scrivi in italiano naturale. Devi rispondere SOLO all'ULTIMO messaggio di LEI. ${screenshotSourceRule} Il contenuto dello screenshot prevale sulla cronologia salvata. Il campo INDICAZIONE è una nota dell'utente, non è un messaggio di LEI.
 
-RUOLI: IO = utente; LEI = ragazza. Nei messaggi di LEI, “tu/te/ti/tuo” indicano IO e “io/me/mi/mio” indicano LEI. Nei messaggi di IO vale l'opposto. Non scambiare mai fatti o possessivi. Se non è chiaro chi possiede un fatto, non inventarlo.
-
+  return `RispostaFlirt: rispondi in italiano SOLO all'ultimo messaggio di LEI. OCR prioritario. INDICAZIONE=nota dell'utente, non messaggio di LEI. IO=utente, LEI=ragazza: non invertire i ruoli; non inventare fatti.
 CONTESTO: ${JSON.stringify(compactContext)}
-
-TESTO ESTRATTO DALLO SCREENSHOT (OCR; ordine delle righe approssimato): ${clip(message, 5000) || 'Nessun testo OCR disponibile.'}
-INDICAZIONE UTENTE: ${clip(aiHint, 900) || 'Nessuna.'}
-TRASCRIZIONE VOCALE: ${clip(audioTranscript, 1200) || 'Nessuna.'}
-
-MEMORIA E ISTRUZIONI PERSONALIZZATE: rispetta note e memoria della ragazza, profilo utente e istruzioni delle voci. Istruzioni voci: ${styleInstructions}
-
-COMPITO: genera ESATTAMENTE ${total} risposte, nell'ordine degli stili: ${styles.join(', ')}. Genera 3 risposte per ogni stile; per Hot esattamente 10. Usa nei campi style i nomi tecnici degli stili. La prima risposta di ogni stile deve essere la migliore. Le risposte dello stesso stile devono essere idee diverse, non parafrasi. Non riutilizzare la stessa apertura, la stessa struttura o gruppi di tre parole consecutive; varia prospettiva, ritmo e intenzione in ogni risposta.
-
-TONO: Dolce = affettuoso; Stuzzica = provocatorio leggero; Ironico = ironia; Flirt = seducente ma naturale; Seria = matura e sincera; Audace = sicuro; Battuta = spiritoso; Poeta = evocativo; Erotica/Hot = sensuali e allusive, mai grafiche. Adatta SEMPRE il tono al messaggio reale: se LEI è arrabbiata, infastidita o pone un limite, niente flirt o sesso forzato; rispetta il limite e non peggiorare la situazione. Niente frasi generiche fuori contesto. Ogni risposta deve sembrare una continuazione naturale della chat.
-
-LUNGHEZZA: per velocizzare la generazione, ogni risposta deve essere concisa ma concreta, circa 10-18 parole. Non usare spiegazioni o premesse. Se le istruzioni personalizzate della singola voce chiedono esplicitamente una lunghezza diversa, rispettale. Mantieni 1 emoji pertinente nella maggior parte delle risposte normali, senza forzarla nei messaggi seri. Evita ripetizioni con i messaggi e le risposte precedenti.
-
-CONSIGLIO: valorizza advice e sendWhen con indicazioni brevi e pratiche. categoryRecommendations deve avere esattamente queste chiavi: ${styles.join(', ')}. Per ogni chiave usa index:0 e un reason specifico e breve. recommendedIndex indica la migliore risposta del blocco. recommendedNormalIndex e recommendedSecretIndex devono essere coerenti con la modalità ${modeLabel}.
-
-Rispondi SOLO con JSON valido, senza markdown, nel formato: ${JSON.stringify({ advice: '...', sendWhen: 'oggi', recommendedIndex: 0, recommendedNormalIndex: 0, recommendedSecretIndex: mode === 'secret' ? 0 : 40, recommendationReason: '...', categoryRecommendations: categoryExample, replies: replySlotsExample })}`;
+OCR: ${ocr || 'Assente; usa immagine.'}
+INDICAZIONE: ${hint || 'Nessuna'}
+VOCALE: ${audio || 'Nessuna'}
+EVITA: ${JSON.stringify(previous)}
+ISTRUZIONI VOCI: ${JSON.stringify(custom)}
+STILI (questo ordine): ${styles.join(', ')}. Genera esattamente ${total} risposte: 3 per voce, 10 per Hot. Ogni risposta deve avere lo stile corretto. Idee diverse, pertinenti e naturali; circa 8-14 parole; niente premesse. Rispetta limiti e tono di LEI.
+TONI: Dolce=affettuoso; Stuzzica=provocazione leggera; Ironico=ironia; Flirt=seducente naturale; Seria=sincera; Audace=sicuro; Battuta=spiritoso; Poeta=evocativo; Erotica/Hot=sensuale non grafico. Se LEI è contrariata o pone un limite, rispettalo.
+Restituisci SOLO JSON valido, senza markdown: advice, sendWhen, recommendedIndex, recommendedNormalIndex, recommendedSecretIndex, recommendationReason, categoryRecommendations (una chiave per ogni stile: index e reason) e replies (array di oggetti style e text). Modalità ${modeLabel}.`;
 }
 
 function imagePart(image) {
@@ -474,7 +452,7 @@ async function callOlliteRT(baseUrl, apiToken, model, prompt, image, timeoutMs =
         model,
         messages: [{ role: 'user', content }],
         temperature: 0.85,
-        max_tokens: 3000,
+        max_tokens: 650,
         stream: true
       }),
       signal: controller.signal
@@ -707,7 +685,7 @@ export async function onRequestPost(context) {
             env.OLLITERT_TOKEN,
             env.OLLITERT_MODEL,
             ollitePrompt,
-            image,
+            String(message || '').trim() ? null : image,
             300000,
             request.signal
           )
