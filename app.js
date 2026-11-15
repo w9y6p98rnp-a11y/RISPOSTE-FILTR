@@ -936,7 +936,9 @@ const AI_MODEL_LABELS={
   "gemini-3.5-flash-lite":"Gemini 3.5 Flash-Lite",
   "gemini-3.6-flash":"Gemini 3.6 Flash",
   "gemini-3.8-flash":"Gemini 3.8 Flash",
-  "openrouter/free":"OpenRouter Free"
+  "openrouter/free":"OpenRouter Free",
+  "groq/qwen3.8-27b":"Groq · Qwen 3.8 27B",
+  "qwen/qwen3.8-27b":"Qwen 3.8 27B"
 };
 function updateAiModelStatus(provider,model){
   const el=$("aiModelStatus");

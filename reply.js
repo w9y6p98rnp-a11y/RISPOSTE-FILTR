@@ -324,6 +324,39 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 55000) {
   return { result: extractJson(data?.choices?.[0]?.message?.content || ''), actualModel: data?.model || 'openrouter/free' };
 }
 
+async function callGroq(apiKey, prompt, image, timeoutMs = 45000) {
+  const content = [{ type: 'text', text: prompt }];
+  if (image) content.push({ type: 'image_url', image_url: { url: image } });
+
+  const response = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'qwen/qwen3.8-27b',
+      messages: [{ role: 'user', content }],
+      temperature: 0.7,
+      max_completion_tokens: 2600,
+      reasoning_effort: 'none',
+      response_format: { type: 'json_object' }
+    })
+  }, timeoutMs);
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const apiMessage = data?.error?.message || `HTTP ${response.status}`;
+    const err = new Error(`Groq: ${apiMessage}`);
+    err.status = response.status;
+    throw err;
+  }
+  return {
+    result: extractJson(data?.choices?.[0]?.message?.content || ''),
+    actualModel: data?.model || 'qwen/qwen3.8-27b'
+  };
+}
+
 export async function onRequestPost(context) {
   const request = context.request;
   const env = context.env;
@@ -392,7 +425,7 @@ export async function onRequestPost(context) {
 
     // Il modello scelto viene provato per primo; se non è disponibile si passa
     // automaticamente agli altri motori configurati. "auto" conserva l'ordine predefinito.
-    const allowedModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash', 'openrouter/free'];
+    const allowedModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash', 'openrouter/free', 'groq/qwen3.8-27b'];
     const preferred = allowedModels.includes(String(aiModel)) ? String(aiModel) : 'auto';
     const order = preferred === 'auto'
       ? allowedModels
@@ -424,6 +457,19 @@ export async function onRequestPost(context) {
             return { result: output.result, provider: 'OpenRouter', model: output.actualModel };
           } catch (err) {
             throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
+          }
+        });
+      } else if (model === 'groq/qwen3.8-27b') {
+        if (!env.GROQ_API_KEY) {
+          errors.push('GROQ_API_KEY non configurata');
+          continue;
+        }
+        attempts.push(async () => {
+          try {
+            const output = await callGroq(env.GROQ_API_KEY, prompt, image, 45000);
+            return { result: output.result, provider: 'Groq', model: output.actualModel };
+          } catch (err) {
+            throw new Error(err?.name === 'AbortError' ? 'Groq: timeout' : err.message);
           }
         });
       }
