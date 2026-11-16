@@ -373,13 +373,18 @@ async function callCloudflareAI(aiBinding, prompt, image, timeoutMs = 55000) {
   if (!aiBinding || typeof aiBinding.run !== 'function') {
     throw new Error('Cloudflare AI: binding AI non disponibile.');
   }
+  // Workers AI per questo modello riceve il testo nel campo `prompt`.
+  // L'immagine viene passata separatamente come data URI base64.
+  // Evitiamo `messages` insieme a `image`: nel binding attuale questa
+  // combinazione può produrre l'errore 3030 durante la costruzione del prompt.
   const input = {
-    messages: [{ role: 'user', content: prompt }],
+    prompt: String(prompt || ''),
     max_tokens: 1400,
     temperature: 0.7
   };
-  // Llama Vision accetta l'immagine come data URI nel campo image.
-  if (image && typeof image === 'string' && image.startsWith('data:image/')) input.image = image;
+  if (image && typeof image === 'string' && image.startsWith('data:image/')) {
+    input.image = image;
+  }
   let timer;
   try {
     const result = await Promise.race([
