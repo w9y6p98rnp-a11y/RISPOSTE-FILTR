@@ -490,6 +490,25 @@ async function compressImageForAI(file){
 }
 
 
+async function compressImageForLlama(file){
+  const isDataUrl=typeof file==="string";
+  const src=isDataUrl?file:URL.createObjectURL(file);
+  try{
+    const img=await new Promise((resolve,reject)=>{
+      const el=new Image(); el.onload=()=>resolve(el); el.onerror=reject; el.src=src;
+    });
+    // Screenshot ad alta leggibilità: il testo delle chat non deve essere ridotto a 512x768.
+    const maxW=1000, maxH=1800;
+    const scale=Math.min(1,maxW/img.naturalWidth,maxH/img.naturalHeight);
+    const w=Math.max(1,Math.round(img.naturalWidth*scale));
+    const h=Math.max(1,Math.round(img.naturalHeight*scale));
+    const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+    const ctx=canvas.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+    ctx.drawImage(img,0,0,w,h);
+    return canvas.toDataURL('image/jpeg',0.76);
+  }finally{ if(!isDataUrl) URL.revokeObjectURL(src); }
+}
+
 async function compressImageForGroq(file){
   const isDataUrl=typeof file==="string";
   const src=isDataUrl?file:URL.createObjectURL(file);
@@ -684,6 +703,7 @@ $("generate").onclick=async()=>{
     const context=await buildContext();
     let image=null;
     let imageGroq=null;
+    let imageLlama=null;
     let audio=null;
     state.message="";
     state.lastAnalysisMessage=text;
@@ -698,9 +718,15 @@ $("generate").onclick=async()=>{
       image=state.imageData;
     }
     if(image){
-      // Variante alleggerita solo per Groq; Gemini e OpenRouter ricevono lo screenshot originale compresso.
-      if(selectedImageFile) imageGroq=await compressImageForGroq(selectedImageFile);
-      else imageGroq=await compressImageForGroq(image);
+      // Ogni motore riceve la propria versione: Groq usa quella leggera,
+      // Llama Vision quella ad alta leggibilità per non perdere il testo della chat.
+      if(selectedImageFile){
+        imageGroq=await compressImageForGroq(selectedImageFile);
+        imageLlama=await compressImageForLlama(selectedImageFile);
+      }else{
+        imageGroq=await compressImageForGroq(image);
+        imageLlama=await compressImageForLlama(image);
+      }
     }
     if(selectedAudioFile){
       audio=await fileToDataUrl(selectedAudioFile);
@@ -729,6 +755,7 @@ $("generate").onclick=async()=>{
           aiHint,
           image,
           imageGroq,
+          imageLlama,
           audio,
           currentTime:getCurrentTimeContext(),
           mode:"normal",

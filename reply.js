@@ -340,10 +340,11 @@ function compactGroqPrompt(context, message, aiHint = '', audioTranscript = '', 
     const instruction = String(settings.get(style)?.instruction || '').replace(/\s+/g, ' ').slice(0, 75);
     return `${style}${instruction ? ': ' + instruction : ''}`;
   }).join('; ');
-  const history = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-2).map(x => ({
-    chi: String(x.role || '').slice(0, 4),
-    testo: String(x.text || '').replace(/\s+/g, ' ').slice(-180)
-  }));
+  const history = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-8).map(x => ({
+    chi: x.role === 'me' ? 'IO' : x.role === 'her' ? 'LEI' : 'ALTRO',
+    testo: String(x.text || '').replace(/\s+/g, ' ').slice(0, 260)
+  })).filter(x => x.testo);
+  const lastHerMessage = [...history].reverse().find(x => x.chi === 'LEI')?.testo || '';
   const previous = [...new Set((Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : [])
     .map(x => String(x).trim()).filter(Boolean))].slice(-2).map(x => x.slice(0, 90));
   const compactContext = {
@@ -356,17 +357,13 @@ function compactGroqPrompt(context, message, aiHint = '', audioTranscript = '', 
   const categoryExample = Object.fromEntries(styles.map(style => [style, { index: 0, reason: '...' }]));
   return `Sei RispostaFlirt. Scrivi esclusivamente in italiano naturale. Leggi lo screenshot e rispondi SOLO all'ULTIMO messaggio di LEI. Distingui Lei da Io. Rispondi alla domanda concreta; rispetta sempre un suo limite. Usa il contesto solo se utile, non inventare fatti. Tono naturale, breve, non ripetitivo.\n` +
     `CONTESTO:${JSON.stringify(compactContext)}\n` +
+    `ULTIMO_TESTO_NOTO_DI_LEI:${lastHerMessage || 'Non disponibile in testo: leggilo dallo screenshot.'}\n` +
     `MESSAGGIO:${String(message || '').replace(/\s+/g, ' ').slice(0, 350)}\n` +
     `INDICAZIONE:${String(aiHint || '').replace(/\s+/g, ' ').slice(0, 180)}\n` +
     `AUDIO:${String(audioTranscript || '').replace(/\s+/g, ' ').slice(0, 180)}\n` +
     `EVITA:${JSON.stringify(previous)}\n` +
     `STILI:${styles.join(', ')}. Regole:${styleRules}\n` +
-    `Crea ESATTAMENTE 5 risposte diverse per OGNI stile, massimo 1 frase ciascuna. Totale: ${styles.length * 5} risposte. Tutte in italiano, pertinenti all'ultimo messaggio di LEI, senza ripetizioni. JSON soltanto: ${JSON.stringify({
-      advice: 'consiglio breve', sendWhen: 'momento', recommendedIndex: 0,
-      recommendedNormalIndex: 0, recommendedSecretIndex: mode === 'secret' ? 0 : 40,
-      recommendationReason: 'motivo', categoryRecommendations: categoryExample,
-      replies: styles.flatMap(style => Array.from({ length: 5 }, (_, i) => ({ style, text: `risposta ${i + 1}` })))
-    })}. Mantieni tutte le chiavi e tutti gli stili.`;
+    `Crea ESATTAMENTE 5 risposte diverse per OGNI stile, massimo 1 frase ciascuna. Totale: ${styles.length * 5} risposte. Tutte in italiano e pertinenti all'ULTIMA BOLLA DI LEI nello screenshot. Non usare frasi intercambiabili, non ripetere lo stesso concetto tra stili e non inventare eventi. Prima individua la frase precisa di LEI e costruisci ogni risposta come continuazione diretta di quella frase. Se il testo non è leggibile, non fingere di averlo capito: usa l'ultimo testo noto della chat come appoggio e dichiaralo nel consiglio. Restituisci esclusivamente un JSON con le chiavi advice, sendWhen, recommendedIndex, recommendedNormalIndex, recommendedSecretIndex, recommendationReason, categoryRecommendations e replies. categoryRecommendations deve contenere una voce per stile con index e reason; replies deve contenere esattamente 5 oggetti per stile, ciascuno con style e text. Non inserire esempi di risposte né testo segnaposto.`;
 }
 
 async function callCloudflareAI(aiBinding, prompt, image, timeoutMs = 55000) {
@@ -395,7 +392,10 @@ async function callCloudflareAI(aiBinding, prompt, image, timeoutMs = 55000) {
     ],
     image,
     max_tokens: 3072,
-    temperature: 0.4
+    temperature: 0.55,
+    top_p: 0.85,
+    repetition_penalty: 1.12,
+    frequency_penalty: 0.35
   };
   let timer;
   try {
@@ -454,7 +454,7 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { message = '', aiHint = '', image = null, imageGroq = null, audio = null, audioTranscript: providedAudioTranscript = '', currentTime = null, mode = 'normal', girlId = '', aiModel = 'auto' } = body;
+    const { message = '', aiHint = '', image = null, imageGroq = null, imageLlama = null, audio = null, audioTranscript: providedAudioTranscript = '', currentTime = null, mode = 'normal', girlId = '', aiModel = 'auto' } = body;
     if (!image && !audio) return json(400, { error: 'Aggiungi uno screenshot oppure una registrazione vocale.' });
     if (!env.DB || !context.user?.id || !girlId) return json(401, { error: 'Sessione o ragazza non valide.' });
 
@@ -558,7 +558,7 @@ export async function onRequestPost(context) {
         }
         attempts.push(async () => {
           const cloudflarePrompt = compactGroqPrompt(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
-          const output = await callCloudflareAI(env.AI, cloudflarePrompt, imageGroq || image, 55000);
+          const output = await callCloudflareAI(env.AI, cloudflarePrompt, imageLlama || image, 55000);
           return { result: output.result, provider: 'Cloudflare AI', model: output.actualModel };
         });
       }
