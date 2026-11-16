@@ -354,18 +354,18 @@ function compactGroqPrompt(context, message, aiHint = '', audioTranscript = '', 
     chat: history
   };
   const categoryExample = Object.fromEntries(styles.map(style => [style, { index: 0, reason: '...' }]));
-  return `Sei RispostaFlirt. Leggi lo screenshot e rispondi all'ULTIMO messaggio di LEI. Distingui Lei da Io. Rispondi alla domanda concreta; rispetta sempre un suo limite. Usa il contesto solo se utile, non inventare fatti. Tono naturale, breve, non ripetitivo.\n` +
+  return `Sei RispostaFlirt. Scrivi esclusivamente in italiano naturale. Leggi lo screenshot e rispondi SOLO all'ULTIMO messaggio di LEI. Distingui Lei da Io. Rispondi alla domanda concreta; rispetta sempre un suo limite. Usa il contesto solo se utile, non inventare fatti. Tono naturale, breve, non ripetitivo.\n` +
     `CONTESTO:${JSON.stringify(compactContext)}\n` +
     `MESSAGGIO:${String(message || '').replace(/\s+/g, ' ').slice(0, 350)}\n` +
     `INDICAZIONE:${String(aiHint || '').replace(/\s+/g, ' ').slice(0, 180)}\n` +
     `AUDIO:${String(audioTranscript || '').replace(/\s+/g, ' ').slice(0, 180)}\n` +
     `EVITA:${JSON.stringify(previous)}\n` +
     `STILI:${styles.join(', ')}. Regole:${styleRules}\n` +
-    `Crea una risposta breve per ciascuno stile, massimo 1 frase ciascuna. JSON soltanto: ${JSON.stringify({
+    `Crea ESATTAMENTE 5 risposte diverse per OGNI stile, massimo 1 frase ciascuna. Totale: ${styles.length * 5} risposte. Tutte in italiano, pertinenti all'ultimo messaggio di LEI, senza ripetizioni. JSON soltanto: ${JSON.stringify({
       advice: 'consiglio breve', sendWhen: 'momento', recommendedIndex: 0,
       recommendedNormalIndex: 0, recommendedSecretIndex: mode === 'secret' ? 0 : 40,
       recommendationReason: 'motivo', categoryRecommendations: categoryExample,
-      replies: [{ style: styles[0] || 'Dolce', text: 'risposta breve' }]
+      replies: styles.flatMap(style => Array.from({ length: 5 }, (_, i) => ({ style, text: `risposta ${i + 1}` })))
     })}. Mantieni tutte le chiavi e tutti gli stili.`;
 }
 
@@ -373,18 +373,13 @@ async function callCloudflareAI(aiBinding, prompt, image, timeoutMs = 55000) {
   if (!aiBinding || typeof aiBinding.run !== 'function') {
     throw new Error('Cloudflare AI: binding AI non disponibile.');
   }
-  // Workers AI per questo modello riceve il testo nel campo `prompt`.
-  // L'immagine viene passata separatamente come data URI base64.
-  // Evitiamo `messages` insieme a `image`: nel binding attuale questa
-  // combinazione può produrre l'errore 3030 durante la costruzione del prompt.
   const input = {
-    prompt: String(prompt || ''),
-    max_tokens: 1400,
+    messages: [{ role: 'user', content: prompt }],
+    max_tokens: 3072,
     temperature: 0.7
   };
-  if (image && typeof image === 'string' && image.startsWith('data:image/')) {
-    input.image = image;
-  }
+  // Llama Vision accetta l'immagine come data URI nel campo image.
+  if (image && typeof image === 'string' && image.startsWith('data:image/')) input.image = image;
   let timer;
   try {
     const result = await Promise.race([
@@ -545,7 +540,8 @@ export async function onRequestPost(context) {
           continue;
         }
         attempts.push(async () => {
-          const output = await callCloudflareAI(env.AI, prompt, image, 55000);
+          const cloudflarePrompt = compactGroqPrompt(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
+          const output = await callCloudflareAI(env.AI, cloudflarePrompt, imageGroq || image, 55000);
           return { result: output.result, provider: 'Cloudflare AI', model: output.actualModel };
         });
       }
