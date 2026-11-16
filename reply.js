@@ -369,6 +369,34 @@ function compactGroqPrompt(context, message, aiHint = '', audioTranscript = '', 
     })}. Mantieni tutte le chiavi e tutti gli stili.`;
 }
 
+async function callCloudflareAI(aiBinding, prompt, image, timeoutMs = 55000) {
+  if (!aiBinding || typeof aiBinding.run !== 'function') {
+    throw new Error('Cloudflare AI: binding AI non disponibile.');
+  }
+  const input = {
+    messages: [{ role: 'user', content: prompt }],
+    max_tokens: 1400,
+    temperature: 0.7
+  };
+  // Llama Vision accetta l'immagine come data URI nel campo image.
+  if (image && typeof image === 'string' && image.startsWith('data:image/')) input.image = image;
+  let timer;
+  try {
+    const result = await Promise.race([
+      aiBinding.run('@cf/meta/llama-3.2-11b-vision-instruct', input),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Cloudflare AI: timeout')), timeoutMs); })
+    ]);
+    const raw = result?.response || result?.result || result?.output_text || '';
+    if (!raw) throw new Error('Cloudflare AI: risposta vuota o formato non riconosciuto.');
+    return { result: extractJson(raw), actualModel: '@cf/meta/llama-3.2-11b-vision-instruct' };
+  } catch (err) {
+    const message = String(err?.message || err || 'errore sconosciuto');
+    throw new Error(message.startsWith('Cloudflare AI:') ? message : `Cloudflare AI: ${message}`);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function callGroq(apiKey, prompt, image, timeoutMs = 45000) {
   const content = [{ type: 'text', text: prompt }];
   // detail=low riduce il costo dei token visivi per gli screenshot lunghi.
@@ -471,8 +499,9 @@ export async function onRequestPost(context) {
 
     // Il modello scelto viene provato per primo; se non è disponibile si passa
     // automaticamente agli altri motori configurati. "auto" conserva l'ordine predefinito.
-    const allowedModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash', 'openrouter/free', 'groq/qwen3.8-27b'];
-    const preferred = allowedModels.includes(String(aiModel)) ? String(aiModel) : 'auto';
+    const allowedModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash', 'openrouter/free', 'cloudflare/llama-3.2-11b-vision'];
+    const requestedModel = String(aiModel) === 'groq/qwen3.8-27b' ? 'cloudflare/llama-3.2-11b-vision' : String(aiModel);
+    const preferred = allowedModels.includes(requestedModel) ? requestedModel : 'auto';
     const order = preferred === 'auto'
       ? allowedModels
       : [preferred, ...allowedModels.filter(model => model !== preferred)];
@@ -505,19 +534,14 @@ export async function onRequestPost(context) {
             throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
           }
         });
-      } else if (model === 'groq/qwen3.8-27b') {
-        if (!env.GROQ_API_KEY) {
-          errors.push('GROQ_API_KEY non configurata');
+      } else if (model === 'cloudflare/llama-3.2-11b-vision') {
+        if (!env.AI || typeof env.AI.run !== 'function') {
+          errors.push('Cloudflare AI: binding AI non configurato sul Worker');
           continue;
         }
         attempts.push(async () => {
-          try {
-            const groqPrompt = compactGroqPrompt(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
-            const output = await callGroq(env.GROQ_API_KEY, groqPrompt, imageGroq || image, 45000);
-            return { result: output.result, provider: 'Groq', model: output.actualModel };
-          } catch (err) {
-            throw new Error(err?.name === 'AbortError' ? 'Groq: timeout' : err.message);
-          }
+          const output = await callCloudflareAI(env.AI, prompt, image, 55000);
+          return { result: output.result, provider: 'Cloudflare AI', model: output.actualModel };
         });
       }
     }

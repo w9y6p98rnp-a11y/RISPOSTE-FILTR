@@ -962,7 +962,7 @@ function saveVoiceEditor(){
   closeVoiceEditor();
 }
 function settingsKey(){return `RispostaFlirtSettings_${currentUser?.id||"local"}`;}
-function loadSettings(){try{return {...{theme:"dark",replyZoom:100,font:"system",aboutMe:""},...(JSON.parse(localStorage.getItem(settingsKey())||"{}"))}}catch(e){return {theme:"dark",replyZoom:100,font:"system",aboutMe:""}}}
+function loadSettings(){try{const settings={...{theme:"dark",replyZoom:100,font:"system",aboutMe:""},...(JSON.parse(localStorage.getItem(settingsKey())||"{}"))};if(settings.aiModel==="groq/qwen3.8-27b")settings.aiModel="cloudflare/llama-3.2-11b-vision";return settings}catch(e){return {theme:"dark",replyZoom:100,font:"system",aboutMe:""}}}
 function applySettings(){const s=loadSettings();document.body.classList.toggle("light-theme",s.theme==="light");const zoom=String((Number(s.replyZoom)||100)/100);document.documentElement.style.setProperty("--ui-zoom",zoom);const r=$("results");if(r)r.style.setProperty("--reply-zoom",zoom);const font=getFontOption(s.font);document.documentElement.style.setProperty("--app-font",font.stack);document.querySelectorAll(".theme-option").forEach(b=>b.classList.toggle("active",b.dataset.theme===s.theme));if($("replyZoom"))$("replyZoom").value=String(s.replyZoom||100);if($("replyZoomValue"))$("replyZoomValue").textContent=(s.replyZoom||100)+"%";if($("fontSettingValue"))$("fontSettingValue").textContent=font.name;}
 function saveSettings(patch){const next={...loadSettings(),...patch};localStorage.setItem(settingsKey(),JSON.stringify(next));if(serverSyncEnabled) scheduleServerSync();applySettings()}
 const AI_MODEL_LABELS={
@@ -971,8 +971,7 @@ const AI_MODEL_LABELS={
   "gemini-3.6-flash":"Gemini 3.6 Flash",
   "gemini-3.8-flash":"Gemini 3.8 Flash",
   "openrouter/free":"OpenRouter Free",
-  "groq/qwen3.8-27b":"Groq · Qwen 3.8 27B",
-  "qwen/qwen3.8-27b":"Qwen 3.8 27B"
+  "cloudflare/llama-3.2-11b-vision":"Cloudflare AI · Llama 3.2 11B Vision"
 };
 function updateAiModelStatus(provider,model,fallbackErrors=[]){
   const el=$("aiModelStatus");
@@ -982,8 +981,8 @@ function updateAiModelStatus(provider,model,fallbackErrors=[]){
     el.textContent=`Ultima risposta generata da: ${provider} · ${known}`;
     // Se il motore scelto non è riuscito e si è attivato il fallback,
     // mostra il motivo tecnico senza esporre chiavi o dati riservati.
-    const groqIssue=(Array.isArray(fallbackErrors)?fallbackErrors:[]).find(e=>/Groq:|GROQ_API_KEY/i.test(String(e)));
-    if(groqIssue) el.textContent+=` · Groq non riuscito: ${String(groqIssue).slice(0,180)}`;
+    const cloudflareIssue=(Array.isArray(fallbackErrors)?fallbackErrors:[]).find(e=>/Cloudflare AI:|Workers AI|env\.AI/i.test(String(e)));
+    if(cloudflareIssue) el.textContent+=` · Cloudflare AI non riuscito: ${String(cloudflareIssue).slice(0,180)}`;
   }else{
     const selected=loadSettings().aiModel||"auto";
     el.textContent=`Motore preferito: ${AI_MODEL_LABELS[selected]||AI_MODEL_LABELS.auto}`;
