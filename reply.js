@@ -376,18 +376,27 @@ async function callCloudflareAI(aiBinding, prompt, image, timeoutMs = 55000) {
   const cleanPrompt = String(prompt || '').trim();
   if (!cleanPrompt) throw new Error('Cloudflare AI: prompt vuoto.');
 
-  // Per il modello Vision usiamo il campo prompt previsto dallo schema
-  // del modello insieme al campo image. Evitiamo messages + image, che
-  // in questa chiamata ha generato l'errore 3030.
-  const input = {
-    prompt: cleanPrompt,
-    max_tokens: 3072,
-    temperature: 0.7
-  };
-  // Llama Vision accetta l'immagine codificata in base64 come data URI.
-  if (image && typeof image === 'string' && image.startsWith('data:image/')) {
-    input.image = image;
+  // Cloudflare documenta per Llama Vision una richiesta multimodale
+  // con messages + image. Il prompt va nel messaggio user: in questo modo
+  // il modello riceve sempre un messaggio valido insieme allo screenshot.
+  if (!image || typeof image !== 'string' || !image.startsWith('data:image/')) {
+    throw new Error('Cloudflare AI: screenshot mancante o formato immagine non valido.');
   }
+  const input = {
+    messages: [
+      {
+        role: 'system',
+        content: 'Sei RispostaFlirt. Rispondi esclusivamente in italiano. Analizza lo screenshot e segui tutte le istruzioni del messaggio utente. Restituisci SOLO un oggetto JSON valido, senza markdown, introduzioni o testo fuori dal JSON.'
+      },
+      {
+        role: 'user',
+        content: cleanPrompt
+      }
+    ],
+    image,
+    max_tokens: 3072,
+    temperature: 0.4
+  };
   let timer;
   try {
     const result = await Promise.race([
