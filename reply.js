@@ -7,53 +7,85 @@ function json(statusCode, payload) {
 
 function extractJson(raw) {
   if (!raw) throw new Error('Risposta AI vuota.');
-  const cleaned = String(raw).trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '');
-  const match = cleaned.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('Risposta AI non valida.');
-  const candidate = match[0];
-  try {
-    const parsed = JSON.parse(candidate);
-    if (!parsed || !Array.isArray(parsed.replies) || !parsed.replies.length) throw new Error('Formato risposta AI non valido.');
-    return parsed;
-  } catch (e) {
-    // Alcuni modelli possono restituire JSON quasi valido anche quando responseMimeType=json è richiesto.
-    // Recuperiamo le coppie style/text senza mostrare l'errore grezzo all'utente.
-    const replies = [];
-    const pairRe = /\"style\"\s*:\s*\"((?:\\.|[^\"\\])*)\"\s*,\s*\"text\"\s*:\s*\"((?:\\.|[^\"\\])*)\"/g;
-    let m;
-    while ((m = pairRe.exec(candidate)) !== null && replies.length < 50) {
+  const source = typeof raw === 'string' ? raw : JSON.stringify(raw);
+  const cleaned = source.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+
+  // Prima prova il parsing standard; poi individua il primo oggetto JSON completo,
+  // rispettando parentesi e virgolette anche quando il testo contiene { o }.
+  const candidates = [cleaned];
+  let start = -1, depth = 0, inString = false, escaped = false;
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === '{') { if (depth === 0) start = i; depth++; }
+    else if (ch === '}' && depth > 0) {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        candidates.push(cleaned.slice(start, i + 1));
+        break;
+      }
+    }
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed && Array.isArray(parsed.replies) && parsed.replies.length) return parsed;
+      if (Array.isArray(parsed) && parsed.length) return { replies: parsed };
+    } catch (_) {}
+  }
+
+  // Se il modello ha troncato solo la parte finale del JSON, recupera gli
+  // oggetti risposta completi uno per uno, senza inventare testo mancante.
+  const replies = [];
+  const objectRe = /\{[^{}]*\}/g;
+  let match;
+  while ((match = objectRe.exec(cleaned)) !== null && replies.length < 60) {
+    try {
+      const item = JSON.parse(match[0]);
+      const style = String(item?.style || '').trim();
+      const text = String(item?.text || '').trim();
+      if (style && text) replies.push({ style, text });
+    } catch (_) {}
+  }
+  if (!replies.length) {
+    const pairRe = /"style"\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*"text"\s*:\s*"((?:\\.|[^"\\])*)"/g;
+    while ((match = pairRe.exec(cleaned)) !== null && replies.length < 60) {
       try {
-        const style = JSON.parse('\"' + m[1] + '\"');
-        const text = JSON.parse('\"' + m[2] + '\"');
+        const style = JSON.parse('"' + match[1] + '"');
+        const text = JSON.parse('"' + match[2] + '"');
         if (style && text) replies.push({ style, text });
       } catch (_) {}
     }
-    if (replies.length >= 1) {
-      const idxMatch = candidate.match(/\"recommendedIndex\"\s*:\s*(\d+)/);
-      const reasonMatch = candidate.match(/\"recommendationReason\"\s*:\s*\"((?:\\.|[^\"\\])*)\"/);
-      let reason = 'Questa è la risposta che si adatta meglio al tono e al momento della conversazione.';
-      if (reasonMatch) { try { reason = JSON.parse('\"' + reasonMatch[1] + '\"'); } catch (_) {} }
-      const recommendedIndex = Math.min(Math.max(parseInt(idxMatch?.[1] || '0', 10), 0), replies.length - 1);
-      const normalRecommendedIndex = (() => { const m = candidate.match(/"recommendedNormalIndex"\s*:\s*(\d+)/); return m ? parseInt(m[1],10) : 0; })();
-      const secretRecommendedIndex = (() => { const m = candidate.match(/"recommendedSecretIndex"\s*:\s*(\d+)/); return m ? parseInt(m[1],10) : 40; })();
-      const adviceMatch = candidate.match(/"advice"\s*:\s*"((?:\\.|[^"\\])*)"/);
-      let advice = "";
-      if (adviceMatch) { try { advice = JSON.parse('"' + adviceMatch[1] + '"'); } catch (_) {} }
-      const sendWhenMatch = candidate.match(/"sendWhen"\s*:\s*"((?:\\.|[^"\\])*)"/);
-      let sendWhen = "";
-      if (sendWhenMatch) { try { sendWhen = JSON.parse('"' + sendWhenMatch[1] + '"'); } catch (_) {} }
-      let categoryRecommendations = {};
-      const catMatch = candidate.match(/"categoryRecommendations"\s*:\s*(\{[\s\S]*?\})\s*,\s*"replies"/);
-      if (catMatch) { try { categoryRecommendations = JSON.parse(catMatch[1]); } catch (_) {} }
-
-      // Se il modello ha troncato il JSON ma ha comunque prodotto le risposte,
-      // non inventiamo un consiglio: lo lasciamo vuoto salvo richiesta esplicita.
-      // Il prompt mette advice/sendWhen all'inizio proprio per farli sopravvivere
-      // anche in caso di output molto lungo.
-      return { replies, recommendedIndex, recommendedNormalIndex: normalRecommendedIndex, recommendedSecretIndex: secretRecommendedIndex, recommendationReason: reason, advice, sendWhen, categoryRecommendations };
-    }
-    throw new Error('Risposta AI non valida.');
   }
+  if (!replies.length) throw new Error('Risposta AI non valida: Llama non ha restituito risposte nel formato previsto.');
+
+  const readString = (key, fallback = '') => {
+    const re = new RegExp('"' + key + '"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"');
+    const found = cleaned.match(re);
+    if (!found) return fallback;
+    try { return JSON.parse('"' + found[1] + '"'); } catch (_) { return fallback; }
+  };
+  const readNumber = (key, fallback = 0) => {
+    const found = cleaned.match(new RegExp('"' + key + '"\\s*:\\s*(\\d+)'));
+    return found ? Number(found[1]) : fallback;
+  };
+  return {
+    replies,
+    advice: readString('advice'),
+    sendWhen: readString('sendWhen'),
+    recommendationReason: readString('recommendationReason'),
+    recommendedIndex: readNumber('recommendedIndex', 0),
+    recommendedNormalIndex: readNumber('recommendedNormalIndex', 0),
+    recommendedSecretIndex: readNumber('recommendedSecretIndex', 0),
+    categoryRecommendations: {}
+  };
 }
 
 function decodeBasicHtmlEntities(value) {
@@ -577,21 +609,28 @@ export async function onRequestPost(context) {
     const configuredStyles = Array.isArray(serverContext?.voiceSettings?.[selectedMode]) && serverContext.voiceSettings[selectedMode].length
       ? serverContext.voiceSettings[selectedMode].map(v => String(v.id || '')).filter(Boolean)
       : (selectedMode === 'secret' ? defaultStyles.slice(8) : defaultStyles.slice(0, 8));
-    // Llama resta l'unico modello. Dividiamo gli stili in due gruppi per evitare
-    // che una singola risposta JSON troppo lunga venga troncata a metà.
+    // Llama resta l'unico modello. Due stili per richiesta riducono molto
+    // la lunghezza del JSON e il rischio che il modello tronchi l'output.
+    // Eseguiamo al massimo due richieste contemporaneamente per non sovraccaricare AI.
     const styleBatches = [];
-    for (let i = 0; i < configuredStyles.length; i += 4) {
-      styleBatches.push(configuredStyles.slice(i, i + 4));
+    for (let i = 0; i < configuredStyles.length; i += 2) {
+      styleBatches.push(configuredStyles.slice(i, i + 2));
     }
     try {
       const screenshotForLlama = imageLlama || image;
-      const batchOutputs = await Promise.all(styleBatches.map(async (styleBatch) => {
-        const batchPrompt = compactGroqPrompt(
-          serverContext, message, aiHint, audioTranscript,
-          previousGeneratedReplies, selectedMode, styleBatch
-        );
-        return callCloudflareAI(env.AI, batchPrompt, screenshotForLlama, 100000, 2048);
-      }));
+      const batchOutputs = [];
+      for (let i = 0; i < styleBatches.length; i += 2) {
+        const wave = styleBatches.slice(i, i + 2);
+        const waveOutputs = await Promise.all(wave.map(async (styleBatch) => {
+          const batchPrompt = compactGroqPrompt(
+            serverContext, message, aiHint, audioTranscript,
+            previousGeneratedReplies, selectedMode, styleBatch
+          );
+          const tokenBudget = styleBatch.includes('Hot') ? 2048 : 1400;
+          return callCloudflareAI(env.AI, batchPrompt, screenshotForLlama, 100000, tokenBudget);
+        }));
+        batchOutputs.push(...waveOutputs);
+      }
       const combined = {
         ...(batchOutputs[0]?.result || {}),
         replies: batchOutputs.flatMap(item => Array.isArray(item?.result?.replies) ? item.result.replies : []),
