@@ -497,15 +497,17 @@ async function compressImageForLlama(file){
     const img=await new Promise((resolve,reject)=>{
       const el=new Image(); el.onload=()=>resolve(el); el.onerror=reject; el.src=src;
     });
-    // Screenshot ad alta leggibilità: il testo delle chat non deve essere ridotto a 512x768.
-    const maxW=1000, maxH=1800;
+    // Riduce il carico visivo senza comprimere eccessivamente le scritte delle chat.
+    const maxW=896, maxH=1600;
     const scale=Math.min(1,maxW/img.naturalWidth,maxH/img.naturalHeight);
     const w=Math.max(1,Math.round(img.naturalWidth*scale));
     const h=Math.max(1,Math.round(img.naturalHeight*scale));
     const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
-    const ctx=canvas.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+    const ctx=canvas.getContext('2d',{alpha:false});
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+    ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
     ctx.drawImage(img,0,0,w,h);
-    return canvas.toDataURL('image/jpeg',0.76);
+    return canvas.toDataURL('image/jpeg',0.66);
   }finally{ if(!isDataUrl) URL.revokeObjectURL(src); }
 }
 
@@ -643,11 +645,11 @@ async function loadSecretRepliesLazy(){
   try{
     if(navigator.onLine===false) throw new Error("Nessuna connessione internet.");
     const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),45000);
+    const timer=setTimeout(()=>controller.abort(),115000);
     let response;
     try{
       response=await fetch("/api/reply",{method:"POST",headers:{"Content-Type":"application/json"},signal:controller.signal,body:JSON.stringify({
-        girlId:a.girlId,message:a.message,aiHint:a.aiHint,image:a.image,audio:a.audio,audioTranscript:a.audioTranscript||"",currentTime:getCurrentTimeContext(),mode:"secret",aiModel:loadSettings().aiModel||"auto"
+        girlId:a.girlId,message:a.message,aiHint:a.aiHint,image:null,imageLlama:a.image,audio:a.audio,audioTranscript:a.audioTranscript||"",currentTime:getCurrentTimeContext(),mode:"secret",aiModel:"cloudflare/llama-3.2-11b-vision"
       })});
     }finally{clearTimeout(timer)}
     if(!response.ok){ const detail=await response.text().catch(()=>""); throw new Error(detail||"Server AI non disponibile."); }
@@ -681,7 +683,7 @@ async function loadSecretRepliesLazy(){
     const state=getGirlState(a.girlId);
     if(state){ state.resultsHtml=document.getElementById("results")?.innerHTML||state.resultsHtml; await persistGirlState(a.girlId); }
   }catch(err){
-    const msg=err?.name==="AbortError"?"Il servizio AI ha impiegato troppo tempo.":(err?.message||"Errore");
+    const msg=err?.name==="AbortError"?"Llama 3.2 Vision ha superato il tempo massimo. Nessun altro modello è stato utilizzato.":(err?.message||"Errore");
     content.innerHTML=`<div class="secret-lazy-card"><div class="secret-lazy-title">⚠️ Non sono riuscito a generarle</div><div class="secret-lazy-text">${escapeHtml(msg)}</div><button type="button" id="loadSecretReplies" class="primary">Riprova</button></div>`;
     bindResultButtons();
   }
@@ -702,31 +704,21 @@ $("generate").onclick=async()=>{
   try{
     const context=await buildContext();
     let image=null;
-    let imageGroq=null;
     let imageLlama=null;
     let audio=null;
     state.message="";
     state.lastAnalysisMessage=text;
     state.aiHint=aiHint;
     if(selectedImageFile){
-      image=await compressImageForAI(selectedImageFile);
-      state.imageData=image;
+      imageLlama=await compressImageForLlama(selectedImageFile);
+      image=imageLlama;
+      state.imageData=imageLlama;
       state.imageFile=selectedImageFile;
       state.imageName="Screenshot: "+selectedImageFile.name;
       await persistGirlState(selectedId);
     }else if(state.imageData){
-      image=state.imageData;
-    }
-    if(image){
-      // Ogni motore riceve la propria versione: Groq usa quella leggera,
-      // Llama Vision quella ad alta leggibilità per non perdere il testo della chat.
-      if(selectedImageFile){
-        imageGroq=await compressImageForGroq(selectedImageFile);
-        imageLlama=await compressImageForLlama(selectedImageFile);
-      }else{
-        imageGroq=await compressImageForGroq(image);
-        imageLlama=await compressImageForLlama(image);
-      }
+      imageLlama=await compressImageForLlama(state.imageData);
+      image=imageLlama;
     }
     if(selectedAudioFile){
       audio=await fileToDataUrl(selectedAudioFile);
@@ -742,7 +734,7 @@ $("generate").onclick=async()=>{
       throw new Error("Nessuna connessione internet.");
     }
     const controller=new AbortController();
-    const clientTimer=setTimeout(()=>controller.abort(),62000);
+    const clientTimer=setTimeout(()=>controller.abort(),115000);
     let response;
     try{
       response=await fetch("/api/reply",{
@@ -753,13 +745,12 @@ $("generate").onclick=async()=>{
           girlId:selectedId,
           message:text,
           aiHint,
-          image,
-          imageGroq,
+          image:null,
           imageLlama,
           audio,
           currentTime:getCurrentTimeContext(),
           mode:"normal",
-          aiModel:loadSettings().aiModel||"auto"
+          aiModel:"cloudflare/llama-3.2-11b-vision"
         })
       });
     }finally{clearTimeout(clientTimer)}
@@ -862,7 +853,7 @@ $("generate").onclick=async()=>{
     const networkError = navigator.onLine === false || err?.name === "TypeError" || /Load failed|Failed to fetch|NetworkError|network request failed/i.test(String(err?.message || ""));
     const msg = networkError
       ? "Nessuna connessione internet."
-      : (err?.name === "AbortError" ? "Il servizio AI ha impiegato troppo tempo. Riprova: la richiesta ora è ottimizzata per rispondere più velocemente." : err.message);
+      : (err?.name === "AbortError" ? "Llama 3.2 Vision ha superato il tempo massimo di attesa. Nessun altro modello è stato utilizzato: puoi riprovare." : err.message);
     alert("Analisi non riuscita: "+msg);
   }finally{
     $("generate").disabled=false;
@@ -989,15 +980,10 @@ function saveVoiceEditor(){
   closeVoiceEditor();
 }
 function settingsKey(){return `RispostaFlirtSettings_${currentUser?.id||"local"}`;}
-function loadSettings(){try{const settings={...{theme:"dark",replyZoom:100,font:"system",aboutMe:""},...(JSON.parse(localStorage.getItem(settingsKey())||"{}"))};if(settings.aiModel==="groq/qwen3.8-27b")settings.aiModel="cloudflare/llama-3.2-11b-vision";return settings}catch(e){return {theme:"dark",replyZoom:100,font:"system",aboutMe:""}}}
+function loadSettings(){try{const settings={...{theme:"dark",replyZoom:100,font:"system",aboutMe:""},...(JSON.parse(localStorage.getItem(settingsKey())||"{}"))};settings.aiModel="cloudflare/llama-3.2-11b-vision";return settings}catch(e){return {theme:"dark",replyZoom:100,font:"system",aboutMe:"",aiModel:"cloudflare/llama-3.2-11b-vision"}}}
 function applySettings(){const s=loadSettings();document.body.classList.toggle("light-theme",s.theme==="light");const zoom=String((Number(s.replyZoom)||100)/100);document.documentElement.style.setProperty("--ui-zoom",zoom);const r=$("results");if(r)r.style.setProperty("--reply-zoom",zoom);const font=getFontOption(s.font);document.documentElement.style.setProperty("--app-font",font.stack);document.querySelectorAll(".theme-option").forEach(b=>b.classList.toggle("active",b.dataset.theme===s.theme));if($("replyZoom"))$("replyZoom").value=String(s.replyZoom||100);if($("replyZoomValue"))$("replyZoomValue").textContent=(s.replyZoom||100)+"%";if($("fontSettingValue"))$("fontSettingValue").textContent=font.name;}
 function saveSettings(patch){const next={...loadSettings(),...patch};localStorage.setItem(settingsKey(),JSON.stringify(next));if(serverSyncEnabled) scheduleServerSync();applySettings()}
 const AI_MODEL_LABELS={
-  auto:"Automatico (fallback)",
-  "gemini-3.5-flash-lite":"Gemini 3.5 Flash-Lite",
-  "gemini-3.6-flash":"Gemini 3.6 Flash",
-  "gemini-3.8-flash":"Gemini 3.8 Flash",
-  "openrouter/free":"OpenRouter Free",
   "cloudflare/llama-3.2-11b-vision":"Cloudflare AI · Llama 3.2 11B Vision"
 };
 function updateAiModelStatus(provider,model,fallbackErrors=[]){
@@ -1006,13 +992,10 @@ function updateAiModelStatus(provider,model,fallbackErrors=[]){
   if(provider&&model){
     const known=AI_MODEL_LABELS[model]||model;
     el.textContent=`Ultima risposta generata da: ${provider} · ${known}`;
-    // Se il motore scelto non è riuscito e si è attivato il fallback,
-    // mostra il motivo tecnico senza esporre chiavi o dati riservati.
     const cloudflareIssue=(Array.isArray(fallbackErrors)?fallbackErrors:[]).find(e=>/Cloudflare AI:|Workers AI|env\.AI/i.test(String(e)));
     if(cloudflareIssue) el.textContent+=` · Cloudflare AI non riuscito: ${String(cloudflareIssue).slice(0,180)}`;
   }else{
-    const selected=loadSettings().aiModel||"auto";
-    el.textContent=`Motore preferito: ${AI_MODEL_LABELS[selected]||AI_MODEL_LABELS.auto}`;
+    el.textContent="Motore unico: Cloudflare AI · Llama 3.2 11B Vision";
   }
 }
 if($("aiModelSelect")){
