@@ -7,85 +7,53 @@ function json(statusCode, payload) {
 
 function extractJson(raw) {
   if (!raw) throw new Error('Risposta AI vuota.');
-  const source = typeof raw === 'string' ? raw : JSON.stringify(raw);
-  const cleaned = source.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-
-  // Prima prova il parsing standard; poi individua il primo oggetto JSON completo,
-  // rispettando parentesi e virgolette anche quando il testo contiene { o }.
-  const candidates = [cleaned];
-  let start = -1, depth = 0, inString = false, escaped = false;
-  for (let i = 0; i < cleaned.length; i++) {
-    const ch = cleaned[i];
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (ch === '\\') escaped = true;
-      else if (ch === '"') inString = false;
-      continue;
-    }
-    if (ch === '"') { inString = true; continue; }
-    if (ch === '{') { if (depth === 0) start = i; depth++; }
-    else if (ch === '}' && depth > 0) {
-      depth--;
-      if (depth === 0 && start >= 0) {
-        candidates.push(cleaned.slice(start, i + 1));
-        break;
-      }
-    }
-  }
-
-  for (const candidate of candidates) {
-    try {
-      const parsed = JSON.parse(candidate);
-      if (parsed && Array.isArray(parsed.replies) && parsed.replies.length) return parsed;
-      if (Array.isArray(parsed) && parsed.length) return { replies: parsed };
-    } catch (_) {}
-  }
-
-  // Se il modello ha troncato solo la parte finale del JSON, recupera gli
-  // oggetti risposta completi uno per uno, senza inventare testo mancante.
-  const replies = [];
-  const objectRe = /\{[^{}]*\}/g;
-  let match;
-  while ((match = objectRe.exec(cleaned)) !== null && replies.length < 60) {
-    try {
-      const item = JSON.parse(match[0]);
-      const style = String(item?.style || '').trim();
-      const text = String(item?.text || '').trim();
-      if (style && text) replies.push({ style, text });
-    } catch (_) {}
-  }
-  if (!replies.length) {
-    const pairRe = /"style"\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*"text"\s*:\s*"((?:\\.|[^"\\])*)"/g;
-    while ((match = pairRe.exec(cleaned)) !== null && replies.length < 60) {
+  const cleaned = String(raw).trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('Risposta AI non valida.');
+  const candidate = match[0];
+  try {
+    const parsed = JSON.parse(candidate);
+    if (!parsed || !Array.isArray(parsed.replies) || !parsed.replies.length) throw new Error('Formato risposta AI non valido.');
+    return parsed;
+  } catch (e) {
+    // Alcuni modelli possono restituire JSON quasi valido anche quando responseMimeType=json è richiesto.
+    // Recuperiamo le coppie style/text senza mostrare l'errore grezzo all'utente.
+    const replies = [];
+    const pairRe = /\"style\"\s*:\s*\"((?:\\.|[^\"\\])*)\"\s*,\s*\"text\"\s*:\s*\"((?:\\.|[^\"\\])*)\"/g;
+    let m;
+    while ((m = pairRe.exec(candidate)) !== null && replies.length < 50) {
       try {
-        const style = JSON.parse('"' + match[1] + '"');
-        const text = JSON.parse('"' + match[2] + '"');
+        const style = JSON.parse('\"' + m[1] + '\"');
+        const text = JSON.parse('\"' + m[2] + '\"');
         if (style && text) replies.push({ style, text });
       } catch (_) {}
     }
-  }
-  if (!replies.length) throw new Error('Risposta AI non valida: Llama non ha restituito risposte nel formato previsto.');
+    if (replies.length >= 1) {
+      const idxMatch = candidate.match(/\"recommendedIndex\"\s*:\s*(\d+)/);
+      const reasonMatch = candidate.match(/\"recommendationReason\"\s*:\s*\"((?:\\.|[^\"\\])*)\"/);
+      let reason = 'Questa è la risposta che si adatta meglio al tono e al momento della conversazione.';
+      if (reasonMatch) { try { reason = JSON.parse('\"' + reasonMatch[1] + '\"'); } catch (_) {} }
+      const recommendedIndex = Math.min(Math.max(parseInt(idxMatch?.[1] || '0', 10), 0), replies.length - 1);
+      const normalRecommendedIndex = (() => { const m = candidate.match(/"recommendedNormalIndex"\s*:\s*(\d+)/); return m ? parseInt(m[1],10) : 0; })();
+      const secretRecommendedIndex = (() => { const m = candidate.match(/"recommendedSecretIndex"\s*:\s*(\d+)/); return m ? parseInt(m[1],10) : 40; })();
+      const adviceMatch = candidate.match(/"advice"\s*:\s*"((?:\\.|[^"\\])*)"/);
+      let advice = "";
+      if (adviceMatch) { try { advice = JSON.parse('"' + adviceMatch[1] + '"'); } catch (_) {} }
+      const sendWhenMatch = candidate.match(/"sendWhen"\s*:\s*"((?:\\.|[^"\\])*)"/);
+      let sendWhen = "";
+      if (sendWhenMatch) { try { sendWhen = JSON.parse('"' + sendWhenMatch[1] + '"'); } catch (_) {} }
+      let categoryRecommendations = {};
+      const catMatch = candidate.match(/"categoryRecommendations"\s*:\s*(\{[\s\S]*?\})\s*,\s*"replies"/);
+      if (catMatch) { try { categoryRecommendations = JSON.parse(catMatch[1]); } catch (_) {} }
 
-  const readString = (key, fallback = '') => {
-    const re = new RegExp('"' + key + '"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"');
-    const found = cleaned.match(re);
-    if (!found) return fallback;
-    try { return JSON.parse('"' + found[1] + '"'); } catch (_) { return fallback; }
-  };
-  const readNumber = (key, fallback = 0) => {
-    const found = cleaned.match(new RegExp('"' + key + '"\\s*:\\s*(\\d+)'));
-    return found ? Number(found[1]) : fallback;
-  };
-  return {
-    replies,
-    advice: readString('advice'),
-    sendWhen: readString('sendWhen'),
-    recommendationReason: readString('recommendationReason'),
-    recommendedIndex: readNumber('recommendedIndex', 0),
-    recommendedNormalIndex: readNumber('recommendedNormalIndex', 0),
-    recommendedSecretIndex: readNumber('recommendedSecretIndex', 0),
-    categoryRecommendations: {}
-  };
+      // Se il modello ha troncato il JSON ma ha comunque prodotto le risposte,
+      // non inventiamo un consiglio: lo lasciamo vuoto salvo richiesta esplicita.
+      // Il prompt mette advice/sendWhen all'inizio proprio per farli sopravvivere
+      // anche in caso di output molto lungo.
+      return { replies, recommendedIndex, recommendedNormalIndex: normalRecommendedIndex, recommendedSecretIndex: secretRecommendedIndex, recommendationReason: reason, advice, sendWhen, categoryRecommendations };
+    }
+    throw new Error('Risposta AI non valida.');
+  }
 }
 
 function decodeBasicHtmlEntities(value) {
@@ -356,114 +324,79 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 55000) {
   return { result: extractJson(data?.choices?.[0]?.message?.content || ''), actualModel: data?.model || 'openrouter/free' };
 }
 
-function compactGroqPrompt(context, message, aiHint = '', audioTranscript = '', previousGeneratedReplies = [], mode = 'normal', selectedStyles = null) {
+function compactGroqPrompt(context, message, aiHint = '', audioTranscript = '', previousGeneratedReplies = [], mode = 'normal') {
+  // Prompt volutamente breve: il piano gratuito Groq ha una quota TPM condivisa.
   const defaults = ['Dolce','Stuzzica','Ironico','Flirt','Seria','Audace','Battuta','Poeta','Erotica','Hot'];
   const normal = Array.isArray(context?.voiceSettings?.normal) && context.voiceSettings.normal.length
     ? context.voiceSettings.normal.map(v => String(v.id || '')).filter(Boolean) : defaults.slice(0, 8);
   const secret = Array.isArray(context?.voiceSettings?.secret) && context.voiceSettings.secret.length
     ? context.voiceSettings.secret.map(v => String(v.id || '')).filter(Boolean) : defaults.slice(8);
-  const allStyles = mode === 'secret' ? secret : normal;
-  const styles = Array.isArray(selectedStyles) && selectedStyles.length
-    ? selectedStyles.filter(style => allStyles.includes(style))
-    : allStyles;
+  const styles = (mode === 'secret' ? secret : normal).slice(0, 8);
   const settings = new Map();
   for (const group of [context?.voiceSettings?.normal, context?.voiceSettings?.secret]) {
     if (Array.isArray(group)) for (const item of group) if (item?.id) settings.set(String(item.id), item);
   }
   const styleRules = styles.map(style => {
-    const item = settings.get(style);
-    const label = String(item?.name || style).replace(/\s+/g, ' ').slice(0, 32);
-    const instruction = String(item?.instruction || '').replace(/\s+/g, ' ').slice(0, 100);
-    return `${style} (${label})${instruction ? ': ' + instruction : ''}`;
-  }).join('\n');
-  const history = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-10).map(x => ({
-    speaker: x.role === 'me' ? 'IO' : x.role === 'her' ? 'LEI' : 'NON IDENTIFICATO',
-    text: String(x.text || '').replace(/\s+/g, ' ').slice(0, 220)
-  })).filter(x => x.text);
-  const lastHerMessage = [...history].reverse().find(x => x.speaker === 'LEI')?.text || '';
+    const instruction = String(settings.get(style)?.instruction || '').replace(/\s+/g, ' ').slice(0, 75);
+    return `${style}${instruction ? ': ' + instruction : ''}`;
+  }).join('; ');
+  const history = (Array.isArray(context?.conversation) ? context.conversation : []).slice(-8).map(x => ({
+    chi: x.role === 'me' ? 'IO' : x.role === 'her' ? 'LEI' : 'ALTRO',
+    testo: String(x.text || '').replace(/\s+/g, ' ').slice(0, 260)
+  })).filter(x => x.testo);
+  const lastHerMessage = [...history].reverse().find(x => x.chi === 'LEI')?.testo || '';
   const previous = [...new Set((Array.isArray(previousGeneratedReplies) ? previousGeneratedReplies : [])
-    .map(x => String(x).trim()).filter(Boolean))].slice(-8).map(x => x.slice(0, 100));
+    .map(x => String(x).trim()).filter(Boolean))].slice(-2).map(x => x.slice(0, 90));
   const compactContext = {
-    girl: String(context?.girl?.name || '').slice(0, 40),
-    note: String(context?.girl?.note || '').replace(/\s+/g, ' ').slice(0, 140),
-    memory: String(context?.girl?.memory || context?.memory || '').replace(/\s+/g, ' ').slice(0, 220),
-    userProfile: String(context?.aboutMe || '').replace(/\s+/g, ' ').slice(0, 100),
-    recentChat: history
+    nome: String(context?.girl?.name || '').slice(0, 45),
+    nota: String(context?.girl?.note || '').replace(/\s+/g, ' ').slice(0, 180),
+    memoria: String(context?.girl?.memory || context?.memory || '').replace(/\s+/g, ' ').slice(0, 300),
+    profilo: String(context?.aboutMe || '').replace(/\s+/g, ' ').slice(0, 120),
+    chat: history
   };
-  const perStyle = styles.map(style => `${style}: ${style === 'Hot' ? 10 : 5}`).join(', ');
-  const total = styles.reduce((sum, style) => sum + (style === 'Hot' ? 10 : 5), 0);
-  return `Sei RispostaFlirt. Il tuo compito è leggere lo screenshot della chat e scrivere risposte da inviare a LEI. Italiano naturale, concreto e coerente. Non inventare dettagli.
-
-IDENTIFICAZIONE OBBLIGATORIA DEI DUE PARTECIPANTI:
-- IO = proprietario dell'app, cioè l'utente. LEI = la ragazza con cui parla.
-- Nelle schermate WhatsApp: bolle VERDI a DESTRA = IO; bolle GRIGIE a SINISTRA = LEI. Leggi le bolle dall'alto verso il basso; quella più in basso è normalmente la più recente.
-- Se l'app di messaggistica è diversa, usa posizione e stile visivo delle bolle per distinguere mittente e destinatario. Non assegnare un testo a qualcuno solo in base al suo contenuto.
-- La risposta va scritta come se IO rispondessi all'ULTIMA bolla ricevuta da LEI. Non rispondere a una mia bolla verde/destra.
-- Se non riesci a distinguere con sicurezza l'ultima bolla di LEI, non inventare: segnala nel campo advice che il mittente o il testo non è leggibile e basa le risposte solo sull'ultimo messaggio LEI chiaramente presente nella cronologia.
-- Nei messaggi scritti da LEI, "io/mio/mia/mi" si riferisce a LEI e "tu/tuo/tua/ti" si riferisce a IO. Nelle bolle scritte da IO vale il contrario. Non scambiare mai i proprietari di lavoro, ferie, familiari, oggetti o attività.
-
-CONTESTO SALVATO (ruoli espliciti):
-${JSON.stringify(compactContext)}
-ULTIMO MESSAGGIO LEI PRESENTE NELLA CRONOLOGIA: ${lastHerMessage || 'Non disponibile; identifica la bolla nello screenshot.'}
-TESTO/INDICAZIONE DELL'UTENTE: ${String(message || '').replace(/\s+/g, ' ').slice(0, 300)}
-ISTRUZIONE AGGIUNTIVA: ${String(aiHint || '').replace(/\s+/g, ' ').slice(0, 160)}
-TRASCRIZIONE AUDIO: ${String(audioTranscript || '').replace(/\s+/g, ' ').slice(0, 120)}
-RISPOSTE GIÀ USATE DA NON RIPETERE: ${JSON.stringify(previous)}
-STILI RICHIESTI: ${styleRules}
-NUMERO OBBLIGATORIO: ${perStyle}. Totale esatto: ${total} risposte.
-
-PRIMA DI SCRIVERE:
-1. Individua nello screenshot le ultime 2-4 bolle visibili e annota mentalmente mittente e testo.
-2. Conferma quale sia l'ultima bolla di LEI. Se la cronologia salvata e lo screenshot sono in conflitto, considera lo screenshot più recente.
-3. Riassumi mentalmente il senso della sua ultima frase, la sua emozione e l'eventuale domanda o limite.
-4. Ogni risposta deve essere una replica diretta a quella frase, non una frase generica da flirt.
-5. Varia davvero le risposte: non usare parafrasi, aperture o concetti ripetuti. Se LEI è seria, arrabbiata o mette un limite, rispondi con rispetto e senza flirt forzato.
-
-REGOLE DI OUTPUT:
-- Restituisci SOLO JSON valido, senza markdown.
-- replies deve essere un ARRAY PIATTO con esattamente ${total} oggetti.
-- Inserisci ESATTAMENTE 5 oggetti per ciascuno stile, tranne Hot che ne richiede 10. Ripeti il nome tecnico dello stile in ogni oggetto.
-- Ogni oggetto deve avere solo queste due proprietà: "style" e "text".
-- Non raggruppare le risposte in un unico testo. Non produrre una sola risposta per stile.
-- Ogni risposta deve essere distinta, naturale, direttamente collegata all'ultima frase di LEI, senza inventare eventi. Mantieni lunghezza indicativa 10-22 parole.
-- categoryRecommendations deve contenere una chiave per ciascuno stile richiesto, con index:0 e reason breve e specifico.
-- recommendedIndex e recommendedNormalIndex devono essere 0; recommendedSecretIndex deve essere 0 in modalità segreta e 40 in modalità normale.
-- advice deve essere un consiglio operativo breve e coerente; sendWhen deve indicare quando inviare.
-- Se il messaggio di LEI non è leggibile, dichiaralo in advice: non fingere di aver capito lo screenshot.
-
-SCHEMA JSON (compila i campi, non copiare segnaposto):
-{"advice":"consiglio breve","sendWhen":"ora","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":${mode === 'secret' ? 0 : 40},"recommendationReason":"motivo breve","categoryRecommendations":{${styles.map(style => `"${style}":{"index":0,"reason":"motivo specifico"}`).join(',')}},"replies":[${styles.map(style => `{"style":"${style}","text":"prima risposta"},{"style":"${style}","text":"seconda risposta"},{"style":"${style}","text":"terza risposta"},{"style":"${style}","text":"quarta risposta"},{"style":"${style}","text":"quinta risposta"}`).join(',')}${styles.includes('Hot') ? ',{"style":"Hot","text":"sesta risposta"},{"style":"Hot","text":"settima risposta"},{"style":"Hot","text":"ottava risposta"},{"style":"Hot","text":"nona risposta"},{"style":"Hot","text":"decima risposta"}' : ''}]}`;
+  const categoryExample = Object.fromEntries(styles.map(style => [style, { index: 0, reason: '...' }]));
+  return `Sei RispostaFlirt. Scrivi esclusivamente in italiano naturale. Leggi lo screenshot e rispondi SOLO all'ULTIMO messaggio di LEI. Distingui Lei da Io. Rispondi alla domanda concreta; rispetta sempre un suo limite. Usa il contesto solo se utile, non inventare fatti. Tono naturale, breve, non ripetitivo.\n` +
+    `CONTESTO:${JSON.stringify(compactContext)}\n` +
+    `ULTIMO_TESTO_NOTO_DI_LEI:${lastHerMessage || 'Non disponibile in testo: leggilo dallo screenshot.'}\n` +
+    `MESSAGGIO:${String(message || '').replace(/\s+/g, ' ').slice(0, 350)}\n` +
+    `INDICAZIONE:${String(aiHint || '').replace(/\s+/g, ' ').slice(0, 180)}\n` +
+    `AUDIO:${String(audioTranscript || '').replace(/\s+/g, ' ').slice(0, 180)}\n` +
+    `EVITA:${JSON.stringify(previous)}\n` +
+    `STILI:${styles.join(', ')}. Regole:${styleRules}\n` +
+    `Crea ESATTAMENTE 5 risposte diverse per OGNI stile, massimo 1 frase ciascuna. Totale: ${styles.length * 5} risposte. Tutte in italiano e pertinenti all'ULTIMA BOLLA DI LEI nello screenshot. Non usare frasi intercambiabili, non ripetere lo stesso concetto tra stili e non inventare eventi. Prima individua la frase precisa di LEI e costruisci ogni risposta come continuazione diretta di quella frase. Se il testo non è leggibile, non fingere di averlo capito: usa l'ultimo testo noto della chat come appoggio e dichiaralo nel consiglio. Restituisci esclusivamente un JSON con le chiavi advice, sendWhen, recommendedIndex, recommendedNormalIndex, recommendedSecretIndex, recommendationReason, categoryRecommendations e replies. categoryRecommendations deve contenere una voce per stile con index e reason; replies deve contenere esattamente 5 oggetti per stile, ciascuno con style e text. Non inserire esempi di risposte né testo segnaposto.`;
 }
 
-async function callCloudflareAI(aiBinding, prompt, image, timeoutMs = 100000, maxTokens = 2048) {
+async function callCloudflareAI(aiBinding, prompt, image, timeoutMs = 55000) {
   if (!aiBinding || typeof aiBinding.run !== 'function') {
     throw new Error('Cloudflare AI: binding AI non disponibile.');
   }
   const cleanPrompt = String(prompt || '').trim();
   if (!cleanPrompt) throw new Error('Cloudflare AI: prompt vuoto.');
 
-  const messages = [
-    {
-      role: 'system',
-      content: 'Sei RispostaFlirt. Rispondi esclusivamente in italiano. Segui le istruzioni e restituisci SOLO JSON valido, senza markdown o testo fuori dal JSON.'
-    },
-    { role: 'user', content: cleanPrompt }
-  ];
-  const input = {
-    messages,
-    max_tokens: maxTokens,
-    temperature: 0.58,
-    top_p: 0.85,
-    repetition_penalty: 1.08,
-    frequency_penalty: 0.25
-  };
-
-  if (image && typeof image === 'string' && image.startsWith('data:image/')) {
-    input.image = image;
-  } else if (image) {
-    throw new Error('Cloudflare AI: screenshot in formato immagine non valido.');
+  // Cloudflare documenta per Llama Vision una richiesta multimodale
+  // con messages + image. Il prompt va nel messaggio user: in questo modo
+  // il modello riceve sempre un messaggio valido insieme allo screenshot.
+  if (!image || typeof image !== 'string' || !image.startsWith('data:image/')) {
+    throw new Error('Cloudflare AI: screenshot mancante o formato immagine non valido.');
   }
-
+  const input = {
+    messages: [
+      {
+        role: 'system',
+        content: 'Sei RispostaFlirt. Rispondi esclusivamente in italiano. Analizza lo screenshot e segui tutte le istruzioni del messaggio utente. Restituisci SOLO un oggetto JSON valido, senza markdown, introduzioni o testo fuori dal JSON.'
+      },
+      {
+        role: 'user',
+        content: cleanPrompt
+      }
+    ],
+    image,
+    max_tokens: 3072,
+    temperature: 0.55,
+    top_p: 0.85,
+    repetition_penalty: 1.12,
+    frequency_penalty: 0.35
+  };
   let timer;
   try {
     const result = await Promise.race([
@@ -515,27 +448,6 @@ async function callGroq(apiKey, prompt, image, timeoutMs = 45000) {
   };
 }
 
-function validateReplyCounts(result, context, mode) {
-  const defaults = ['Dolce','Stuzzica','Ironico','Flirt','Seria','Audace','Battuta','Poeta','Erotica','Hot'];
-  const normal = Array.isArray(context?.voiceSettings?.normal) && context.voiceSettings.normal.length
-    ? context.voiceSettings.normal.map(v => String(v.id || '')).filter(Boolean) : defaults.slice(0, 8);
-  const secret = Array.isArray(context?.voiceSettings?.secret) && context.voiceSettings.secret.length
-    ? context.voiceSettings.secret.map(v => String(v.id || '')).filter(Boolean) : defaults.slice(8);
-  const styles = mode === 'secret' ? secret : normal;
-  const replies = Array.isArray(result?.replies) ? result.replies : [];
-  const expectedTotal = styles.reduce((sum, style) => sum + (style === 'Hot' ? 10 : 5), 0);
-  const problems = [];
-  for (const style of styles) {
-    const count = replies.filter(item => item && item.style === style && String(item.text || '').trim()).length;
-    const expected = style === 'Hot' ? 10 : 5;
-    if (count !== expected) problems.push(`${style}: ${count}/${expected}`);
-  }
-  if (replies.length !== expectedTotal || problems.length) {
-    throw new Error(`Risposta incompleta di Llama (${problems.join(', ') || `${replies.length}/${expectedTotal} totali`}). Premi di nuovo Analizza per riprovare con Llama.`);
-  }
-  return result;
-}
-
 export async function onRequestPost(context) {
   const request = context.request;
   const env = context.env;
@@ -543,7 +455,7 @@ export async function onRequestPost(context) {
   try {
     const body = await request.json().catch(() => ({}));
     const { message = '', aiHint = '', image = null, imageGroq = null, imageLlama = null, audio = null, audioTranscript: providedAudioTranscript = '', currentTime = null, mode = 'normal', girlId = '', aiModel = 'auto' } = body;
-    if (!image && !imageLlama && !audio) return json(400, { error: 'Aggiungi uno screenshot oppure una registrazione vocale.' });
+    if (!image && !audio) return json(400, { error: 'Aggiungi uno screenshot oppure una registrazione vocale.' });
     if (!env.DB || !context.user?.id || !girlId) return json(401, { error: 'Sessione o ragazza non valide.' });
 
     // Il contesto usato dall'AI viene letto dal database del proprietario della sessione.
@@ -600,62 +512,74 @@ export async function onRequestPost(context) {
 
     if (providedAudioTranscript) audioTranscript = String(providedAudioTranscript).slice(0, 12000);
     const prompt = promptFor(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
-    // Modalità Llama esclusiva: nessun fallback automatico verso Gemini, Groq o OpenRouter.
-    if (!env.AI || typeof env.AI.run !== 'function') {
-      return json(503, { error: 'Cloudflare AI non è configurato: il binding AI non è disponibile. Nessun altro motore verrà usato.' });
-    }
-    const selectedMode = mode === 'secret' ? 'secret' : 'normal';
-    const defaultStyles = ['Dolce','Stuzzica','Ironico','Flirt','Seria','Audace','Battuta','Poeta','Erotica','Hot'];
-    const configuredStyles = Array.isArray(serverContext?.voiceSettings?.[selectedMode]) && serverContext.voiceSettings[selectedMode].length
-      ? serverContext.voiceSettings[selectedMode].map(v => String(v.id || '')).filter(Boolean)
-      : (selectedMode === 'secret' ? defaultStyles.slice(8) : defaultStyles.slice(0, 8));
-    // Llama resta l'unico modello. Due stili per richiesta riducono molto
-    // la lunghezza del JSON e il rischio che il modello tronchi l'output.
-    // Eseguiamo al massimo due richieste contemporaneamente per non sovraccaricare AI.
-    const styleBatches = [];
-    for (let i = 0; i < configuredStyles.length; i += 2) {
-      styleBatches.push(configuredStyles.slice(i, i + 2));
-    }
-    try {
-      const screenshotForLlama = imageLlama || image;
-      const batchOutputs = [];
-      for (let i = 0; i < styleBatches.length; i += 2) {
-        const wave = styleBatches.slice(i, i + 2);
-        const waveOutputs = await Promise.all(wave.map(async (styleBatch) => {
-          const batchPrompt = compactGroqPrompt(
-            serverContext, message, aiHint, audioTranscript,
-            previousGeneratedReplies, selectedMode, styleBatch
-          );
-          const tokenBudget = styleBatch.includes('Hot') ? 2048 : 1400;
-          return callCloudflareAI(env.AI, batchPrompt, screenshotForLlama, 100000, tokenBudget);
-        }));
-        batchOutputs.push(...waveOutputs);
+    const errors = [];
+
+    // Il modello scelto viene provato per primo; se non è disponibile si passa
+    // automaticamente agli altri motori configurati. "auto" conserva l'ordine predefinito.
+    const allowedModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash', 'openrouter/free', 'cloudflare/llama-3.2-11b-vision'];
+    const requestedModel = String(aiModel) === 'groq/qwen3.8-27b' ? 'cloudflare/llama-3.2-11b-vision' : String(aiModel);
+    const preferred = allowedModels.includes(requestedModel) ? requestedModel : 'auto';
+    const order = preferred === 'auto'
+      ? allowedModels
+      : [preferred, ...allowedModels.filter(model => model !== preferred)];
+    const attempts = [];
+
+    for (const model of order) {
+      if (model.startsWith('gemini-')) {
+        if (!env.GEMINI_API_KEY) {
+          errors.push(`${model}: GEMINI_API_KEY non configurata`);
+          continue;
+        }
+        attempts.push(async () => {
+          try {
+            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 55000);
+            return { result, provider: 'Gemini', model };
+          } catch (err) {
+            throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
+          }
+        });
+      } else if (model === 'openrouter/free') {
+        if (!env.OPENROUTER_API_KEY) {
+          errors.push('OPENROUTER_API_KEY non configurata');
+          continue;
+        }
+        attempts.push(async () => {
+          try {
+            const output = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 55000);
+            return { result: output.result, provider: 'OpenRouter', model: output.actualModel };
+          } catch (err) {
+            throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
+          }
+        });
+      } else if (model === 'cloudflare/llama-3.2-11b-vision') {
+        if (!env.AI || typeof env.AI.run !== 'function') {
+          errors.push('Cloudflare AI: binding AI non configurato sul Worker');
+          continue;
+        }
+        attempts.push(async () => {
+          const cloudflarePrompt = compactGroqPrompt(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
+          const output = await callCloudflareAI(env.AI, cloudflarePrompt, imageLlama || image, 55000);
+          return { result: output.result, provider: 'Cloudflare AI', model: output.actualModel };
+        });
       }
-      const combined = {
-        ...(batchOutputs[0]?.result || {}),
-        replies: batchOutputs.flatMap(item => Array.isArray(item?.result?.replies) ? item.result.replies : []),
-        categoryRecommendations: Object.assign({}, ...batchOutputs.map(item => item?.result?.categoryRecommendations || {}))
-      };
-      validateReplyCounts(combined, serverContext, selectedMode);
-      return new Response(JSON.stringify({
-        ...combined,
-        audioTranscript,
-        provider: 'Cloudflare AI',
-        model: '@cf/meta/llama-3.2-11b-vision-instruct',
-        fallbackErrors: []
-      }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
-    } catch (err) {
-      const detail = String(err?.message || err || 'errore sconosciuto');
-      const isTimeout = /timeout|timed out|3007|3008/i.test(detail);
-      return new Response(JSON.stringify({
-        error: isTimeout
-          ? 'Llama 3.2 Vision ha impiegato troppo tempo. Lo screenshot è stato alleggerito: riprova tra poco.'
-          : 'Llama 3.2 Vision non ha completato tutti i gruppi di risposte. Nessun altro motore è stato utilizzato.',
-        details: [detail],
-        provider: 'Cloudflare AI',
-        model: '@cf/meta/llama-3.2-11b-vision-instruct'
-      }), { status: isTimeout ? 504 : 502, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
     }
+
+    for (const attempt of attempts) {
+      try {
+        const winner = await attempt();
+        return new Response(JSON.stringify({ ...winner.result, audioTranscript, provider: winner.provider, model: winner.model, fallbackErrors: errors }), { status: 200, headers: { "Content-Type": "application/json" } });
+      } catch (err) {
+        errors.push(err?.message || String(err));
+      }
+    }
+
+    const retryable = errors.some(e => /429|RESOURCE_EXHAUSTED|quota|rate limit|temporarily|unavailable|503/i.test(String(e)));
+    return new Response(JSON.stringify({
+      error: retryable
+        ? 'Il servizio AI gratuito è momentaneamente saturo o ha raggiunto un limite. Riprova tra poco.'
+        : 'Nessun servizio AI gratuito disponibile in questo momento.',
+      details: errors
+    }), { status: 503, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
     return new Response(JSON.stringify({ error: error?.message || 'Errore del server AI.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
