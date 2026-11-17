@@ -25,3 +25,6 @@ Non inserire le API key direttamente nel codice della pagina e non condividerle 
 
 DEPLOY
 Carica questa cartella/ZIP su Netlify come sito. La funzione Netlify è già inclusa in netlify/functions/reply.js e /api/reply viene instradato tramite netlify.toml.
+
+
+NOTA VERSIONE LLAMA UNICO: pacchetto ripristinato con la struttura completa precedente. I file canonici app.js, index.html, reply.js e style.css sono aggiornati. Il Worker va pubblicato con npx wrangler deploy dalla cartella RispostaFlirt.

@@ -324,13 +324,16 @@ async function callOpenRouter(apiKey, prompt, image, timeoutMs = 55000) {
   return { result: extractJson(data?.choices?.[0]?.message?.content || ''), actualModel: data?.model || 'openrouter/free' };
 }
 
-function compactGroqPrompt(context, message, aiHint = '', audioTranscript = '', previousGeneratedReplies = [], mode = 'normal') {
+function compactGroqPrompt(context, message, aiHint = '', audioTranscript = '', previousGeneratedReplies = [], mode = 'normal', selectedStyles = null) {
   const defaults = ['Dolce','Stuzzica','Ironico','Flirt','Seria','Audace','Battuta','Poeta','Erotica','Hot'];
   const normal = Array.isArray(context?.voiceSettings?.normal) && context.voiceSettings.normal.length
     ? context.voiceSettings.normal.map(v => String(v.id || '')).filter(Boolean) : defaults.slice(0, 8);
   const secret = Array.isArray(context?.voiceSettings?.secret) && context.voiceSettings.secret.length
     ? context.voiceSettings.secret.map(v => String(v.id || '')).filter(Boolean) : defaults.slice(8);
-  const styles = mode === 'secret' ? secret : normal;
+  const allStyles = mode === 'secret' ? secret : normal;
+  const styles = Array.isArray(selectedStyles) && selectedStyles.length
+    ? selectedStyles.filter(style => allStyles.includes(style))
+    : allStyles;
   const settings = new Map();
   for (const group of [context?.voiceSettings?.normal, context?.voiceSettings?.secret]) {
     if (Array.isArray(group)) for (const item of group) if (item?.id) settings.set(String(item.id), item);
@@ -400,37 +403,35 @@ SCHEMA JSON (compila i campi, non copiare segnaposto):
 {"advice":"consiglio breve","sendWhen":"ora","recommendedIndex":0,"recommendedNormalIndex":0,"recommendedSecretIndex":${mode === 'secret' ? 0 : 40},"recommendationReason":"motivo breve","categoryRecommendations":{${styles.map(style => `"${style}":{"index":0,"reason":"motivo specifico"}`).join(',')}},"replies":[${styles.map(style => `{"style":"${style}","text":"prima risposta"},{"style":"${style}","text":"seconda risposta"},{"style":"${style}","text":"terza risposta"},{"style":"${style}","text":"quarta risposta"},{"style":"${style}","text":"quinta risposta"}`).join(',')}${styles.includes('Hot') ? ',{"style":"Hot","text":"sesta risposta"},{"style":"Hot","text":"settima risposta"},{"style":"Hot","text":"ottava risposta"},{"style":"Hot","text":"nona risposta"},{"style":"Hot","text":"decima risposta"}' : ''}]}`;
 }
 
-async function callCloudflareAI(aiBinding, prompt, image, timeoutMs = 55000) {
+async function callCloudflareAI(aiBinding, prompt, image, timeoutMs = 100000, maxTokens = 2048) {
   if (!aiBinding || typeof aiBinding.run !== 'function') {
     throw new Error('Cloudflare AI: binding AI non disponibile.');
   }
   const cleanPrompt = String(prompt || '').trim();
   if (!cleanPrompt) throw new Error('Cloudflare AI: prompt vuoto.');
 
-  // Cloudflare documenta per Llama Vision una richiesta multimodale
-  // con messages + image. Il prompt va nel messaggio user: in questo modo
-  // il modello riceve sempre un messaggio valido insieme allo screenshot.
-  if (!image || typeof image !== 'string' || !image.startsWith('data:image/')) {
-    throw new Error('Cloudflare AI: screenshot mancante o formato immagine non valido.');
-  }
+  const messages = [
+    {
+      role: 'system',
+      content: 'Sei RispostaFlirt. Rispondi esclusivamente in italiano. Segui le istruzioni e restituisci SOLO JSON valido, senza markdown o testo fuori dal JSON.'
+    },
+    { role: 'user', content: cleanPrompt }
+  ];
   const input = {
-    messages: [
-      {
-        role: 'system',
-        content: 'Sei RispostaFlirt. Rispondi esclusivamente in italiano. Analizza lo screenshot e segui tutte le istruzioni del messaggio utente. Restituisci SOLO un oggetto JSON valido, senza markdown, introduzioni o testo fuori dal JSON.'
-      },
-      {
-        role: 'user',
-        content: cleanPrompt
-      }
-    ],
-    image,
-    max_tokens: 3072,
-    temperature: 0.68,
-    top_p: 0.88,
-    repetition_penalty: 1.12,
-    frequency_penalty: 0.35
+    messages,
+    max_tokens: maxTokens,
+    temperature: 0.58,
+    top_p: 0.85,
+    repetition_penalty: 1.08,
+    frequency_penalty: 0.25
   };
+
+  if (image && typeof image === 'string' && image.startsWith('data:image/')) {
+    input.image = image;
+  } else if (image) {
+    throw new Error('Cloudflare AI: screenshot in formato immagine non valido.');
+  }
+
   let timer;
   try {
     const result = await Promise.race([
@@ -498,7 +499,7 @@ function validateReplyCounts(result, context, mode) {
     if (count !== expected) problems.push(`${style}: ${count}/${expected}`);
   }
   if (replies.length !== expectedTotal || problems.length) {
-    throw new Error(`Risposta incompleta del motore AI (${problems.join(', ') || `${replies.length}/${expectedTotal} totali`}). Passo al motore successivo.`);
+    throw new Error(`Risposta incompleta di Llama (${problems.join(', ') || `${replies.length}/${expectedTotal} totali`}). Premi di nuovo Analizza per riprovare con Llama.`);
   }
   return result;
 }
@@ -510,7 +511,7 @@ export async function onRequestPost(context) {
   try {
     const body = await request.json().catch(() => ({}));
     const { message = '', aiHint = '', image = null, imageGroq = null, imageLlama = null, audio = null, audioTranscript: providedAudioTranscript = '', currentTime = null, mode = 'normal', girlId = '', aiModel = 'auto' } = body;
-    if (!image && !audio) return json(400, { error: 'Aggiungi uno screenshot oppure una registrazione vocale.' });
+    if (!image && !imageLlama && !audio) return json(400, { error: 'Aggiungi uno screenshot oppure una registrazione vocale.' });
     if (!env.DB || !context.user?.id || !girlId) return json(401, { error: 'Sessione o ragazza non valide.' });
 
     // Il contesto usato dall'AI viene letto dal database del proprietario della sessione.
@@ -567,75 +568,55 @@ export async function onRequestPost(context) {
 
     if (providedAudioTranscript) audioTranscript = String(providedAudioTranscript).slice(0, 12000);
     const prompt = promptFor(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
-    const errors = [];
-
-    // Il modello scelto viene provato per primo; se non è disponibile si passa
-    // automaticamente agli altri motori configurati. "auto" conserva l'ordine predefinito.
-    const allowedModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash', 'openrouter/free', 'cloudflare/llama-3.2-11b-vision'];
-    const requestedModel = String(aiModel) === 'groq/qwen3.8-27b' ? 'cloudflare/llama-3.2-11b-vision' : String(aiModel);
-    const preferred = allowedModels.includes(requestedModel) ? requestedModel : 'auto';
-    const order = preferred === 'auto'
-      ? allowedModels
-      : [preferred, ...allowedModels.filter(model => model !== preferred)];
-    const attempts = [];
-
-    for (const model of order) {
-      if (model.startsWith('gemini-')) {
-        if (!env.GEMINI_API_KEY) {
-          errors.push(`${model}: GEMINI_API_KEY non configurata`);
-          continue;
-        }
-        attempts.push(async () => {
-          try {
-            const result = await callGemini(env.GEMINI_API_KEY, model, prompt, image, 55000);
-            return { result, provider: 'Gemini', model };
-          } catch (err) {
-            throw new Error(err?.name === 'AbortError' ? `Gemini ${model}: timeout` : err.message);
-          }
-        });
-      } else if (model === 'openrouter/free') {
-        if (!env.OPENROUTER_API_KEY) {
-          errors.push('OPENROUTER_API_KEY non configurata');
-          continue;
-        }
-        attempts.push(async () => {
-          try {
-            const output = await callOpenRouter(env.OPENROUTER_API_KEY, prompt, image, 55000);
-            return { result: output.result, provider: 'OpenRouter', model: output.actualModel };
-          } catch (err) {
-            throw new Error(err?.name === 'AbortError' ? 'OpenRouter: timeout' : err.message);
-          }
-        });
-      } else if (model === 'cloudflare/llama-3.2-11b-vision') {
-        if (!env.AI || typeof env.AI.run !== 'function') {
-          errors.push('Cloudflare AI: binding AI non configurato sul Worker');
-          continue;
-        }
-        attempts.push(async () => {
-          const cloudflarePrompt = compactGroqPrompt(serverContext, message, aiHint, audioTranscript, previousGeneratedReplies, mode === 'secret' ? 'secret' : 'normal');
-          const output = await callCloudflareAI(env.AI, cloudflarePrompt, imageLlama || image, 55000);
-          return { result: output.result, provider: 'Cloudflare AI', model: output.actualModel };
-        });
-      }
+    // Modalità Llama esclusiva: nessun fallback automatico verso Gemini, Groq o OpenRouter.
+    if (!env.AI || typeof env.AI.run !== 'function') {
+      return json(503, { error: 'Cloudflare AI non è configurato: il binding AI non è disponibile. Nessun altro motore verrà usato.' });
     }
-
-    for (const attempt of attempts) {
-      try {
-        const winner = await attempt();
-        validateReplyCounts(winner.result, serverContext, mode === 'secret' ? 'secret' : 'normal');
-        return new Response(JSON.stringify({ ...winner.result, audioTranscript, provider: winner.provider, model: winner.model, fallbackErrors: errors }), { status: 200, headers: { "Content-Type": "application/json" } });
-      } catch (err) {
-        errors.push(err?.message || String(err));
-      }
+    const selectedMode = mode === 'secret' ? 'secret' : 'normal';
+    const defaultStyles = ['Dolce','Stuzzica','Ironico','Flirt','Seria','Audace','Battuta','Poeta','Erotica','Hot'];
+    const configuredStyles = Array.isArray(serverContext?.voiceSettings?.[selectedMode]) && serverContext.voiceSettings[selectedMode].length
+      ? serverContext.voiceSettings[selectedMode].map(v => String(v.id || '')).filter(Boolean)
+      : (selectedMode === 'secret' ? defaultStyles.slice(8) : defaultStyles.slice(0, 8));
+    // Llama resta l'unico modello. Dividiamo gli stili in due gruppi per evitare
+    // che una singola risposta JSON troppo lunga venga troncata a metà.
+    const styleBatches = [];
+    for (let i = 0; i < configuredStyles.length; i += 4) {
+      styleBatches.push(configuredStyles.slice(i, i + 4));
     }
-
-    const retryable = errors.some(e => /429|RESOURCE_EXHAUSTED|quota|rate limit|temporarily|unavailable|503/i.test(String(e)));
-    return new Response(JSON.stringify({
-      error: retryable
-        ? 'Il servizio AI gratuito è momentaneamente saturo o ha raggiunto un limite. Riprova tra poco.'
-        : 'Nessun servizio AI gratuito disponibile in questo momento.',
-      details: errors
-    }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+    try {
+      const screenshotForLlama = imageLlama || image;
+      const batchOutputs = await Promise.all(styleBatches.map(async (styleBatch) => {
+        const batchPrompt = compactGroqPrompt(
+          serverContext, message, aiHint, audioTranscript,
+          previousGeneratedReplies, selectedMode, styleBatch
+        );
+        return callCloudflareAI(env.AI, batchPrompt, screenshotForLlama, 100000, 2048);
+      }));
+      const combined = {
+        ...(batchOutputs[0]?.result || {}),
+        replies: batchOutputs.flatMap(item => Array.isArray(item?.result?.replies) ? item.result.replies : []),
+        categoryRecommendations: Object.assign({}, ...batchOutputs.map(item => item?.result?.categoryRecommendations || {}))
+      };
+      validateReplyCounts(combined, serverContext, selectedMode);
+      return new Response(JSON.stringify({
+        ...combined,
+        audioTranscript,
+        provider: 'Cloudflare AI',
+        model: '@cf/meta/llama-3.2-11b-vision-instruct',
+        fallbackErrors: []
+      }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+    } catch (err) {
+      const detail = String(err?.message || err || 'errore sconosciuto');
+      const isTimeout = /timeout|timed out|3007|3008/i.test(detail);
+      return new Response(JSON.stringify({
+        error: isTimeout
+          ? 'Llama 3.2 Vision ha impiegato troppo tempo. Lo screenshot è stato alleggerito: riprova tra poco.'
+          : 'Llama 3.2 Vision non ha completato tutti i gruppi di risposte. Nessun altro motore è stato utilizzato.',
+        details: [detail],
+        provider: 'Cloudflare AI',
+        model: '@cf/meta/llama-3.2-11b-vision-instruct'
+      }), { status: isTimeout ? 504 : 502, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+    }
   } catch (error) {
     return new Response(JSON.stringify({ error: error?.message || 'Errore del server AI.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
